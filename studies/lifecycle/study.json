@@ -1,0 +1,17 @@
+{
+  "id": "lifecycle",
+  "title": "生命周期四类方法比较",
+  "status": "protocol-only",
+  "depends_on": [
+    "E"
+  ],
+  "protocol_ref": "research/papers/E/protocol.md",
+  "runner": null,
+  "runs": [],
+  "conditions": [
+    "code-centered",
+    "spec-centered",
+    "model-assisted",
+    "metamodel-centered"
+  ]
+}

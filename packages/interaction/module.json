@@ -1,0 +1,29 @@
+{
+  "id": "interaction",
+  "title": "任务界面与用户审查",
+  "status": "planned",
+  "version": "0.1.0-reviewed",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "model-kernel",
+    "implementation"
+  ],
+  "provides": [
+    "TaskView",
+    "InteractionPlan",
+    "VisualAssetRef"
+  ],
+  "scope": "同源任务视图和操作绑定，面向用户解释后果；开放图像语义需要经验评估。",
+  "implementation_entrypoints": [],
+  "validation_evidence": [],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "reviewed",
+  "dependency_semantics": {
+    "implementation": "public CommandBinding contract; no builder-internal runtime import"
+  }
+}

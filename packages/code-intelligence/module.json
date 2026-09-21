@@ -1,0 +1,25 @@
+{
+  "id": "code-intelligence",
+  "title": "代码恢复与语义变化",
+  "status": "planned",
+  "version": "0.1.0-reviewed",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "model-kernel"
+  ],
+  "provides": [
+    "ImplementationFact",
+    "TraceLink",
+    "SemanticDelta"
+  ],
+  "scope": "以静态/执行证据恢复候选模型，支持缺失追踪和未覆盖范围；不承诺任意代码无损往返。",
+  "implementation_entrypoints": [],
+  "validation_evidence": [],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "reviewed"
+}

@@ -1,0 +1,23 @@
+{
+  "maturity": "reviewed design examples; NOT executed application behavior",
+  "positive": {
+    "call": "match",
+    "component_ref": {
+      "artifact_id": "external-order-component",
+      "revision": "2",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "declared_unit": "major",
+    "required_unit": "minor",
+    "status": "unknown",
+    "gaps": [
+      "unit conversion",
+      "permission behavior not checked"
+    ]
+  },
+  "negative": {
+    "same_operation_name": true,
+    "evidence_refs": [],
+    "expected": "unknown; cannot claim compatibility"
+  }
+}

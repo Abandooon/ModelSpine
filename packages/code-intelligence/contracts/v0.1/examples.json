@@ -1,0 +1,31 @@
+{
+  "maturity": "reviewed design examples; NOT executed application behavior",
+  "positive": {
+    "call": "recover",
+    "source": {
+      "artifact_id": "legacy-code",
+      "revision": "commit-example",
+      "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "fact": {
+      "id": "threshold-constant",
+      "span": "policy.py:12",
+      "property": "threshold_minor",
+      "value": 100000,
+      "assumptions": [
+        "static path only"
+      ]
+    },
+    "uncovered": [
+      "dynamic plugins"
+    ]
+  },
+  "negative": {
+    "call": "diff",
+    "changed_parameter": [
+      100000,
+      200000
+    ],
+    "expected": "semantic change; not unchanged"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "maturity": "reviewed design examples; NOT executed application behavior",
+  "positive": {
+    "call": "propose",
+    "base": {
+      "project_id": "pilot",
+      "model_id": "order-design",
+      "revision": 0,
+      "metamodel": {
+        "id": "information-system-pilot",
+        "version": "0.1"
+      },
+      "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+      "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+    },
+    "claim": {
+      "id": "amount-unit",
+      "category": "intent",
+      "confirmed": true,
+      "text": "Use integer minor units",
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ],
+      "scope": [
+        "order"
+      ]
+    },
+    "operations": [
+      {
+        "op": "set_property",
+        "target": "approval-policy",
+        "field": "threshold_minor",
+        "value": 250000
+      }
+    ]
+  },
+  "negative": {
+    "claim": {
+      "category": "fact",
+      "source_refs": []
+    },
+    "expected": "missing provenance; no model write"
+  }
+}

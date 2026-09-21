@@ -1,0 +1,25 @@
+{
+  "id": "requirements",
+  "title": "需求澄清与模型细化",
+  "status": "planned",
+  "version": "0.1.0-reviewed",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "model-kernel"
+  ],
+  "provides": [
+    "RequirementEvidence",
+    "Clarification",
+    "ModelProposal"
+  ],
+  "scope": "从自然语言/已有模型形成候选，区分映射错误、表示不足、规则错误与未知。",
+  "implementation_entrypoints": [],
+  "validation_evidence": [],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "reviewed"
+}

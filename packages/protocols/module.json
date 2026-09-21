@@ -1,0 +1,44 @@
+{
+  "id": "protocols",
+  "title": "共享协议与稳定引用",
+  "status": "implemented-slice",
+  "version": "0.1.0-experimental",
+  "entrypoint": "README.md",
+  "depends_on": [],
+  "provides": [
+    "MetamodelRef",
+    "ArtifactRef",
+    "EvidenceRef",
+    "SnapshotRef",
+    "ElementRef",
+    "ChangeProposal",
+    "ValidationReport",
+    "Decision",
+    "RunReceipt"
+  ],
+  "scope": "定义交换格式和版本策略；不承担所有领域语义。",
+  "implementation_entrypoints": [
+    "src/modelspine_protocols/__init__.py"
+  ],
+  "validation_evidence": [
+    "../../../artifacts/audits/modelspine/2026-09-21/README.md"
+  ],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "exercised-subset",
+  "implemented_scope": "Strict immutable v0.1 JSON values, scalar-field metamodel, identity/version/hash binding",
+  "reference_sources": [
+    {
+      "asset_id": "prime-code-audit-2026-09-21",
+      "entries": [
+        "source-review-snapshot.zip",
+        "source-inventory.json"
+      ],
+      "integration_status": "selected-mechanisms-reimplemented",
+      "mapping": "../../../artifacts/audits/modelspine/2026-09-21/source-mapping.json"
+    }
+  ]
+}
