@@ -1,0 +1,60 @@
+{
+  "ref": {
+    "id": "information-system-pilot",
+    "version": "0.1"
+  },
+  "kinds": [
+    {
+      "name": "group",
+      "fields": []
+    },
+    {
+      "name": "entity",
+      "fields": [
+        {
+          "name": "currency",
+          "type": "string"
+        },
+        {
+          "name": "unit",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "policy",
+      "fields": [
+        {
+          "name": "threshold_minor",
+          "type": "integer"
+        },
+        {
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "name": "invalidate_on_change",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "command",
+      "fields": [
+        {
+          "name": "permission",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "weather",
+      "fields": [
+        {
+          "name": "temperature",
+          "type": "integer"
+        }
+      ]
+    }
+  ]
+}

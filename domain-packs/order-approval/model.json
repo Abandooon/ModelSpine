@@ -1,0 +1,190 @@
+{
+  "project_id": "pilot",
+  "model_id": "order-design",
+  "revision": 0,
+  "metamodel": {
+    "id": "information-system-pilot",
+    "version": "0.1"
+  },
+  "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+  "elements": [
+    {
+      "id": "root",
+      "kind": "group",
+      "name": "root",
+      "parent": null,
+      "properties": [],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    },
+    {
+      "id": "order",
+      "kind": "entity",
+      "name": "order",
+      "parent": "root",
+      "properties": [
+        {
+          "name": "currency",
+          "value": "CNY"
+        },
+        {
+          "name": "unit",
+          "value": "minor"
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    },
+    {
+      "id": "approval-policy",
+      "kind": "policy",
+      "name": "approval-policy",
+      "parent": "root",
+      "properties": [
+        {
+          "name": "threshold_minor",
+          "value": 100000
+        },
+        {
+          "name": "role",
+          "value": "manager"
+        },
+        {
+          "name": "invalidate_on_change",
+          "value": true
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    },
+    {
+      "id": "approve-command",
+      "kind": "command",
+      "name": "approve-command",
+      "parent": "root",
+      "properties": [
+        {
+          "name": "permission",
+          "value": "manager"
+        }
+      ],
+      "dependencies": [
+        "approval-policy",
+        "order"
+      ],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    },
+    {
+      "id": "weather",
+      "kind": "weather",
+      "name": "weather",
+      "parent": "root",
+      "properties": [
+        {
+          "name": "temperature",
+          "value": 22
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    },
+    {
+      "id": "external-signal",
+      "kind": "weather",
+      "name": "external-signal",
+      "parent": "root",
+      "properties": [
+        {
+          "name": "temperature",
+          "value": 23
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": false,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": [
+        {
+          "source": {
+            "project_id": "pilot",
+            "artifact_id": "assumptions",
+            "revision": "1",
+            "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+          },
+          "locator": "README.md",
+          "origin": "explicit pilot assumption; not customer-confirmed"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "component-reuse",
+  "title": "外部组件能力与适配",
+  "status": "planned",
+  "version": "0.1.0-reviewed",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "assurance"
+  ],
+  "runtime_dependencies": null,
+  "provides": [
+    "CapabilityProfile",
+    "CompatibilityReport",
+    "AdaptationProposal"
+  ],
+  "scope": "记录来源/版本/假设和行为协议；检索相似不等于业务兼容。",
+  "implementation_entrypoints": [],
+  "validation_evidence": [],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "reviewed",
+  "design_contract_entrypoint": "contracts/design.md",
+  "design_contract_maturity": "draft"
+}

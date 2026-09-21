@@ -1,0 +1,126 @@
+{
+  "maturity": "reviewed only; no application runtime",
+  "business": {
+    "positive": {
+      "command": {
+        "id": "approve",
+        "contract_version": "0.1",
+        "model_ref": {
+          "project_id": "pilot",
+          "model_id": "order-design",
+          "revision": 0,
+          "metamodel": {
+            "id": "information-system-pilot",
+            "version": "0.1"
+          },
+          "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+          "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+        },
+        "input_type": {
+          "order_id": "string",
+          "expected_order_version": "integer",
+          "rule_revision": "string"
+        },
+        "output_type": "ApprovalRecord",
+        "permissions": [
+          "manager"
+        ],
+        "preconditions": [
+          "amount_minor <= current threshold",
+          "order and rule versions match"
+        ],
+        "effects": [
+          "record approval bound to order version and rule revision"
+        ],
+        "errors": [
+          "forbidden",
+          "conflict",
+          "violated"
+        ],
+        "concurrency": "atomic application order-version compare"
+      },
+      "order_before": {
+        "id": "o1",
+        "version": 7,
+        "amount_minor": 1234,
+        "approval": {
+          "actor": "m1",
+          "order_version": 7,
+          "rule_revision": "rule-1"
+        }
+      },
+      "change_amount": {
+        "amount_minor": 1500,
+        "expected_order_version": 7
+      },
+      "order_after": {
+        "id": "o1",
+        "version": 8,
+        "amount_minor": 1500,
+        "approval": null
+      },
+      "reapproval": {
+        "actor": "m1",
+        "order_version": 8,
+        "rule_revision": "rule-1"
+      },
+      "design_rule_change": {
+        "new_rule_revision": "rule-2",
+        "old_approval_applicable": false
+      }
+    },
+    "negative": {
+      "file": {
+        "path": "src/custom.py",
+        "owner": "human",
+        "expected_old_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "new_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "model_ref": {
+          "project_id": "pilot",
+          "model_id": "order-design",
+          "revision": 0,
+          "metamodel": {
+            "id": "information-system-pilot",
+            "version": "0.1"
+          },
+          "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+          "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+        }
+      },
+      "expected": "conflict; no file overwritten"
+    }
+  },
+  "ui": {
+    "positive": {
+      "call": "bind",
+      "command_id": "change_amount",
+      "contract_version": "0.1",
+      "input": {
+        "display_amount": "12.34",
+        "currency": "CNY"
+      },
+      "converted": {
+        "amount_minor": 1234,
+        "expected_order_version": 7
+      },
+      "explanation": "Changing the amount invalidates the old approval"
+    },
+    "negative": {
+      "input": {
+        "display_amount": "12.345"
+      },
+      "expected": "invalid; no request sent"
+    }
+  },
+  "no_change_write": {
+    "before_version": 7,
+    "amount_before": 1234,
+    "amount_after": 1234,
+    "after_version": 7,
+    "approval_preserved": true
+  },
+  "check_is_not_approval": {
+    "validation_status": "satisfied",
+    "business_approval": null
+  }
+}

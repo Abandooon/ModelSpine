@@ -1,0 +1,28 @@
+{
+  "id": "implementation",
+  "title": "业务实现与应用交付",
+  "status": "planned",
+  "version": "0.1.0-reviewed",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "generation"
+  ],
+  "runtime_dependencies": null,
+  "provides": [
+    "CommandBinding",
+    "MigrationPlan",
+    "ApplicationBuild"
+  ],
+  "scope": "负责后端命令、权限、数据迁移和运行交付；生成应用与平台源码分离。",
+  "implementation_entrypoints": [],
+  "validation_evidence": [],
+  "review_targets": [
+    "architecture"
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "reviewed",
+  "design_contract_entrypoint": "contracts/design.md",
+  "design_contract_maturity": "draft"
+}

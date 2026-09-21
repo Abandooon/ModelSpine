@@ -1,0 +1,325 @@
+{
+  "maturity": "exercised example values; not persisted decisions",
+  "metamodel": {
+    "id": "information-system-pilot",
+    "version": "0.1"
+  },
+  "base": {
+    "project_id": "pilot",
+    "model_id": "order-design",
+    "revision": 0,
+    "metamodel": {
+      "id": "information-system-pilot",
+      "version": "0.1"
+    },
+    "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+    "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+  },
+  "proposal": {
+    "api_version": "0.1",
+    "proposal_id": "example",
+    "base": {
+      "project_id": "pilot",
+      "model_id": "order-design",
+      "revision": 0,
+      "metamodel": {
+        "id": "information-system-pilot",
+        "version": "0.1"
+      },
+      "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+      "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+    },
+    "operations": [
+      {
+        "op": "set_property",
+        "target": "approval-policy",
+        "field": "threshold_minor",
+        "value": 250000
+      }
+    ],
+    "intent_refs": [
+      {
+        "source": {
+          "project_id": "pilot",
+          "artifact_id": "assumptions",
+          "revision": "1",
+          "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+        },
+        "locator": "README.md",
+        "origin": "explicit pilot assumption; not customer-confirmed"
+      }
+    ]
+  },
+  "preview": {
+    "proposal_hash": "259c668c28174606e221c5b00022d260f4b770a585aa2e7a703e29dbd38b5df3",
+    "candidate_hash": "71f14edc1ef4bce908643e7604d33a5903b3e105f8d09f06dfad8f14c82ba6d6",
+    "candidate": {
+      "project_id": "pilot",
+      "model_id": "order-design",
+      "revision": 1,
+      "metamodel": {
+        "id": "information-system-pilot",
+        "version": "0.1"
+      },
+      "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+      "elements": [
+        {
+          "id": "root",
+          "kind": "group",
+          "name": "root",
+          "parent": null,
+          "properties": [],
+          "dependencies": [],
+          "dependencies_complete": true,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        },
+        {
+          "id": "order",
+          "kind": "entity",
+          "name": "order",
+          "parent": "root",
+          "properties": [
+            {
+              "name": "currency",
+              "value": "CNY"
+            },
+            {
+              "name": "unit",
+              "value": "minor"
+            }
+          ],
+          "dependencies": [],
+          "dependencies_complete": true,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        },
+        {
+          "id": "approval-policy",
+          "kind": "policy",
+          "name": "approval-policy",
+          "parent": "root",
+          "properties": [
+            {
+              "name": "threshold_minor",
+              "value": 250000
+            },
+            {
+              "name": "role",
+              "value": "manager"
+            },
+            {
+              "name": "invalidate_on_change",
+              "value": true
+            }
+          ],
+          "dependencies": [],
+          "dependencies_complete": true,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        },
+        {
+          "id": "approve-command",
+          "kind": "command",
+          "name": "approve-command",
+          "parent": "root",
+          "properties": [
+            {
+              "name": "permission",
+              "value": "manager"
+            }
+          ],
+          "dependencies": [
+            "approval-policy",
+            "order"
+          ],
+          "dependencies_complete": true,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        },
+        {
+          "id": "weather",
+          "kind": "weather",
+          "name": "weather",
+          "parent": "root",
+          "properties": [
+            {
+              "name": "temperature",
+              "value": 22
+            }
+          ],
+          "dependencies": [],
+          "dependencies_complete": true,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        },
+        {
+          "id": "external-signal",
+          "kind": "weather",
+          "name": "external-signal",
+          "parent": "root",
+          "properties": [
+            {
+              "name": "temperature",
+              "value": 23
+            }
+          ],
+          "dependencies": [],
+          "dependencies_complete": false,
+          "category": "hypothesis",
+          "confirmed": true,
+          "sources": [
+            {
+              "source": {
+                "project_id": "pilot",
+                "artifact_id": "assumptions",
+                "revision": "1",
+                "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+              },
+              "locator": "README.md",
+              "origin": "explicit pilot assumption; not customer-confirmed"
+            }
+          ]
+        }
+      ]
+    },
+    "impact": {
+      "changed": [
+        "approval-policy"
+      ],
+      "affected": [
+        "approval-policy",
+        "approve-command"
+      ],
+      "unknown": [
+        "external-signal"
+      ]
+    }
+  },
+  "report": {
+    "binding": {
+      "candidate_hash": "71f14edc1ef4bce908643e7604d33a5903b3e105f8d09f06dfad8f14c82ba6d6",
+      "plan_hash": "e400bf5686b0fbd5bee4c061706e791851d97c7ad686b9dbe0102d3c1371903f",
+      "scope": [
+        "approval-policy",
+        "external-signal",
+        "order",
+        "weather"
+      ],
+      "assumptions": [
+        "CNY integer minor units",
+        "manager role is a pilot assumption"
+      ],
+      "tool": "modelspine-field-checker",
+      "tool_version": "0.1.0"
+    },
+    "outcomes": [
+      {
+        "obligation_id": "amount-domain",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "role",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "approval-invalidation",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "currency",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "unit",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "weather-range",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      },
+      {
+        "obligation_id": "external-range",
+        "obligation_version": "1",
+        "status": "satisfied",
+        "findings": []
+      }
+    ]
+  },
+  "negative": {
+    "proposal_api_version": "9",
+    "expected": "invalid"
+  }
+}

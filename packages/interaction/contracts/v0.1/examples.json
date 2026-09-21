@@ -1,0 +1,23 @@
+{
+  "maturity": "reviewed design examples; NOT executed application behavior",
+  "positive": {
+    "call": "bind",
+    "command_id": "change_amount",
+    "contract_version": "0.1",
+    "input": {
+      "display_amount": "12.34",
+      "currency": "CNY"
+    },
+    "converted": {
+      "amount_minor": 1234,
+      "expected_order_version": 7
+    },
+    "explanation": "Changing the amount invalidates the old approval"
+  },
+  "negative": {
+    "input": {
+      "display_amount": "12.345"
+    },
+    "expected": "invalid; no request sent"
+  }
+}

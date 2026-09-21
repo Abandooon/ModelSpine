@@ -1,0 +1,48 @@
+"""Verify runtime imports with only the package and its current runtime dependency."""
+import ast
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+
+PLATFORM = Path(__file__).resolve().parents[1]
+PACKAGES = {
+    "protocols": "modelspine_protocols",
+    "model-kernel": "modelspine_kernel",
+    "assurance": "modelspine_assurance",
+    "generation": "modelspine_generation",
+}
+
+
+class PackageBoundaryTests(unittest.TestCase):
+    def test_packages_import_without_other_capabilities_or_application_paths(self):
+        for package, module in PACKAGES.items():
+            with self.subTest(package=package):
+                paths = [str(PLATFORM / "packages" / name / "src")
+                         for name in dict.fromkeys(("protocols", package))]
+                expected = {"modelspine_protocols", module}
+                script = (f"import sys; sys.path[:0]={paths!r}; import {module}; "
+                          "loaded={name for name in sys.modules if name.startswith('modelspine_')}; "
+                          f"assert loaded == {expected!r}, loaded")
+                result = subprocess.run([sys.executable, "-B", "-I", "-c", script],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_runtime_imports_stay_within_standard_library_and_protocols(self):
+        for package, module in PACKAGES.items():
+            allowed = sys.stdlib_module_names | {module, "modelspine_protocols"}
+            for source in (PLATFORM / "packages" / package / "src").rglob("*.py"):
+                with self.subTest(source=source):
+                    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+                        if isinstance(node, ast.Import):
+                            imports = [alias.name.split(".")[0] for alias in node.names]
+                        elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                            imports = [node.module.split(".")[0]]
+                        else:
+                            continue
+                        self.assertTrue(set(imports) <= allowed, (source, imports))
+
+
+if __name__ == "__main__":
+    unittest.main()

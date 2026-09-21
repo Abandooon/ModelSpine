@@ -1,0 +1,45 @@
+{
+  "id": "assurance",
+  "title": "合同形式化与独立保障",
+  "status": "implemented-slice",
+  "version": "0.1.0-experimental",
+  "entrypoint": "README.md",
+  "depends_on": [
+    "protocols",
+    "model-kernel"
+  ],
+  "runtime_dependencies": [
+    "protocols"
+  ],
+  "provides": [
+    "Obligation",
+    "CheckPlan",
+    "check",
+    "ValidationReport (producer; schema owned by protocols)"
+  ],
+  "scope": "首期一个参考解释器与一个后端；规格忠实、编译、覆盖、范围和证据来源分开记录。",
+  "implementation_entrypoints": [
+    "src/modelspine_assurance/__init__.py"
+  ],
+  "validation_evidence": [
+    "../../docs/validation.md"
+  ],
+  "review_targets": [
+    "architecture"
+  ],
+  "reference_sources": [
+    {
+      "asset_id": "p0-code-2026-09-20",
+      "entries": [
+        "src/validation/v2/repair_loop.py"
+      ],
+      "integration_status": "not-extracted"
+    }
+  ],
+  "contract_entrypoint": "contracts/v0.1/README.md",
+  "contract_examples": "contracts/v0.1/examples.json",
+  "contract_maturity": "exercised-subset",
+  "implemented_scope": "Design-field integer_range/equals terminal checks; unsupported remains unknown; no business runtime approval",
+  "design_contract_entrypoint": "contracts/design.md",
+  "design_contract_maturity": "draft"
+}

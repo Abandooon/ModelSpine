@@ -1,0 +1,105 @@
+{
+  "maturity": "exercised finite field construction",
+  "plan": {
+    "check_plan_hash": "e400bf5686b0fbd5bee4c061706e791851d97c7ad686b9dbe0102d3c1371903f",
+    "controls": [
+      {
+        "obligation_id": "amount-domain",
+        "obligation_version": "1",
+        "fragment": "integer_range",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "role",
+        "obligation_version": "1",
+        "fragment": "equals",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "approval-invalidation",
+        "obligation_version": "1",
+        "fragment": "equals",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "currency",
+        "obligation_version": "1",
+        "fragment": "equals",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "unit",
+        "obligation_version": "1",
+        "fragment": "equals",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "weather-range",
+        "obligation_version": "1",
+        "fragment": "integer_range",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      },
+      {
+        "obligation_id": "external-range",
+        "obligation_version": "1",
+        "fragment": "integer_range",
+        "stage": "construction",
+        "mechanism": "finite-field-filter on edited field only",
+        "remaining": "independent terminal check required"
+      }
+    ],
+    "residual": []
+  },
+  "positive": {
+    "api_version": "0.1",
+    "proposal_id": "example",
+    "base": {
+      "project_id": "pilot",
+      "model_id": "order-design",
+      "revision": 0,
+      "metamodel": {
+        "id": "information-system-pilot",
+        "version": "0.1"
+      },
+      "metamodel_hash": "7bee679a727f82e1421cf33609af6900606d583a5c17c1710513d957579a9d2f",
+      "content_hash": "74e98b493b38459a59e224767b930b2730da1867fae30ed86d398bc3060ccad1"
+    },
+    "operations": [
+      {
+        "op": "set_property",
+        "target": "approval-policy",
+        "field": "threshold_minor",
+        "value": 250000
+      }
+    ],
+    "intent_refs": [
+      {
+        "source": {
+          "project_id": "pilot",
+          "artifact_id": "assumptions",
+          "revision": "1",
+          "content_hash": "7650ca09ba6d4f7985e905314b595ab4fa61b561d6b4cdf353bd3ab59bbb4abf"
+        },
+        "locator": "README.md",
+        "origin": "explicit pilot assumption; not customer-confirmed"
+      }
+    ]
+  },
+  "negative": {
+    "field": "threshold_minor",
+    "value": -1,
+    "expected": "construction excluded; direct product violated in terminal check"
+  }
+}

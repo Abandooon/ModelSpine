@@ -1,0 +1,114 @@
+{
+  "id": "pilot-design",
+  "version": "1",
+  "rule_version": "pilot-rules/1",
+  "assumptions": [
+    "CNY integer minor units",
+    "manager role is a pilot assumption"
+  ],
+  "obligations": [
+    {
+      "id": "amount-domain",
+      "version": "1",
+      "kind": "integer_range",
+      "target": "approval-policy",
+      "field": "threshold_minor",
+      "parameters": [
+        {
+          "name": "min",
+          "value": 0
+        },
+        {
+          "name": "max",
+          "value": 100000000
+        }
+      ]
+    },
+    {
+      "id": "role",
+      "version": "1",
+      "kind": "equals",
+      "target": "approval-policy",
+      "field": "role",
+      "parameters": [
+        {
+          "name": "value",
+          "value": "manager"
+        }
+      ]
+    },
+    {
+      "id": "approval-invalidation",
+      "version": "1",
+      "kind": "equals",
+      "target": "approval-policy",
+      "field": "invalidate_on_change",
+      "parameters": [
+        {
+          "name": "value",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "currency",
+      "version": "1",
+      "kind": "equals",
+      "target": "order",
+      "field": "currency",
+      "parameters": [
+        {
+          "name": "value",
+          "value": "CNY"
+        }
+      ]
+    },
+    {
+      "id": "unit",
+      "version": "1",
+      "kind": "equals",
+      "target": "order",
+      "field": "unit",
+      "parameters": [
+        {
+          "name": "value",
+          "value": "minor"
+        }
+      ]
+    },
+    {
+      "id": "weather-range",
+      "version": "1",
+      "kind": "integer_range",
+      "target": "weather",
+      "field": "temperature",
+      "parameters": [
+        {
+          "name": "min",
+          "value": -100
+        },
+        {
+          "name": "max",
+          "value": 100
+        }
+      ]
+    },
+    {
+      "id": "external-range",
+      "version": "1",
+      "kind": "integer_range",
+      "target": "external-signal",
+      "field": "temperature",
+      "parameters": [
+        {
+          "name": "min",
+          "value": -100
+        },
+        {
+          "name": "max",
+          "value": 100
+        }
+      ]
+    }
+  ]
+}
