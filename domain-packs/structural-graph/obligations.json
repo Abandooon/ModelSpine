@@ -1,0 +1,19 @@
+{
+  "id": "structural-graph-checks",
+  "version": "1",
+  "rule_version": "structural-graph/0.1",
+  "assumptions": [
+    "finite engineering configuration; not a business pilot",
+    "root membership read completeness is not established"
+  ],
+  "obligations": [
+    {
+      "id": "graph-structure",
+      "version": "1",
+      "kind": "directed_acyclic_graph",
+      "target": "graph",
+      "field": "root",
+      "parameters": []
+    }
+  ]
+}

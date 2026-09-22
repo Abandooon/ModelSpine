@@ -2,7 +2,7 @@
   "id": "assurance",
   "title": "合同形式化与独立保障",
   "status": "implemented-slice",
-  "version": "0.1.0-experimental",
+  "version": "0.1.1-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",

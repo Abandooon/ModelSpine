@@ -4,7 +4,7 @@ from dataclasses import replace
 from fixtures import load_fixture
 from modelspine_generation import compare_reports,construct,plan
 from modelspine_protocols import (
-    ContractError, Obligation, Outcome, ReportBinding, ValidationReport,
+    ContractError, Obligation, Outcome, Property, ReportBinding, ValidationReport,
 )
 
 
@@ -23,8 +23,27 @@ class GenerationTests(unittest.TestCase):
             construct(self.snapshot,self.checks,'boundary','approval-policy','threshold_minor',value)
         expanded=replace(self.checks,obligations=self.checks.obligations+(
             Obligation('open','1','runtime_trace','approval-policy','role',()),))
-        self.assertEqual(plan(expanded).residual,('open',))
-        self.assertEqual(plan(expanded).controls[-1].stage,'terminal-only')
+        planned=plan(expanded,target='approval-policy',field='threshold_minor')
+        self.assertEqual(planned.residual,tuple(o.id for o in expanded.obligations[1:]))
+        self.assertEqual(planned.controls[-1].stage,'terminal-only')
+
+    def test_plan_only_claims_control_for_the_selected_field(self):
+        planned=plan(self.checks,target='approval-policy',field='threshold_minor')
+        self.assertEqual([c.obligation_id for c in planned.controls if c.stage=='construction'],
+                         ['amount-domain'])
+        self.assertTrue(all(c.remaining=='independent terminal check required' for c in planned.controls))
+        absent=plan(self.checks,target='another-element',field='threshold_minor')
+        self.assertEqual(absent.residual,tuple(o.id for o in self.checks.obligations))
+
+    def test_malformed_control_and_invalid_proposal_id_are_rejected(self):
+        broken=replace(self.checks,obligations=(replace(self.checks.obligations[0],
+            parameters=(Property('min',5),Property('max',1))),))
+        with self.assertRaises(ContractError):
+            plan(broken,target='approval-policy',field='threshold_minor')
+        with self.assertRaises(ContractError):
+            construct(self.snapshot,broken,'bad','approval-policy','threshold_minor',10)
+        with self.assertRaises(ContractError):
+            construct(self.snapshot,self.checks,123,'approval-policy','threshold_minor',10)
 
     def report(self, domain, states):
         return ValidationReport(ReportBinding('candidate','fixed-plan',(domain,),('fixture-only',),'fixture','1'),

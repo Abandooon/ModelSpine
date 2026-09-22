@@ -10,7 +10,11 @@
 
 预览校验项目/模型/修订/元模型/哈希；提交锁覆盖重预览、许可核对、版本比较及快照/收据写入。同 proposal ID+内容+actor 的重试返回原收据，不同内容 conflict。失败不增版本、不改变历史或证据。只承诺单进程同一实例的并发线程内存事务，无持久化、跨进程 CAS 或崩溃恢复。权限在决定与提交两处验证。
 
+预览复用 protocols 的来源引用内容校验，拒绝意图引用中缺少身份、定位、出处或非法 SHA-256 的项，错误为 invalid；空 intent_refs 仍合法。AddElement 检查本实例加载及后续已接受快照中的已用 ID，以及当前提案内已新增 ID；删除后同 ID 重建返回 conflict。新身份需新 ID，不能通过 RemoveElement/AddElement 改写原身份的 kind/category。本规则利用现有内存历史，不新增身份注册表，也不承诺重新加载后保留此前未提供的历史。
+
 影响使用 before/after 两图的 changed→dependent 闭包；包含关系不传播。证据从范围向 prerequisites 展开，完整性未知则 unknown；指纹或相关依赖变化 stale；完整无关范围 current。计划/工具整体改变保守 stale，不宣称精准逐规则迁移。原始报告不改写。
+
+公开 `impact(before, after)` 仅比较相同 project_id/model_id/metamodel 身份、版本及 metamodel_hash 的两个快照，跨模型或元模型变化返回 conflict；模型 revision 可以不同。这不是元模型迁移差异接口。
 
 检查器实际读到的数据须由模型依赖覆盖；`dependencies_complete` 是上游可信声明，当前没有自动读集追踪。输出绑定验证不证明语义或依赖完整，检查器跨范围读取却不声明依赖时不能据此认定证据可复用。
 

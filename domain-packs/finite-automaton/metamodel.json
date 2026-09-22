@@ -1,0 +1,51 @@
+{
+  "ref": {
+    "id": "finite-automaton",
+    "version": "0.1"
+  },
+  "kinds": [
+    {
+      "name": "machine",
+      "fields": [
+        {
+          "name": "initial",
+          "type": "string"
+        },
+        {
+          "name": "alphabet",
+          "type": "string"
+        },
+        {
+          "name": "trace",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "state",
+      "fields": [
+        {
+          "name": "accepting",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "transition",
+      "fields": [
+        {
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

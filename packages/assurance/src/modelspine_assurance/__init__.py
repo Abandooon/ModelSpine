@@ -5,7 +5,7 @@ from modelspine_protocols import (
 )
 
 TOOL = "modelspine-field-checker"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 SUPPORTED = frozenset({"integer_range", "equals"})
 
 
@@ -22,10 +22,10 @@ def check(snapshot: Snapshot, plan: CheckPlan, scope: tuple[str, ...] | None = N
         if obligation.target not in scope:
             continue
         status, findings = "satisfied", ()
-        if obligation.kind not in SUPPORTED:
-            status, findings = "unknown", (f"{obligation.target}:unsupported:{obligation.kind}",)
-        elif obligation.target not in elements:
+        if obligation.target not in elements:
             status, findings = "error", (f"{obligation.target}:missing_target",)
+        elif obligation.kind not in SUPPORTED:
+            status, findings = "unknown", (f"{obligation.target}:unsupported:{obligation.kind}",)
         else:
             values = properties(elements[obligation.target].properties)
             parameters = properties(obligation.parameters)

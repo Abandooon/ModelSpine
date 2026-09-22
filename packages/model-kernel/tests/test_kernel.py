@@ -2,10 +2,11 @@
 import unittest
 from dataclasses import replace
 
-from modelspine_kernel import ModelKernel
+from modelspine_kernel import ModelKernel, impact
 from modelspine_protocols import (
-    ChangeProposal, CheckPlan, ContractError, Element, FieldSpec, KindSpec, Metamodel,
-    MetamodelRef, Obligation, Outcome, Property, ReportBinding, SetProperty, Snapshot,
+    AddElement, ArtifactRef, ChangeProposal, CheckPlan, ContractError, Element, EvidenceRef,
+    FieldSpec, KindSpec, Metamodel, MetamodelRef, Obligation, Outcome, Property,
+    RemoveElement, ReportBinding, SetProperty, Snapshot,
     ValidationReport, digest, properties, ref,
 )
 
@@ -156,6 +157,75 @@ class KernelCheckerTests(unittest.TestCase):
             kernel.apply(self.proposal, decision, "editor")
         self.assertEqual(raised.exception.code, "conflict")
         self.assert_uncommitted(kernel)
+
+    def test_proposal_intent_references_are_validated_before_checking(self):
+        source = ArtifactRef('project', 'source', '1', digest('source content'))
+        valid = EvidenceRef(source, 'line:1', 'user-input')
+        malformed = [replace(valid, locator=''), replace(valid, origin=''),
+                     replace(valid, source=replace(source, project_id='')),
+                     replace(valid, source=replace(source, content_hash='not-a-hash'))]
+        kernel = self.kernel()
+        for reference in malformed:
+            with self.subTest(reference=reference), self.assertRaises(ContractError) as raised:
+                kernel.preview(replace(self.proposal, intent_refs=(reference,)))
+            self.assertEqual(raised.exception.code, 'invalid')
+            self.assert_uncommitted(kernel)
+        proposal = replace(self.proposal, intent_refs=(valid,))
+        report = symbol_checker(kernel.preview(proposal).candidate, self.plan)
+        decision = kernel.decide(proposal, report, 'editor')
+        self.assertEqual(kernel.apply(proposal, decision, 'editor').snapshot.revision, 1)
+
+    def test_impact_rejects_different_model_or_metamodel_identity(self):
+        changes = [dict(project_id='other'), dict(model_id='other'),
+                   dict(metamodel=replace(self.snapshot.metamodel, id='other')),
+                   dict(metamodel=replace(self.snapshot.metamodel, version='2')),
+                   dict(metamodel_hash='0' * 64)]
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(ContractError) as raised:
+                impact(self.snapshot, replace(self.snapshot, **change))
+            self.assertEqual(raised.exception.code, 'conflict')
+        self.assertEqual(impact(self.snapshot, replace(self.snapshot, revision=1)).changed, ())
+
+    def test_removed_identity_cannot_be_recreated_in_the_same_batch(self):
+        kernel = self.kernel()
+        old = self.snapshot.elements[0]
+        replacements = [old, replace(old, category='hypothesis'), replace(old, kind='another-kind')]
+        for replacement in replacements:
+            proposal = replace(self.proposal, operations=(
+                RemoveElement('remove_element', old.id), AddElement('add_element', replacement)))
+            with self.subTest(replacement=replacement), self.assertRaises(ContractError) as raised:
+                kernel.preview(proposal)
+            self.assertEqual(raised.exception.code, 'conflict')
+            self.assert_uncommitted(kernel)
+        fresh = replace(old, id='temporary')
+        proposal = replace(self.proposal, operations=(AddElement('add_element', fresh),
+            RemoveElement('remove_element', fresh.id), AddElement('add_element', fresh)))
+        with self.assertRaises(ContractError) as raised:
+            kernel.preview(proposal)
+        self.assertEqual(raised.exception.code, 'conflict')
+        self.assert_uncommitted(kernel)
+
+    def test_committed_history_prevents_id_reuse_after_deletion(self):
+        kernel = self.kernel()
+        extra = replace(self.snapshot.elements[0], id='retired')
+
+        def submit(proposal_id, operation):
+            proposal = ChangeProposal('0.1', proposal_id, ref(kernel.snapshot()), (operation,), ())
+            report = symbol_checker(kernel.preview(proposal).candidate, self.plan)
+            decision = kernel.decide(proposal, report, 'editor')
+            return kernel.apply(proposal, decision, 'editor')
+
+        submit('add', AddElement('add_element', extra))
+        submit('remove', RemoveElement('remove_element', extra.id))
+        before = kernel.snapshot()
+        with self.assertRaises(ContractError) as raised:
+            submit('reuse', AddElement('add_element', extra))
+        self.assertEqual(raised.exception.code, 'conflict')
+        self.assertEqual(kernel.snapshot(), before)
+        self.assertEqual(kernel.snapshot().revision, 2)
+        self.assertIn(extra, kernel.snapshot(1).elements)
+        self.assertEqual(submit('new-identity', AddElement('add_element',
+            replace(extra, id='new-identity'))).snapshot.revision, 3)
 
 
 if __name__ == "__main__":

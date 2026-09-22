@@ -200,7 +200,8 @@ class KernelIntegrationTests(unittest.TestCase):
     def test_unknown_generation_obligation_remains_a_terminal_residual(self):
         expanded = replace(self.plan, obligations=self.plan.obligations + (
             Obligation('open', '1', 'runtime_trace', 'approval-policy', 'role', ()),))
-        self.assertEqual(plan(expanded).residual, ('open',))
+        planned = plan(expanded, target='approval-policy', field='threshold_minor')
+        self.assertEqual(planned.residual, tuple(o.id for o in expanded.obligations[1:]))
         self.assertIn('open', check(self.snapshot, expanded).residual)
 
 

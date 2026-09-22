@@ -12,12 +12,18 @@ class AssuranceTests(unittest.TestCase):
 
     def test_unsupported_and_missing_targets_do_not_pass(self):
         for kind,target,status in [('arbitrary_temporal_logic','approval-policy','unknown'),
+                                   ('arbitrary_temporal_logic','absent','error'),
                                    ('equals','absent','error')]:
             obligation=Obligation('new','1',kind,target,'role',(Property('value','manager'),))
             report=check(self.snapshot,replace(self.plan,obligations=(obligation,)))
             self.assertEqual(report.outcomes[0].status,status)
             self.assertFalse(report.satisfied)
             self.assertEqual(report.residual,('new',))
+
+    def test_unknown_rule_does_not_guess_field_semantics(self):
+        obligation=Obligation('new','1','arbitrary_temporal_logic','approval-policy','semantic-focus',())
+        report=check(self.snapshot,replace(self.plan,obligations=(obligation,)))
+        self.assertEqual(report.outcomes[0].status,'unknown')
 
     def test_malformed_supported_rule_is_error(self):
         obligation=replace(self.plan.obligations[0],parameters=(Property('min',5),Property('max',1)))

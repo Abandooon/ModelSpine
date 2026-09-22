@@ -2,7 +2,7 @@
   "id": "protocols",
   "title": "共享协议与稳定引用",
   "status": "implemented-slice",
-  "version": "0.1.1-experimental",
+  "version": "0.1.2-experimental",
   "entrypoint": "README.md",
   "depends_on": [],
   "runtime_dependencies": [],

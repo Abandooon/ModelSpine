@@ -2,7 +2,7 @@
   "id": "generation",
   "title": "约束编译与生成修复",
   "status": "implemented-slice",
-  "version": "0.1.0-experimental",
+  "version": "0.1.1-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -40,7 +40,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "One SetProperty candidate construction with field controls; pure repair report regression gate; no LLM or repair loop",
+  "implemented_scope": "One SetProperty candidate; generation plan scoped to explicit target/field with all obligations requiring terminal checks; pure repair report regression gate; no LLM or repair loop",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft"
 }

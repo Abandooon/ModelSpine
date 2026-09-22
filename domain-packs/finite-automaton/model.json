@@ -1,0 +1,150 @@
+{
+  "project_id": "foundation-examples",
+  "model_id": "finite-automaton",
+  "revision": 0,
+  "metamodel": {
+    "id": "finite-automaton",
+    "version": "0.1"
+  },
+  "metamodel_hash": "d79df3f7ae626375787dcd08ed337bdc797392dd3ccd3dc8589568d5dd703b17",
+  "elements": [
+    {
+      "id": "machine",
+      "kind": "machine",
+      "name": "machine",
+      "parent": null,
+      "properties": [
+        {
+          "name": "initial",
+          "value": "s0"
+        },
+        {
+          "name": "alphabet",
+          "value": "ab"
+        },
+        {
+          "name": "trace",
+          "value": "ab"
+        }
+      ],
+      "dependencies": [
+        "s0",
+        "s1",
+        "s2",
+        "step-a",
+        "step-b"
+      ],
+      "dependencies_complete": false,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "s0",
+      "kind": "state",
+      "name": "s0",
+      "parent": "machine",
+      "properties": [
+        {
+          "name": "accepting",
+          "value": false
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "s1",
+      "kind": "state",
+      "name": "s1",
+      "parent": "machine",
+      "properties": [
+        {
+          "name": "accepting",
+          "value": false
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "s2",
+      "kind": "state",
+      "name": "s2",
+      "parent": "machine",
+      "properties": [
+        {
+          "name": "accepting",
+          "value": true
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "step-a",
+      "kind": "transition",
+      "name": "step-a",
+      "parent": "machine",
+      "properties": [
+        {
+          "name": "source",
+          "value": "s0"
+        },
+        {
+          "name": "target",
+          "value": "s1"
+        },
+        {
+          "name": "symbol",
+          "value": "a"
+        }
+      ],
+      "dependencies": [
+        "s0",
+        "s1"
+      ],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "step-b",
+      "kind": "transition",
+      "name": "step-b",
+      "parent": "machine",
+      "properties": [
+        {
+          "name": "source",
+          "value": "s1"
+        },
+        {
+          "name": "target",
+          "value": "s2"
+        },
+        {
+          "name": "symbol",
+          "value": "b"
+        }
+      ],
+      "dependencies": [
+        "s1",
+        "s2"
+      ],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    }
+  ]
+}

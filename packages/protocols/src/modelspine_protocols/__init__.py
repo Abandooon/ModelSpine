@@ -399,6 +399,16 @@ def properties(items: tuple[Property, ...]) -> dict[str, Scalar]:
     return {p.name: p.value for p in items}
 
 
+def validate_evidence_refs(references: tuple[EvidenceRef, ...]) -> None:
+    """Check reference content after the containing value's strict shape decoding."""
+    for reference in references:
+        source = reference.source
+        require(bool(reference.locator and reference.origin and source.project_id
+                     and source.artifact_id and source.revision), "incomplete source reference")
+        require(len(source.content_hash) == 64
+                and all(c in "0123456789abcdef" for c in source.content_hash), "invalid source SHA-256")
+
+
 def validate_model(snapshot: Snapshot, metamodel: Metamodel) -> None:
     snapshot, metamodel = checked(snapshot, Snapshot), checked(metamodel, Metamodel)
     require(snapshot.metamodel == metamodel.ref and snapshot.metamodel_hash == digest(metamodel),
@@ -410,17 +420,14 @@ def validate_model(snapshot: Snapshot, metamodel: Metamodel) -> None:
     require(bool(kinds) and len(kinds) == len(metamodel.kinds), "duplicate/empty kinds")
     for kind in kinds.values():
         require(kind.name and len({f.name for f in kind.fields}) == len(kind.fields), "duplicate kind fields")
+        require(all(field.name for field in kind.fields), "empty metamodel field name")
     elements = {e.id: e for e in snapshot.elements}
     require(len(elements) == len(snapshot.elements), "duplicate element ID")
     types_by_name = {"integer": int, "string": str, "boolean": bool}
     for element in snapshot.elements:
         require(bool(element.id and element.name), "empty identity/name")
         require(element.category != "fact" or bool(element.sources), "implementation fact needs provenance")
-        for source in element.sources:
-            require(bool(source.locator and source.origin and source.source.project_id
-                         and source.source.artifact_id and source.source.revision), "incomplete source reference")
-            require(len(source.source.content_hash) == 64
-                    and all(c in "0123456789abcdef" for c in source.source.content_hash), "invalid source SHA-256")
+        validate_evidence_refs(element.sources)
         require(element.kind in kinds, f"unsupported kind {element.kind}", "unsupported")
         values = properties(element.properties)
         spec = {f.name: f.type for f in kinds[element.kind].fields}

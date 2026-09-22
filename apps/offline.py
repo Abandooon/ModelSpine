@@ -12,7 +12,7 @@ from fixtures import load_fixture
 from modelspine_protocols import (
     ContractError, Obligation, RunReceipt, SetProperty, digest, to_data,
 )
-from modelspine_assurance import check
+from modelspine_assurance import VERSION as CHECKER_VERSION, check
 from modelspine_generation import compare_reports, construct, plan
 from modelspine_kernel import ModelKernel
 
@@ -47,7 +47,7 @@ def demo(threshold: int = 250000):
     statuses = {item.evidence_id: item for item in commit.evidence_status}
     output = {
         "scenario": "design-model change; no business approval or application delivery",
-        "generation_plan": to_data(plan(extended)),
+        "generation_plan": to_data(plan(extended, target="approval-policy", field="threshold_minor")),
         "preview_revision": preview.candidate.revision,
         "stored_revision_before_commit": before_commit,
         "commit": to_data(commit),
@@ -60,7 +60,7 @@ def demo(threshold: int = 250000):
     }
     output["receipt"] = to_data(RunReceipt(
         "offline-order-approval", (digest(snapshot), digest(checks), digest(proposal)), (digest(commit),),
-        ("Python standard library", "modelspine-field-checker/0.1.0", "finite-field-constructor/0.1.0"),
+        ("Python standard library", f"modelspine-field-checker/{CHECKER_VERSION}", "finite-field-constructor/0.1.1"),
         int((perf_counter() - started) * 1000), "completed"))
     return output
 

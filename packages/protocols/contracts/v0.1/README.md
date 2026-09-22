@@ -10,6 +10,8 @@ S1 完成三场景自查；运行字段唯一权威定义位于 `src/modelspine_
 
 Element 的 kind/name/parent/properties/dependencies/dependencies_complete/category/confirmed/sources 均是模型内容。category 为 intent/fact/hypothesis，confirmed 不改变类别或来源。parent 只表达包含；dependencies 指向语义前提。领域字段由版本化 Metamodel 的 KindSpec/FieldSpec 定义；首期支持整数、字符串、布尔和元素依赖，不是任意 DSL。ArtifactRef 记录来源身份/版本/哈希，EvidenceRef 加定位和出处，路径不是身份。
 
+KindSpec 中的 FieldSpec 名称必须非空，即使模型尚无该类型的实例也要检查。`validate_evidence_refs` 复用来源引用内容校验：模型校验中的 Element.sources 与提案预览中的 ChangeProposal.intent_refs 均要求非空来源项目/制品/版本、定位、出处及 64 位小写十六进制 SHA-256。引用集合可以为空，但 fact 元素仍须至少一个来源；这只验证引用完整性，不证明内容真实或意图忠实。JSON 解码完成不等于这些语义校验已经完成。
+
 JSON 用 UTF-8、排序对象键、紧凑分隔符；元组编码数组，数组顺序保留。拒绝未知/缺失字段、重复 JSON 键、浮点/NaN、bool 冒充 int、未知操作及不支持 api_version。所有字段必填，只有声明可空者可 null。破坏性字段/语义变更升版并同步消费者；新增字段也需协同升级，不承诺严格解析器前向兼容，无隐式迁移。
 
 ## 变更、判定和证据
@@ -19,6 +21,8 @@ JSON 用 UTF-8、排序对象键、紧凑分隔符；元组编码数组，数组
 kernel 校验返回报告的候选/计划哈希、规范范围、前提、非空工具身份/版本，以及范围内义务 ID/版本的完整唯一覆盖；错绑定或覆盖为 conflict，结构不合法为 invalid。执行器仍是可信依赖，绑定校验不证明规则真值或独立性。检查器读取的数据必须由模型显式依赖覆盖；`dependencies_complete` 是可信声明，当前不自动追踪读集。无法保证完整性时应标为不完整并保留 unknown，不能把跨范围未声明读取产生的证据视作可安全复用。
 
 ChangeProposal 含 api_version/proposal_id/base/operations/intent_refs，六种操作是 Rename、SetProperty、SetDependencies、AddElement、RemoveElement、Confirm。整批在副本执行并验证最终结构；无任意 callback/metadata patch。新增 ID 唯一，删除不留悬空引用，重命名保留 ID。成功设计提交 revision+1（含无变化提案），与业务无变化写入规则分开。
+
+元素 ID 在 kernel 本实例加载及此后已接受的历史快照内不得删除后重用，同一提案批次也不得 RemoveElement 后以相同 ID AddElement。需要新身份时使用新 ID；当前操作不能改写已有身份的 kind/category，也不能以删除重建模拟迁移。本规则不声明跨进程或重新加载后已恢复全部历史身份。
 
 Preview 绑定提案哈希、候选哈希、候选快照与 ImpactSet。ValidationReport 只有此处一份共享结构；binding 包括候选哈希、计划哈希、范围、前提、检查器/版本，计划含规则和逐义务版本。outcome 为 satisfied/violated/unknown/not_applicable/error；非 satisfied 项保留为 residual。未支持项为 unknown，不是通过。
 

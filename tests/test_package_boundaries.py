@@ -16,6 +16,14 @@ PACKAGES = {
 
 
 class PackageBoundaryTests(unittest.TestCase):
+    def test_finite_model_adapter_imports_with_only_protocols(self):
+        paths = [str(PLATFORM / 'packages' / 'protocols' / 'src'), str(PLATFORM / 'adapters')]
+        script = (f"import sys; sys.path[:0]={paths!r}; import finite_models; "
+                  "loaded={name for name in sys.modules if name.startswith('modelspine_')}; "
+                  "assert loaded == {'modelspine_protocols'}, loaded")
+        result = subprocess.run([sys.executable, '-B', '-I', '-c', script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_packages_import_without_other_capabilities_or_application_paths(self):
         for package, module in PACKAGES.items():
             with self.subTest(package=package):

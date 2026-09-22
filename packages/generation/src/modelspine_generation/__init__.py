@@ -8,15 +8,36 @@ from modelspine_protocols import (
 )
 
 
-def plan(check_plan: CheckPlan) -> GenerationPlan:
+def _control_parameters(obligation):
+    params = properties(obligation.parameters)
+    if obligation.kind == "integer_range":
+        require(set(params) == {"min", "max"} and type(params["min"]) is int
+                and type(params["max"]) is int and params["min"] <= params["max"], "malformed range control")
+    elif obligation.kind == "equals":
+        require(set(params) == {"value"}, "malformed equality control")
+    return params
+
+
+def plan(check_plan: CheckPlan, *, target: str, field: str) -> GenerationPlan:
     check_plan = validate_plan(check_plan)
+    require(type(target) is str and bool(target) and type(field) is str and bool(field),
+            "invalid construction target/field")
     supported = {"integer_range", "equals"}
-    controls = tuple(GenerationControl(
-        o.id, o.version, o.kind, "construction" if o.kind in supported else "terminal-only",
-        "finite-field-filter on edited field only" if o.kind in supported else "unsupported",
-        "independent terminal check required") for o in check_plan.obligations)
-    return GenerationPlan(digest(check_plan), controls,
-                          tuple(o.id for o in check_plan.obligations if o.kind not in supported))
+    controls, residual = [], []
+    for obligation in check_plan.obligations:
+        matches = (obligation.target, obligation.field) == (target, field)
+        controlled = matches and obligation.kind in supported
+        if controlled:
+            _control_parameters(obligation)
+        else:
+            residual.append(obligation.id)
+        mechanism = ("finite-field-filter on edited field only" if controlled else
+                     "outside edited field" if not matches else "unsupported")
+        controls.append(GenerationControl(
+            obligation.id, obligation.version, obligation.kind,
+            "construction" if controlled else "terminal-only", mechanism,
+            "independent terminal check required"))
+    return GenerationPlan(digest(check_plan), tuple(controls), tuple(residual))
 
 
 def construct(snapshot: Snapshot, check_plan: CheckPlan, proposal_id: str,
@@ -33,15 +54,12 @@ def construct(snapshot: Snapshot, check_plan: CheckPlan, proposal_id: str,
     for obligation in check_plan.obligations:
         if (obligation.target, obligation.field) != (target, field):
             continue
-        params = properties(obligation.parameters)
+        params = _control_parameters(obligation)
         if obligation.kind == "integer_range":
-            require(set(params) == {"min", "max"} and type(params["min"]) is int
-                    and type(params["max"]) is int and params["min"] <= params["max"], "malformed range control")
             require(type(value) is int and params["min"] <= value <= params["max"], "candidate excluded by range")
         elif obligation.kind == "equals":
-            require(set(params) == {"value"}, "malformed equality control")
             require(type(value) is type(params["value"]) and value == params["value"], "candidate excluded by equality")
-    require(bool(proposal_id), "empty proposal ID")
+    require(type(proposal_id) is str and bool(proposal_id), "invalid proposal ID")
     return ChangeProposal("0.1", proposal_id, ref(snapshot),
                           (SetProperty("set_property", target, field, value),), element.sources)
 

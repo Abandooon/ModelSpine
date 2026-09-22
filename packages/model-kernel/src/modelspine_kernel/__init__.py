@@ -7,11 +7,16 @@ from modelspine_protocols import (
     AddElement, Applicability, ChangeProposal, Checker, CheckPlan, Commit, Confirm, Decision,
     DependencyFingerprint, Element, ElementRef, EvidenceRecord, ImpactSet, Metamodel,
     Preview, Property, RemoveElement, Rename, SetDependencies, SetProperty, Snapshot,
-    ValidationReport, checked, digest, properties, ref, require, validate_model, validate_plan,
+    ValidationReport, checked, digest, properties, ref, require, validate_evidence_refs,
+    validate_model, validate_plan,
 )
 
 
 def impact(before: Snapshot, after: Snapshot) -> ImpactSet:
+    before, after = checked(before, Snapshot), checked(after, Snapshot)
+    require((before.project_id, before.model_id, before.metamodel, before.metamodel_hash) == (
+        after.project_id, after.model_id, after.metamodel, after.metamodel_hash),
+        "impact requires the same model and metamodel", "conflict")
     old, new = ({e.id: e for e in s.elements} for s in (before, after))
     changed = {key for key in old.keys() | new.keys() if old.get(key) != new.get(key)}
     reverse: dict[str, set[str]] = {}
@@ -116,12 +121,15 @@ class ModelKernel:
         with self._lock:
             require(proposal.base == ref(self._current), "stale/mismatched base", "conflict")
             require(bool(proposal.proposal_id and proposal.operations), "empty proposal")
+            validate_evidence_refs(proposal.intent_refs)
             elements = {e.id: e for e in self._current.elements}
+            used_ids = {element.id for snapshot in self._history.values() for element in snapshot.elements}
             # A detached working set; no state is changed until the whole batch is valid.
             for operation in proposal.operations:
                 if isinstance(operation, AddElement):
-                    require(operation.element.id not in elements, "duplicate element ID", "conflict")
+                    require(operation.element.id not in used_ids, "element ID already used in this history/batch", "conflict")
                     elements[operation.element.id] = operation.element
+                    used_ids.add(operation.element.id)
                     continue
                 require(operation.target in elements, "operation target missing", "not_found")
                 element = elements[operation.target]

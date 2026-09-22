@@ -15,52 +15,59 @@
         "obligation_id": "role",
         "obligation_version": "1",
         "fragment": "equals",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       },
       {
         "obligation_id": "approval-invalidation",
         "obligation_version": "1",
         "fragment": "equals",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       },
       {
         "obligation_id": "currency",
         "obligation_version": "1",
         "fragment": "equals",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       },
       {
         "obligation_id": "unit",
         "obligation_version": "1",
         "fragment": "equals",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       },
       {
         "obligation_id": "weather-range",
         "obligation_version": "1",
         "fragment": "integer_range",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       },
       {
         "obligation_id": "external-range",
         "obligation_version": "1",
         "fragment": "integer_range",
-        "stage": "construction",
-        "mechanism": "finite-field-filter on edited field only",
+        "stage": "terminal-only",
+        "mechanism": "outside edited field",
         "remaining": "independent terminal check required"
       }
     ],
-    "residual": []
+    "residual": [
+      "role",
+      "approval-invalidation",
+      "currency",
+      "unit",
+      "weather-range",
+      "external-range"
+    ]
   },
   "positive": {
     "api_version": "0.1",
@@ -101,5 +108,9 @@
     "field": "threshold_minor",
     "value": -1,
     "expected": "construction excluded; direct product violated in terminal check"
+  },
+  "edit": {
+    "target": "approval-policy",
+    "field": "threshold_minor"
   }
 }

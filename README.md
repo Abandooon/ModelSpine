@@ -10,16 +10,19 @@ ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台
 
 ```text
 python -B run_tests.py
+python -B apps/boundary_examples.py --profile structural-graph
+python -B apps/boundary_examples.py --profile finite-automaton
 python -B apps/offline.py
 python -B apps/offline.py --threshold -1
 ```
 
-最后一条命令用于验证非法输入，预期退出码为 2。CLI 执行候选构造、预览、检查、决定、模型提交和证据适用性判断，当前加载[既有订单工程夹具](domain-packs/order-approval/README.md)。该夹具用于回归，不指定未来应用试点；CLI 尚不提供任意领域配置加载。
+两条 boundary_examples 命令通过显式适配检查器完成两类配置的加载、预览、检查、决定和模型提交；只解释各自有限语言，范围见[公共基础边界](docs/foundation-boundaries.md)。既有 offline CLI 执行字段构造与同一提交链，固定加载[订单工程夹具](domain-packs/order-approval/README.md)，不提供任意领域配置加载。最后一条为非法输入反例，预期退出码 2。所有入口均不指定未来应用试点。
 
 ## 框架与研究入口
 
 - [九模块职责、解耦规则与方向实验入口](docs/architecture.md)
 - [共享接口与当前支持范围](packages/protocols/contracts/v0.1/README.md)
+- [两类异质配置与公共基础边界](docs/foundation-boundaries.md)
 - [行为验收及结果边界](docs/validation.md)
 - [机制来源与许可状态](docs/provenance.md)
 - [适配器](adapters/README.md)、[领域包](domain-packs/README.md)、[平台应用](apps/README.md)

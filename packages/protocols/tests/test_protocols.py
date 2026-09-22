@@ -4,7 +4,8 @@ from dataclasses import replace
 
 from fixtures import load_fixture
 from modelspine_protocols import (
-    ChangeProposal, ContractError, Element, Property, Rename, Snapshot,
+    ArtifactRef, ChangeProposal, ContractError, Element, EvidenceRef, FieldSpec, KindSpec,
+    Metamodel, MetamodelRef, Property, Rename, Snapshot,
     digest, dumps, loads, ref, to_data, validate_model,
 )
 
@@ -65,6 +66,30 @@ class ProtocolTests(unittest.TestCase):
         order=replace(self.snapshot.elements[1],category='fact',sources=())
         with self.assertRaises(ContractError):
             validate_model(replace(self.snapshot,elements=(self.snapshot.elements[0],order,*self.snapshot.elements[2:])),self.meta)
+
+    def test_source_references_require_complete_identity_locator_and_sha256(self):
+        source = ArtifactRef('project', 'source', '1', digest('source content'))
+        valid = EvidenceRef(source, 'line:1', 'user-input')
+        malformed = [replace(valid, locator=''), replace(valid, origin='')]
+        malformed += [replace(valid, source=replace(source, **{field: ''}))
+                      for field in ('project_id', 'artifact_id', 'revision')]
+        malformed += [replace(valid, source=replace(source, content_hash=value))
+                      for value in ('short', 'z' * 64, source.content_hash.upper())]
+        for reference in malformed:
+            element = replace(self.snapshot.elements[0], sources=(reference,))
+            with self.subTest(reference=reference), self.assertRaises(ContractError) as raised:
+                validate_model(replace(self.snapshot, elements=(element, *self.snapshot.elements[1:])), self.meta)
+            self.assertEqual(raised.exception.code, 'invalid')
+        element = replace(self.snapshot.elements[0], category='fact', sources=(valid,))
+        validate_model(replace(self.snapshot, elements=(element, *self.snapshot.elements[1:])), self.meta)
+
+    def test_empty_field_name_is_rejected_without_any_instances(self):
+        meta = Metamodel(MetamodelRef('empty-model', '1'), (
+            KindSpec('node', (FieldSpec('', 'string'),)),))
+        snapshot = Snapshot('project', 'model', 0, meta.ref, digest(meta), ())
+        with self.assertRaises(ContractError) as raised:
+            validate_model(snapshot, meta)
+        self.assertEqual(raised.exception.code, 'invalid')
 
 
 if __name__ == '__main__':

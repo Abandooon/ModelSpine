@@ -15,7 +15,7 @@
         "manager role is a pilot assumption"
       ],
       "tool": "modelspine-field-checker",
-      "tool_version": "0.1.0"
+      "tool_version": "0.1.1"
     },
     "outcomes": [
       {

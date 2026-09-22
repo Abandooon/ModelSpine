@@ -1,0 +1,27 @@
+{
+  "id": "finite-automaton-checks",
+  "version": "1",
+  "rule_version": "finite-automaton/0.1",
+  "assumptions": [
+    "finite engineering configuration; not a business pilot",
+    "root membership read completeness is not established"
+  ],
+  "obligations": [
+    {
+      "id": "machine-structure",
+      "version": "1",
+      "kind": "deterministic_automaton",
+      "target": "machine",
+      "field": "initial",
+      "parameters": []
+    },
+    {
+      "id": "trace-accepted",
+      "version": "1",
+      "kind": "finite_trace_acceptance",
+      "target": "machine",
+      "field": "trace",
+      "parameters": []
+    }
+  ]
+}
