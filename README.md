@@ -23,6 +23,7 @@ python -B apps/offline.py --threshold -1
 - [九模块职责、解耦规则与方向实验入口](docs/architecture.md)
 - [共享接口与当前支持范围](packages/protocols/contracts/v0.1/README.md)
 - [两类异质配置与公共基础边界](docs/foundation-boundaries.md)
+- [下一轮任务：版本化任务合同与固定目标验收（设计）](docs/next-iteration.md)
 - [行为验收及结果边界](docs/validation.md)
 - [机制来源与许可状态](docs/provenance.md)
 - [适配器](adapters/README.md)、[领域包](domain-packs/README.md)、[平台应用](apps/README.md)

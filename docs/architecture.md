@@ -55,3 +55,5 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 不预设应用试点。[两类异质配置](foundation-boundaries.md)通过显式 Checker 分别解释结构图端点/无环与有限自动机确定性/有限输入串接受；它们共用协议和模型提交合同。字符串编码并不使内核原生支持关系或行为语义；状态机模拟不是应用运行时。全图成员读取无法用现有指纹证明完备，两配置根必须保留 dependencies_complete=False，旧证据为 unknown 或 stale。既有订单夹具仍只承担有限回归。
 
 研究运行要求见[公开协议摘要](../studies/lifecycle/protocol.md)，工程验收见[validation.md](validation.md)。
+
+下一编码轮按[任务合同与固定目标验收设计](next-iteration.md)推进：共享信封归 protocols，通用评估归 assurance，文件/提交装配归 apps，有限语义规则归 adapters。研究任务卡与留出评价在研究/测试侧；该设计尚未实现，不改变上方当前能力状态。
