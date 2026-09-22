@@ -20,6 +20,8 @@ JSON 用 UTF-8、排序对象键、紧凑分隔符；元组编码数组，数组
 
 kernel 校验返回报告的候选/计划哈希、规范范围、前提、非空工具身份/版本，以及范围内义务 ID/版本的完整唯一覆盖；错绑定或覆盖为 conflict，结构不合法为 invalid。执行器仍是可信依赖，绑定校验不证明规则真值或独立性。检查器读取的数据必须由模型显式依赖覆盖；`dependencies_complete` 是可信声明，当前不自动追踪读集。无法保证完整性时应标为不完整并保留 unknown，不能把跨范围未声明读取产生的证据视作可安全复用。
 
+这部分报告完整性校验由公共 `validate_report(report, snapshot, plan, scope) -> ValidationReport` 实现，供 kernel 和 assurance 复用。调用方必须显式提供预期 scope；`select_scope(plan, scope=None)` 可选择并排序计划全部目标或合法非空子集，拒绝重复/计划外目标。不能把报告自报的局部 scope 当作完整期望范围。校验不执行规则、不改变 satisfied/violated/unknown/not_applicable/error，也不提供提交或任务完成许可。
+
 ChangeProposal 含 api_version/proposal_id/base/operations/intent_refs，六种操作是 Rename、SetProperty、SetDependencies、AddElement、RemoveElement、Confirm。整批在副本执行并验证最终结构；无任意 callback/metadata patch。新增 ID 唯一，删除不留悬空引用，重命名保留 ID。成功设计提交 revision+1（含无变化提案），与业务无变化写入规则分开。
 
 元素 ID 在 kernel 本实例加载及此后已接受的历史快照内不得删除后重用，同一提案批次也不得 RemoveElement 后以相同 ID AddElement。需要新身份时使用新 ID；当前操作不能改写已有身份的 kind/category，也不能以删除重建模拟迁移。本规则不声明跨进程或重新加载后已恢复全部历史身份。
@@ -29,6 +31,21 @@ Preview 绑定提案哈希、候选哈希、候选快照与 ImpactSet。Validati
 Decision 是内核登记许可，绑定基准、提案、候选、报告、策略、actor 和范围；不能用 approved=True 替代。checker 由平台注入可信进程，签发时重算报告以防外来 JSON 冒充检查。这不是跨进程认证系统。四类接受：修复进展、模型保存、业务订单批准、应用交付。默认 satisfied-save 要求非空范围内全部满足；显式 checked-save 可保存带残余的设计，不授予交付权限。
 
 EvidenceRecord 保留原报告、基准及完整依赖指纹；Applicability 另算 current/stale/unknown。依赖完整且指纹、元模型、规则/工具/前提相符才 current；current 的 violated 仍是 violated。RunReceipt 只记录实际工具、输入/输出哈希、耗时和终态，不补造调用或成本。
+
+## 独立任务信封
+
+任务信封使用独立 `schema_version`，不改变现有模型/提案 JSON v0.1 字段。以下值对象均不可变，使用同一严格编解码器；新增/未知字段、未知版本或状态、缺失必填字段和错误嵌套类型均拒绝。
+
+| 对象 | 共享字段 |
+|---|---|
+| TaskStatement | id、text、category（intent/fact/hypothesis）、confirmation（confirmed/unresolved/conflicted）、required、source_refs、pending_reason |
+| TaskBinding | obligation_id、obligation_version、statement_ids |
+| TaskContract | schema_version=`task-contract/0.1`、id、version、base、statements、plan、bindings |
+| TaskAssessment | schema_version=`task-assessment/0.1`、task_ref、candidate、report、intent_status、goal_status、mapped_statements、unresolved |
+
+`plan` 可显式为 null；TaskAssessment 的 candidate/report 也可为 null；pending_reason 可为 null。字段本身仍必填。intent_status 为 ready/unresolved，goal_status 为 satisfied/violated/unknown/error/not_checked；unresolved 是用于呈现的诊断文本，不是控制逻辑编码。评估信封没有 commit 字段，不能冒称模型已经保存。
+
+protocols 只定义交换形状和引用格式。`validate_artifact_ref` 与 `validate_snapshot_ref` 分别核对严格类型、非空身份、非负模型修订及小写 64 位 SHA-256，返回合法引用；它们不读取源文件或证明内容真实。任务/来源字节身份、定位、声明授权、映射覆盖及状态之间的语义一致性由 assurance 的 PreparedTask 和任务评估入口负责。应用负责文件读取和保存结果；TaskCard、EvaluationSpec、论文条件及评价实现不进入共享运行信封。
 
 ## S1 全局推演
 

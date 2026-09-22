@@ -35,25 +35,26 @@ def _members(snapshot, root, root_kind):
     return members, None
 
 
-def _structure(snapshot, root, obligation):
+def _graph(snapshot, root):
+    """Return adjacency only after the supported graph structure is valid."""
     members, failure = _members(snapshot, root, "graph")
     if failure:
-        return failure
+        return None, failure
     nodes = {e.id: e for e in members if e.kind == "node"}
     edges = tuple(e for e in members if e.kind == "edge")
     if len(nodes) + len(edges) != len(members):
-        return "violated", (f"{root.id}:unsupported_member_kind",)
+        return None, ("violated", (f"{root.id}:unsupported_member_kind",))
     if properties(root.properties).get("root") not in nodes:
-        return "violated", (f"{root.id}:invalid_root_node",)
+        return None, ("violated", (f"{root.id}:invalid_root_node",))
     adjacency = {key: [] for key in nodes}
     indegree = {key: 0 for key in nodes}
     for edge in edges:
         values = properties(edge.properties)
         source, target = values.get("source"), values.get("target")
         if source not in nodes or target not in nodes:
-            return "violated", (f"{edge.id}:invalid_endpoint",)
+            return None, ("violated", (f"{edge.id}:invalid_endpoint",))
         if not {source, target} <= set(edge.dependencies):
-            return "error", (f"{edge.id}:endpoint_read_dependencies_missing",)
+            return None, ("error", (f"{edge.id}:endpoint_read_dependencies_missing",))
         adjacency[source].append(target)
         indegree[target] += 1
     todo = [key for key in nodes if indegree[key] == 0]
@@ -66,53 +67,73 @@ def _structure(snapshot, root, obligation):
             if indegree[target] == 0:
                 todo.append(target)
     if visited != len(nodes):
-        return "violated", (f"{root.id}:directed_cycle",)
-    return "satisfied", ()
+        return None, ("violated", (f"{root.id}:directed_cycle",))
+    return adjacency, None
 
 
-def _automaton(snapshot, root, obligation):
+def _structure(snapshot, root, obligation):
+    _, failure = _graph(snapshot, root)
+    return failure if failure else ("satisfied", ())
+
+
+def _machine(snapshot, root):
+    """Return a validated finite machine without consulting its editable trace."""
     members, failure = _members(snapshot, root, "machine")
     if failure:
-        return failure
+        return None, failure
     states = {e.id: e for e in members if e.kind == "state"}
     transitions = tuple(e for e in members if e.kind == "transition")
     if len(states) + len(transitions) != len(members):
-        return "violated", (f"{root.id}:unsupported_member_kind",)
+        return None, ("violated", (f"{root.id}:unsupported_member_kind",))
     values = properties(root.properties)
     initial, alphabet = values.get("initial"), values.get("alphabet")
     if initial not in states:
-        return "violated", (f"{root.id}:invalid_initial_state",)
+        return None, ("violated", (f"{root.id}:invalid_initial_state",))
     if type(alphabet) is not str or not alphabet or len(set(alphabet)) != len(alphabet):
-        return "violated", (f"{root.id}:invalid_finite_alphabet",)
+        return None, ("violated", (f"{root.id}:invalid_finite_alphabet",))
     accepting = {key: properties(state.properties).get("accepting") for key, state in states.items()}
     if any(type(value) is not bool for value in accepting.values()):
-        return "violated", (f"{root.id}:invalid_accepting_flag",)
+        return None, ("violated", (f"{root.id}:invalid_accepting_flag",))
     table = {}
     for transition in transitions:
         fields = properties(transition.properties)
         source, target, symbol = fields.get("source"), fields.get("target"), fields.get("symbol")
         if source not in states or target not in states:
-            return "violated", (f"{transition.id}:invalid_endpoint",)
+            return None, ("violated", (f"{transition.id}:invalid_endpoint",))
         if not {source, target} <= set(transition.dependencies):
-            return "error", (f"{transition.id}:endpoint_read_dependencies_missing",)
+            return None, ("error", (f"{transition.id}:endpoint_read_dependencies_missing",))
         if type(symbol) is not str or len(symbol) != 1 or symbol not in alphabet:
-            return "violated", (f"{transition.id}:invalid_finite_symbol",)
+            return None, ("violated", (f"{transition.id}:invalid_finite_symbol",))
         if (source, symbol) in table:
-            return "violated", (f"{root.id}:nondeterministic:{source}:{symbol}",)
+            return None, ("violated", (f"{root.id}:nondeterministic:{source}:{symbol}",))
         table[source, symbol] = target
-    if obligation.kind == "deterministic_automaton":
-        return "satisfied", ()
-    trace = values.get("trace")
-    if type(trace) is not str or any(symbol not in alphabet for symbol in trace):
-        return "violated", (f"{root.id}:trace_outside_alphabet",)
+    return (initial, alphabet, accepting, table), None
+
+
+def _run_input(machine, trace):
+    """Execute a supported input on a validated deterministic machine."""
+    initial, _, accepting, table = machine
     current = initial
     for index, symbol in enumerate(trace):
         if (current, symbol) not in table:
-            return "violated", (f"{root.id}:trace_blocked:{index}",)
+            return False, f"trace_blocked:{index}"
         current = table[current, symbol]
     if not accepting[current]:
-        return "violated", (f"{root.id}:trace_not_accepted:{current}",)
-    return "satisfied", ()
+        return False, f"trace_not_accepted:{current}"
+    return True, ""
+
+
+def _automaton(snapshot, root, obligation):
+    machine, failure = _machine(snapshot, root)
+    if failure:
+        return failure
+    if obligation.kind == "deterministic_automaton":
+        return "satisfied", ()
+    trace = properties(root.properties).get("trace")
+    if type(trace) is not str or any(symbol not in machine[1] for symbol in trace):
+        return "violated", (f"{root.id}:trace_outside_alphabet",)
+    accepted, reason = _run_input(machine, trace)
+    return ("satisfied", ()) if accepted else ("violated", (f"{root.id}:{reason}",))
 
 
 def _check(snapshot, plan, scope, supported, evaluate, tool):

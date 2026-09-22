@@ -1,6 +1,6 @@
 # 共享协议与稳定引用
 
-已实现有限离线切片：严格不可变 v0.1 JSON、标量字段元模型、身份/版本/哈希绑定，以及同步 Checker 接口。包版本为 0.1.1-experimental，JSON api_version 仍为 0.1。
+已实现有限离线切片：严格不可变 v0.1 JSON、标量字段元模型、身份/版本/哈希绑定，以及同步 Checker 接口。新增 TaskContract/TaskAssessment 独立信封与公共报告校验。当前包版本见 module.json；原 JSON api_version 仍为 0.1，任务信封为 task-contract/0.1、task-assessment/0.1。
 
 状态、依赖和证据由 [module.json](module.json) 维护。公开字段与错误/副作用/版本语义见 [合同](contracts/v0.1/README.md)，正反例见 [结构化样例](contracts/v0.1/examples.json)。共享结构只有 [protocols](../protocols/contracts/v0.1/README.md) 一处定义。
 

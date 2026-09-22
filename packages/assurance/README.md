@@ -1,6 +1,6 @@
 # 合同形式化与独立保障
 
-已实现有限离线切片：Design-field integer_range/equals terminal checks; unsupported remains unknown; no business runtime approval。
+已实现设计字段 integer_range/equals 检查，以及纯内存的固定任务准备与评估。任务来源、声明和映射合同见 [tasks.md](contracts/v0.1/tasks.md)，入口为 [tasks.py](src/modelspine_assurance/tasks.py)。有限图/自动机语义由外部 Checker 注入，不内置领域或论文条件。未知保持未知，映射与检查通过不证明意图忠实。
 
 状态、依赖和证据由 [module.json](module.json) 维护。公开字段与错误/副作用/版本语义见 [合同](contracts/v0.1/README.md)，正反例见 [结构化样例](contracts/v0.1/examples.json)。共享结构只有 [protocols](../protocols/contracts/v0.1/README.md) 一处定义。
 

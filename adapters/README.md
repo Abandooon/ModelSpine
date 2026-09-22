@@ -10,4 +10,11 @@
 
 目标不存在为 error；目标存在但义务 kind 不支持为 unknown。支持的义务配置错误为 error；可判定的候选语义反例为 violated。检查失败不更换执行器或改变义务。
 
+[task_checks.py](task_checks.py) 提供 `check_tasks(snapshot, plan, scope=None)`，工具身份为 `modelspine-task-checker/0.1.0`。保留三条旧有限规则，并增加两个从固定计划读取目标的规则：
+
+- `graph_reachability` 使用 `field=root`，参数为 `source`、`destination` 字符串和 `expected_reachable` 布尔值。先验证当前支持的有效有向无环图，再按固定节点 ID 检查可达性，包含同一有效节点到自身的零长度路径。任务端点不属于本图为 error。
+- `trace_acceptance` 使用 `field=initial`，参数为 `input` 字符串和 `expected_accept` 布尔值。先验证平坦、确定、依赖声明符合边界的有限自动机，再执行参数 input；不使用或替换候选的 `machine.trace`。输入超出声明字母表为 unknown；受支持输入遇到缺失转移或非接受终态是正常拒绝，可满足 expected_accept=false。
+
+非法模型不能借负向期望得到 satisfied；参数类型或集合错误为 error。旧 `finite_trace_acceptance` 仍读取模型内 trace，超字母表仍按旧语义 violated，两者不混同。新旧消费者共享有限结构解析与执行辅助，没有向公共核心添加图/自动机分支；报告始终绑定实际原候选和原计划哈希。任务规则只判断已声明的有限目标，不证明意图完整或研究优势。
+
 [平台入口](../README.md)

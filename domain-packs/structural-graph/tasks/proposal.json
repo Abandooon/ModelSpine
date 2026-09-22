@@ -1,0 +1,23 @@
+{
+  "api_version": "0.1",
+  "proposal_id": "structural-graph-task-rename",
+  "base": {
+    "project_id": "foundation-examples",
+    "model_id": "structural-graph",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "a5a7e0ac5921057fe2c4c4f4074c13f332d03bdeada2f5d306e8c68763bf49c2"
+  },
+  "operations": [
+    {
+      "op": "rename",
+      "target": "node-a",
+      "name": "Renamed without changing identity"
+    }
+  ],
+  "intent_refs": []
+}

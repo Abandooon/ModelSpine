@@ -13,3 +13,5 @@ python -B apps/boundary_examples.py --profile structural-graph
 示例加载三份 JSON，经同一 ModelKernel 预览、检查、决定和提交，将 `node-b → node-c` 改为 `node-a → node-c`，同时更新边依赖。已知悬空端点、端点类型错误或环为 violated；根目标缺失、错误规则配置或虚假完整声明为 error；未支持义务 kind 为 unknown。失败不提交。
 
 模型中的 hypothesis/confirmed 表示本工程样例显式采用的假设，不表示真实用户确认或来源恢复。JSON 及代码支持范围都不构成研究优势结论。
+
+固定目标版本见 [任务合同](tasks/task.json)及[任务卡](tasks/card.json)。公开 [source.txt](tasks/source.txt)由工程任务作者确认；卡片钉住原始字节与来源，不从候选自带输入重建目标。运行 `python -B -I apps/task_acceptance.py --profile structural-graph`；此正例改名保持身份，行为反例由集成验收另测。

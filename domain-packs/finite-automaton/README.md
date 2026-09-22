@@ -15,3 +15,5 @@ python -B apps/boundary_examples.py --profile finite-automaton
 原模型接受 `ab`。示例将第二条转移的符号改为 `a`，并把要验收的 trace 改为 `aa`，经共同的预览/检查/决定/提交入口保存；若只改转移而保留 `ab`，检查失败。行为由实际转移决定，不是比较状态字符串。
 
 根列出所有成员依赖并设 `dependencies_complete=false`；转移列出端点依赖。v0.1 不能自动追踪将来新增成员，根声明完整时检查器返回 error；证据不得因当前检查通过而被称作 current。模型的 hypothesis/confirmed 仅表示样例假设，验收不证明研究比较优势。
+
+固定目标版本见 [任务合同](tasks/task.json)及[任务卡](tasks/card.json)。公开 [source.txt](tasks/source.txt)由工程任务作者确认；卡片钉住原始字节与来源，不从候选自带输入重建目标。运行 `python -B -I apps/task_acceptance.py --profile finite-automaton`；此正例改名保持身份，行为反例由集成验收另测。

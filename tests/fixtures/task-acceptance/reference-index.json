@@ -1,0 +1,14 @@
+{
+  "graph-reference.json": {
+    "project_id": "foundation-examples",
+    "artifact_id": "structural-graph-reference",
+    "revision": "1",
+    "content_hash": "58e261e3b7531685e1498ff4830f775179db0f8f1505b96cd58a922a45b8974e"
+  },
+  "automaton-reference.json": {
+    "project_id": "foundation-examples",
+    "artifact_id": "finite-automaton-reference",
+    "revision": "1",
+    "content_hash": "8f21f7732456a14ee06c5b6c83309b559c4143680c3d2635e77ca956180c48cc"
+  }
+}

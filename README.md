@@ -4,6 +4,8 @@ ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台
 
 当前九模块已有合同设计；`protocols`、`model-kernel`、`assurance`、`generation` 提供有限离线模型变更实现，其他五模块为 planned。尚无完整无代码平台、应用运行时或研究比较结果。模块实际状态以各 `module.json` 和源码为准；目标合同 `contracts/design.md` 为 draft，不代表已有实现。
 
+本轮已实现版本化任务合同与固定目标检查：共享信封归 protocols，来源与声明评估归 assurance，有限规则由适配器解释，apps 装配已有内核保存。独立参考验收留在测试侧，和开发检查分别记录；126 项工程验收全部通过，范围见[本轮实现交接](docs/next-iteration.md)。
+
 ## 运行
 
 使用 Python 3.10+，当前只依赖标准库，无安装步骤。从本仓库根执行：
@@ -18,12 +20,22 @@ python -B apps/offline.py --threshold -1
 
 两条 boundary_examples 命令通过显式适配检查器完成两类配置的加载、预览、检查、决定和模型提交；只解释各自有限语言，范围见[公共基础边界](docs/foundation-boundaries.md)。既有 offline CLI 执行字段构造与同一提交链，固定加载[订单工程夹具](domain-packs/order-approval/README.md)，不提供任意领域配置加载。最后一条为非法输入反例，预期退出码 2。所有入口均不指定未来应用试点。
 
+本轮任务入口已完成工程验收：
+
+```text
+python -B apps/task_acceptance.py --profile structural-graph
+python -B apps/task_acceptance.py --profile finite-automaton
+```
+
+任务输入来自预先固定的合同和来源；自动机任务使用合同中的固定输入串，不以候选模型的 `trace` 替换目标。输出分别保留任务评估与模型提交；无计划、必需意图未决或开发检查未全满足时不提交。该 CLI 不执行参考验收，也不声称完整用户意图已获证明。
+
 ## 框架与研究入口
 
 - [九模块职责、解耦规则与方向实验入口](docs/architecture.md)
 - [共享接口与当前支持范围](packages/protocols/contracts/v0.1/README.md)
 - [两类异质配置与公共基础边界](docs/foundation-boundaries.md)
-- [下一轮任务：版本化任务合同与固定目标验收（设计）](docs/next-iteration.md)
+- [本轮实现交接：版本化任务合同与固定目标验收](docs/next-iteration.md)
+- [任务准备与评估合同](packages/assurance/contracts/v0.1/tasks.md)
 - [行为验收及结果边界](docs/validation.md)
 - [机制来源与许可状态](docs/provenance.md)
 - [适配器](adapters/README.md)、[领域包](domain-packs/README.md)、[平台应用](apps/README.md)

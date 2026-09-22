@@ -1,0 +1,4 @@
+Task author confirms this finite engineering task; no end-user or research ground truth is claimed.
+Preserve a valid finite directed acyclic graph.
+Keep node-a able to reach node-c.
+Keep node-c unable to reach node-a.

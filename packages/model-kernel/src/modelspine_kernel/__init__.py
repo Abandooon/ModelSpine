@@ -7,8 +7,8 @@ from modelspine_protocols import (
     AddElement, Applicability, ChangeProposal, Checker, CheckPlan, Commit, Confirm, Decision,
     DependencyFingerprint, Element, ElementRef, EvidenceRecord, ImpactSet, Metamodel,
     Preview, Property, RemoveElement, Rename, SetDependencies, SetProperty, Snapshot,
-    ValidationReport, checked, digest, properties, ref, require, validate_evidence_refs,
-    validate_model, validate_plan,
+    ValidationReport, checked, digest, properties, ref, require, select_scope, validate_evidence_refs,
+    validate_model, validate_plan, validate_report,
 )
 
 
@@ -158,24 +158,10 @@ class ModelKernel:
 
     def _check(self, snapshot: Snapshot, scope: tuple[str, ...] | None = None) -> ValidationReport:
         """Validate the selected checker's output without duplicating its rules."""
-        targets = {o.target for o in self._plan.obligations}
-        scope = tuple(sorted(targets)) if scope is None else scope
-        require(type(scope) is tuple and bool(scope) and all(type(s) is str for s in scope),
-                "invalid check scope")
-        require(len(set(scope)) == len(scope) and set(scope) <= targets, "invalid check scope")
-        scope = tuple(sorted(scope))
+        scope = select_scope(self._plan, scope)
         # A backend exception aborts the operation; never substitute a cached or empty report.
-        report = checked(self._checker(snapshot, self._plan, scope), ValidationReport)
-        binding = report.binding
-        require((binding.candidate_hash, binding.plan_hash, binding.scope, binding.assumptions) == (
-            digest(snapshot), digest(self._plan), scope, self._plan.assumptions),
-            "checker returned mismatched report binding", "conflict")
-        require(bool(binding.tool and binding.tool_version), "checker identity/version missing", "conflict")
-        expected = {o.id: o.version for o in self._plan.obligations if o.target in scope}
-        actual = {o.obligation_id: o.obligation_version for o in report.outcomes}
-        require(len(actual) == len(report.outcomes) and actual == expected,
-                "checker returned incomplete, duplicate or mismatched obligation coverage", "conflict")
-        return report
+        report = self._checker(snapshot, self._plan, scope)
+        return validate_report(report, snapshot, self._plan, scope)
 
     def decide(self, proposal: ChangeProposal, report: ValidationReport, actor: str,
                policy: str = "satisfied-save") -> Decision:

@@ -6,10 +6,10 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 | 模块 | 拥有的状态或产物 | 公开边界及当前范围 |
 |---|---|---|
-| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON 和有限标量元模型；不持有项目状态 |
+| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON 和有限标量元模型；本轮新增任务信封与公共报告校验，不持有项目状态 |
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；无持久化或跨进程事务 |
 | [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | planned；产生模型提案或元模型扩展建议，无直接模型写权 |
-| [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；一般形式化和外部求解器仍属设计 |
+| [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
 | [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段候选控制和纯报告比较；无 LLM 或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |
 | [interaction](../packages/interaction/contracts/design.md) | TaskView、交互计划、用户请求 | planned；业务界面与开发审查台分开，无模型或业务授权权力 |
@@ -29,6 +29,24 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 apps 负责装配当前能力；studies 可装配替代方法、检查器、条件和记录器。运行包不能反向导入 apps/studies/tests/research。适配器实现公开合同，按调用显式选择；失败不自动换后端。尚无实际消费者的扩展保持设计，不预建插件注册中心、运行框架或空包实现。
 
 当前真实检查器入口是 `protocols.Checker(snapshot, plan, scope=None) -> ValidationReport` 的同步调用合同。kernel 核对返回报告结构、候选/计划/范围/前提绑定及义务覆盖，执行器异常不被转成成功。替换检查器不需修改 kernel 的能力依赖。模型依赖必须覆盖检查器实际读取的数据；`dependencies_complete` 是可信声明，当前不自动追踪读集，报告绑定校验不能证明依赖完整或语义正确。
+
+本轮将既有报告完整性校验归入 `protocols.validate_report(report, snapshot, plan, scope)`，供 kernel 和 assurance 共用。`select_scope(plan, scope=None)` 规范化计划全部目标或合法非空子集；校验调用方必须显式传入预期范围，不能信任报告自行缩小范围。共同校验保持结构错误与错绑定的拒绝行为，不替检查器证明规则正确。
+
+## 本轮任务边界与集成归属
+
+[版本化任务与固定目标验收](next-iteration.md)已完成本轮有限实现及工程验收，结果见 [validation.md](validation.md)；本轮不启动完整需求澄清方法或比较实验。
+
+| 位置 | 本轮责任 | 不授予的权力 |
+|---|---|---|
+| protocols | `TaskStatement`、`TaskBinding`、`TaskContract`、`TaskAssessment` 的唯一严格交换定义；公共引用/报告完整性校验 | 不读取文件、不解释来源正文、不保存模型 |
+| assurance | `prepare_task` 在内存中核对任务/来源原始字节、位置及显式映射；`assess_task` 执行固定计划并分别报告意图就绪与目标检查状态 | 不导入领域适配器、不产生模型提交、不认证真实用户意图 |
+| adapters | `graph_reachability`、`trace_acceptance` 解释两个有限任务语义，通过 Checker 注入 | 不决定任务授权、不选择评价规格 |
+| apps | 显式读取任务/来源路径，固定初始模型及计划；预览候选，符合保存条件时调用 kernel | 不用留出评价结果驱动选择或重试，不把模型保存说成应用交付 |
+| tests/studies | 固定评价规格、参考实现、方法装配及其证据记录 | 不被运行包或任务 CLI 反向导入 |
+
+TaskContract 的原始字节引用由调用方在候选产生前确定；PreparedTask 是 assurance 的可信进程内值，不是跨进程授权令牌。当前工程任务卡只装配任务、来源与提案文件，研究条件和预算仍由后续研究编排设计。任务信封不含行业 profile、论文条件或评价文件位置。
+
+任务到声明/计划的绑定与候选到报告的绑定分别负责不同完整性。两者成立仍不证明声明和规则语义忠实。TaskAssessment 没有 commit 字段；apps 只在必需意图 ready 且全部开发义务 satisfied 时调用原有内核保存。独立评价可随后失败，必须保留保存事实与评价失败，不伪造回滚或成功。
 
 ## 身份、变更与接受
 
@@ -56,4 +74,4 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 研究运行要求见[公开协议摘要](../studies/lifecycle/protocol.md)，工程验收见[validation.md](validation.md)。
 
-下一编码轮按[任务合同与固定目标验收设计](next-iteration.md)推进：共享信封归 protocols，通用评估归 assurance，文件/提交装配归 apps，有限语义规则归 adapters。研究任务卡与留出评价在研究/测试侧；该设计尚未实现，不改变上方当前能力状态。
+本轮新增规则仍只在终验阶段执行，generation 没有新增图或行为生成算法。requirements、interaction、implementation、code-intelligence、component-reuse 仍为 planned；任务边界的工程实现不升级这些方向或论文结论。

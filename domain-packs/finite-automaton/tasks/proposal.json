@@ -1,0 +1,23 @@
+{
+  "api_version": "0.1",
+  "proposal_id": "finite-automaton-task-rename",
+  "base": {
+    "project_id": "foundation-examples",
+    "model_id": "finite-automaton",
+    "revision": 0,
+    "metamodel": {
+      "id": "finite-automaton",
+      "version": "0.1"
+    },
+    "metamodel_hash": "d79df3f7ae626375787dcd08ed337bdc797392dd3ccd3dc8589568d5dd703b17",
+    "content_hash": "55791a659fb7b42c72f231410b1eba9d2a62d5dbb8cc840922b0a475a5b0c4b7"
+  },
+  "operations": [
+    {
+      "op": "rename",
+      "target": "s1",
+      "name": "Renamed without changing identity"
+    }
+  ],
+  "intent_refs": []
+}

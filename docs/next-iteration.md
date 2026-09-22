@@ -1,12 +1,12 @@
-# 下一轮：版本化任务合同与固定目标验收
+# 版本化任务合同与固定目标验收：本轮实现交接
 
-状态：2026-09-23 设计，尚未实现。代码基线为 `ec8e3a3296ee8df767ad513b7a25de0ac1916e01`；该版本的 69 项测试属于上轮工程证据，本设计没有新增运行结果。当前能力见[支持矩阵](foundation-boundaries.md)。
+状态：2026-09-23 本轮有限实现完成，126 项工程验收通过。本页从原设计转为本轮接口、文件归属与验收交接；新增任务信封、准备/评估、应用入口、有限规则及参考验收已实际调用。起点为 `ec8e3a3296ee8df767ad513b7a25de0ac1916e01`；该版本的 69 项测试只属于上轮工程证据，不作为本轮完成结论。当前范围见[支持矩阵](foundation-boundaries.md)，最终工程结果由 [validation.md](validation.md)记录。
 
 ## 1. 目标与退出条件
 
 使候选模型接受事先固定的任务要求检查，并明确区分模型合法、已声明目标满足、意图仍未决及独立评价结果。候选修改不能同时替换任务目标后继续冒称完成原任务。
 
-完成时应能从版本化来源和任务合同加载一项有限任务，预览候选，执行固定目标检查，再通过已有 kernel 保存合格候选；错误、未知或必需意图未决时保留原因。另有独立实现的参考验收揭露“候选与开发检查共同错误”的工程反例。该反例不等于已完成合同忠实性算法或比较研究。
+本轮交付链为：从版本化来源和任务合同加载一项有限任务，预览候选，执行固定目标检查，再通过已有 kernel 保存合格候选；错误、未知或必需意图未决时保留原因。独立实现的参考验收负责揭露“候选与开发检查共同错误”的工程反例。完整调用及反例已完成工程验收；它们不等于合同忠实性算法或比较研究。
 
 这轮落在公共任务边界、P1-A 输入语义、P2-A/B 的有限检查消费者及 E0 验收设计交界。它不是完整 P1 实现，也不包含九模块全部实现。
 
@@ -21,8 +21,8 @@
 | 材料 | 拥有者与内容 | 可见性及权力 |
 |---|---|---|
 | TaskContract：任务合同 | 任务提供方确定；身份、原始来源、目标声明、未决项、初始模型引用、固定开发检查计划及声明—义务映射 | 方法可读取；一次运行开始前固定，模型提案无写权；是结构化输入，不是自动形式化的成果 |
-| TaskCard：工程/研究任务卡 | apps/studies 装配；钉住任务合同和输入引用，规定允许信息、预算、记录位置和评价方式 | 是编排材料；论文条件和评价文件位置不能进入运行包 |
-| EvaluationSpec：独立评价规格 | 评价方预先制定；留出输入/期望、目标来源、工具版本及构造依据 | 不传给候选生成/修复接口；输出只用于评价。当前公开工程样例可被开发者看到，不能冒称安全隔离的隐藏研究集 |
+| TaskCard：工程/研究任务卡 | 当前工程卡由 apps 装配，包含 schema、任务文件/引用、来源路径/引用及提案路径；研究预算、允许信息和记录方式仍待后续编排 | 是编排材料；论文条件和评价文件位置不能进入运行包 |
+| EvaluationSpec：独立评价规格 | 测试侧拥有 schema、id/version、task_ref、模型身份及固定输入/期望 cases；评价方事先钉住规格原始字节引用 | 不传给候选生成/修复接口；输出只用于评价。当前公开工程样例可被开发者看到，不能冒称安全隔离的隐藏研究集 |
 
 开发义务可以作为方法反馈；留出评价不能被偷偷用于生成、选择候选或决定重试。独立性来自目标建立和推导路径，不是文件分开或工具改名；本轮人工编写的工程规格须记录共同作者/来源，不能冒称已获得独立专家真值。
 
@@ -35,7 +35,7 @@ TaskContract 和 TaskAssessment 是 assurance 与 apps 之间的实际交换对�
 | 对象 | 必须承载的最小信息 |
 |---|---|
 | TaskContract | 独立 schema_version、id/version；初始 SnapshotRef；带 ID、正文、类别、确认状态和来源引用的目标声明；哪些未决项影响必需目标；固定 CheckPlan 或明确的无可执行计划状态；义务 ID/version 到声明 ID 的显式映射 |
-| PreparedTask | 通过校验的 TaskContract、外部钉住的 ArtifactRef、规范化计划及其哈希（无计划则均为 None）；不可变，不暴露修改计划的入口 |
+| PreparedTask | 通过校验的 contract、外部钉住的 task_ref、plan_hash（无计划则为 None）、mapped_statements、unresolved；不可变，计划保存在 contract.plan |
 | TaskAssessment | task_ref、candidate SnapshotRef、完整开发 ValidationReport；未形成候选/未检查时引用或报告允许 None 并列原因；独立的意图就绪状态、声明覆盖及目标检查状态。它只描述评估，不包含未来提交事实；commit/未提交原因由 apps 的运行结果关联 |
 
 TaskContract 自身不存其自身字节哈希。任务提供方在 TaskCard 中钉住其 ArtifactRef；应用读取原始字节，assurance 逐字节核对任务及来源身份、版本、哈希和已登记位置。来源只支持 UTF-8 文本及 `lines:start-end` 定位（从 1 开始、包含两端），使用显式传入的制品引用→路径映射，不遍历任意来源或回退到旧文件。
@@ -46,13 +46,14 @@ TaskContract 自身不存其自身字节哈希。任务提供方在 TaskCard 中
 
 ## 5. 接口与接受边界
 
-以下为下一编码轮拟实施的接口语义，名称可随现有代码风格调整，职责不可隐式合并：
+以下为本轮已经加入并通过工程验收的调用接口；精确准备/评估合同见 [tasks.md](../packages/assurance/contracts/v0.1/tasks.md)：
 
 ```text
 load_task(path, expected_task_ref, source_paths) -> PreparedTask  # apps
 prepare_task(contract_bytes, expected_task_ref, source_contents) -> PreparedTask  # assurance
 assess_task(prepared_task, snapshot, checker) -> TaskAssessment  # assurance
-run_task(prepared_task, metamodel, snapshot, proposal, checker, actor) -> task run result  # apps
+run_task(prepared_task, metamodel, snapshot, proposal, checker, actor) -> TaskRunResult  # apps
+pin_evaluation_spec(raw_json, expected_ref) -> PinnedEvaluationSpec  # 评价侧
 evaluate_candidate(snapshot, evaluation_spec) -> EvaluationResult  # 评价侧
 ```
 
@@ -62,13 +63,15 @@ evaluate_candidate(snapshot, evaluation_spec) -> EvaluationResult  # 评价侧
 
 无计划分支在核对输入身份后、装配 kernel 之前早退：candidate_ref=None、report=None，基准仍由 TaskContract 的初始 SnapshotRef 定位；不执行候选 preview 或提交。assess_task 接受此明确未形成候选状态，只有存在计划时才要求候选 Snapshot。现有 kernel 要求非空计划，不为这条分支弱化该合同。
 
-任务/来源的 ArtifactRef 哈希均指原始字节，prepare_task 直接核对收到的 bytes；CheckPlan 的 digest 仍是现有规范对象哈希。记录中的 task_file_sha256 与 plan_hash 名称分开，不能通过重序列化推算原文件哈希。任务引用由可信调用方在候选产生前固定；哈希一致不代表候选有权选择另一任务。跨进程持久化授权不在本轮范围。
+任务/来源的 ArtifactRef 哈希均指原始字节，prepare_task 直接核对收到的 bytes；CheckPlan 的 digest 仍是现有规范对象哈希。原文件 SHA-256 与 plan_hash 分别记录，不能通过重序列化推算原文件哈希。任务引用由可信调用方在候选产生前固定；哈希一致不代表候选有权选择另一任务。跨进程持久化授权不在本轮范围。
 
-`assess_task` 检查 task↔计划/目标声明的绑定并调用显式 Checker，输出逐项报告和未决项，不获得模型写权。候选/计划/范围/义务完整性的共同报告校验由 protocols 提供给 assurance/kernel 复用；调用方传入预期范围，不能以报告自报的范围决定完整覆盖。实现时从已有内核校验提取最小公共函数，保留旧拒绝行为，避免两套判断逐渐分叉。assurance 不导入有限模型适配器。
+`prepare_task` 建立声明到义务的显式绑定，`assess_task` 再核对固定计划与候选模型身份，并调用显式 Checker；输出逐项报告和未决项，不获得模型写权。候选/计划/范围/义务完整性已移入 `protocols.validate_report(report, snapshot, plan, scope)` 供 assurance/kernel 复用；调用方传入 `select_scope(plan)` 得到的预期范围，不能以报告自报的范围决定完整覆盖。该公共函数保留原内核拒绝行为，assurance 不导入有限模型适配器。
 
 `run_task` 由应用装配 kernel。绑定的 Checker 每次调用都核对实际计划与 PreparedTask 的固定计划一致，再执行有限语义检查；kernel 仍执行公共报告校验并独占保存事务。任务输入与初始模型的身份、元模型和基准必须吻合，不按名称匹配。候选不会携带替代任务合同、检查器或评价文件位置。初次执行绑定合同中的初始快照；后续改变目标/基准另建明确任务版本，不自动把旧任务重放到最新模型。
 
 处理次序为：加载固定上下文 → 校验候选基准 → preview → 固定开发义务 check → 记录目标/意图状态 → 合格时 decide/apply。默认仅在必需意图已明确且开发义务全部 satisfied 时保存；其余返回诊断且本入口不提交。kernel 原有 checked-save 仍是独立的残余保存能力，不能被本入口用来标记任务完成。
+
+TaskRunResult 分别返回 assessment、commit、candidate、accepted 和 reason；有计划但不合格时可保留候选与未提交原因，无计划时没有候选。TaskAssessment.intent_status 只表示必需声明的就绪状态；goal_status 来自完整开发报告，error 优先于 violated，其余非 satisfied 残余聚合为 unknown，原始逐项状态保持不变。结构/引用/绑定错误抛 ContractError，检查器异常继续传播，不能把执行失败写成一份满足报告。
 
 独立评价在评价侧对终候选/已保存版本执行，结果另记。若开发检查通过而留出评价失败，保留真实模型保存与评价失败两个事实；不伪造回滚，不把留出结果偷喂给方法。工程测试也应直接对未提交候选运行参考验收，用于检查边界；这不改变生产保存策略。
 
@@ -87,28 +90,30 @@ evaluate_candidate(snapshot, evaluation_spec) -> EvaluationResult  # 评价侧
 
 两个新规则放在显式适配器，通过现有 Checker 合同接入。现有 `directed_acyclic_graph`、`deterministic_automaton` 和可编辑输入的 `finite_trace_acceptance` 保持原义；新规则用新名称/工具版本，不覆盖旧运行语义。Obligation.parameters 现有标量已能表达本轮参数，无需先扩原生引用/集合。
 
-未知规则为 unknown，已知语义反例为 violated，参数/来源/绑定或执行错误为 error；不得转换为通过。whole-model 依赖继续保守 incomplete，证据适用性保持 unknown/stale，本轮不实现安全全图 current。
+未知规则为 unknown，已知语义反例为 violated，规则参数错误或缺目标为逐项 error；任务/来源/报告的完整性错误直接拒绝，执行器异常继续传播。不得把这些情况转换为通过。whole-model 依赖继续保守 incomplete，证据适用性保持 unknown/stale，本轮不实现安全全图 current。
 
-参考验收在测试/研究侧用独立实现：图可达使用不同遍历实现，自动机按规格中的固定输入展开状态序列；不得调用被评 Checker、复用其执行结果或从候选 trace/开发报告反推期望。共享严格协议解码可以，但要记录共同输入来源，并用故意错误的开发规则/绑定验证参考验收会暴露差异。
+参考验收在测试/研究侧用独立实现：图可达使用不同遍历实现，自动机按规格中的固定输入展开状态序列；不得调用被评 Checker、复用其执行结果或从候选 trace/开发报告反推期望。共享严格协议解码可以，但要记录共同输入来源；共同语义错误反例必须保留合法固定的任务/计划/报告绑定，不能以错哈希被拒替代。
 
-## 7. 文件归属与实施顺序
+## 7. 当前文件归属与收尾责任
 
-下表是下一编码轮的计划文件，不表示已创建实现：
+核心源码及材料已进入本轮实现，下表用于责任与验收定位。
 
-| 顺序 | 计划文件范围 | 交付责任 |
+| 归属 | 文件范围 | 交付责任 |
 |---|---|---|
-| 1 | `packages/protocols/` 的源码/合同/测试；`packages/assurance/src/modelspine_assurance/tasks.py` 及合同/测试；`packages/model-kernel/` 的报告校验调用 | 任务信封、通用任务评估、实际复用的报告完整性校验；assurance/kernel 仅依赖 protocols |
-| 2 | `adapters/task_checks.py`；必要时小改 `adapters/finite_models.py` | 两条新任务规则；仅依赖 protocols，旧规则回归不变；若抽取语义辅助，只为这两个真实消费者 |
-| 3 | `apps/task_contracts.py`、`apps/task_acceptance.py` | 显式本地文件读取、路径边界和固定上下文；CLI 完整调用预览、评估、决定和保存流程 |
-| 4 | `domain-packs/structural-graph/tasks/`、`domain-packs/finite-automaton/tasks/` | 版本化公开来源片段、任务合同及固定开发义务；不改旧样例目标来配合新候选 |
-| 5 | `tests/support/task_oracle.py`、`tests/fixtures/task-acceptance/`、`tests/test_task_acceptance.py`、现有导入边界测试 | 独立参考实现、评价规格与正反验收；评价端只能向方法提供预定的公开反馈 |
-| 6 | `docs/`、apps/adapters 说明；`studies/lifecycle/` 的任务卡设计说明 | 支持矩阵、调用示例、版本身份/成本字段与后续研究接入说明；不新增统计运行器 |
+| 公共包 | `packages/protocols/` 的源码/合同/测试；`packages/assurance/src/modelspine_assurance/tasks.py` 及合同/测试；`packages/model-kernel/` 的报告校验调用 | 任务信封、通用任务评估、实际复用的报告完整性校验；assurance/kernel 仅依赖 protocols |
+| 有限适配 | `adapters/task_checks.py`、`adapters/finite_models.py` | 两条新任务规则；共享有限语义辅助支持两个实际调用方，须保留旧规则回归 |
+| 应用装配 | `apps/task_contracts.py`、`apps/task_acceptance.py` | 显式本地文件读取、路径边界和固定上下文；完整调用预览、评估、决定和保存流程 |
+| 任务材料 | `domain-packs/structural-graph/tasks/`、`domain-packs/finite-automaton/tasks/` | 版本化公开来源片段、任务合同、固定开发义务和明确提案；不改旧样例目标来配合新候选 |
+| 工程评价 | `tests/support/task_oracle.py`、`tests/fixtures/task-acceptance/`、`tests/test_task_acceptance.py`、现有导入边界测试 | 独立参考实现、评价规格与正反验收；评价规格不传入方法接口 |
+| 交接说明 | `docs/`、apps/adapters 说明；`studies/lifecycle/` 的任务卡设计说明 | 支持矩阵、调用示例、版本引用及后续研究接入说明；正式预算/成本采集仍待研究编排，不新增统计运行器 |
 
 apps 装配 assurance、kernel 与检查器；能力包不导入 apps/studies/tests。TaskContract 是任务语义合同，TaskCard 中的论文条件、预算及 EvaluationSpec 不得反向进入它。assurance 增加通用任务评估，有限领域规则仍由适配器提供，不能在 implemented_scope 中混记为内置规则。
 
 protocols/assurance 因真实供应/消费任务信封而扩展，kernel 只复用原有报告校验逻辑；不增加任务/论文条件分支。generation 不新增生成算法，新增任务规则仍是 terminal-only。实际变更包按消费者兼容性升版，不统一升级九模块。requirements、interaction、implementation、code-intelligence、component-reuse 继续 planned。
 
-## 8. 必须通过的验收
+## 8. 本轮验收与结果记录
+
+以下行为已由本轮验收覆盖：完整运行共 126 项，含原 69 项与新增 57 项。命令、CLI 结果及证据边界见 [validation.md](validation.md)。
 
 1. 两类任务都存在明确正例，固定目标检查通过并提交；初始模型、任务/计划/候选引用和输出结果可核对。
 2. 图保持合法无环但破坏任务指定可达性：结构检查通过，固定目标 violated，本入口不保存。
@@ -121,7 +126,7 @@ protocols/assurance 因真实供应/消费任务信封而扩展，kernel 只复�
 9. 更改任务目标必须建立新版本/新运行，旧任务结果不能冒用；本轮约束为单次运行中固定上下文，不宣称已有跨进程任务仓库或永久版本注册表。
 10. 新入口不会导入评价实现；运行包不导入 apps/studies/tests；原 69 项行为回归继续通过，新增测试按真实边界组织，不预填数量代替验收。
 
-## 9. 执行范围与停止条件
+## 9. 未实现范围与后续入口
 
 只使用现有 Python 标准库、本地结构化材料和显式候选。不实现自然语言抽取、问题排序/答复会话、自动表示缺口证明、元模型迁移、LLM 调用、外部求解器、应用运行时或 UI；不完整修复旧来源框架。表达不了的目标明确 unsupported/unknown，不能临时缩目标后宣称完成原任务。
 

@@ -19,7 +19,7 @@ class PackageBoundaryTests(unittest.TestCase):
     def test_finite_model_adapter_imports_with_only_protocols(self):
         paths = [str(PLATFORM / 'packages' / 'protocols' / 'src'), str(PLATFORM / 'adapters')]
         script = (f"import sys; sys.path[:0]={paths!r}; import finite_models; "
-                  "loaded={name for name in sys.modules if name.startswith('modelspine_')}; "
+                  "import task_checks; loaded={name for name in sys.modules if name.startswith('modelspine_')}; "
                   "assert loaded == {'modelspine_protocols'}, loaded")
         result = subprocess.run([sys.executable, '-B', '-I', '-c', script], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -36,6 +36,21 @@ class PackageBoundaryTests(unittest.TestCase):
                 result = subprocess.run([sys.executable, "-B", "-I", "-c", script],
                                         capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_task_assessment_imports_without_kernel_adapter_or_application(self):
+        paths = [str(PLATFORM / "packages" / name / "src") for name in ("protocols", "assurance")]
+        script = (f"import sys; sys.path[:0]={paths!r}; import modelspine_assurance.tasks; "
+                  "assert 'modelspine_kernel' not in sys.modules; "
+                  "assert 'task_checks' not in sys.modules")
+        result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_task_application_does_not_load_reference_evaluator(self):
+        paths = [str(PLATFORM / "apps")]
+        script = (f"import sys; sys.path[:0]={paths!r}; import task_acceptance; "
+                  "assert not any('oracle' in name or name.startswith('support') for name in sys.modules)")
+        result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_runtime_imports_stay_within_standard_library_and_protocols(self):
         for package, module in PACKAGES.items():

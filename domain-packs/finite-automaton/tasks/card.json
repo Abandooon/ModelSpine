@@ -1,0 +1,22 @@
+{
+  "schema": "engineering-task-card/0.1",
+  "task": "task.json",
+  "task_ref": {
+    "project_id": "foundation-examples",
+    "artifact_id": "finite-automaton-task",
+    "revision": "1",
+    "content_hash": "2de0f8f48e3325ff13770354f76d34f4b220d1383c2b9d82fb490d74fbc9c169"
+  },
+  "sources": [
+    {
+      "ref": {
+        "project_id": "foundation-examples",
+        "artifact_id": "finite-automaton-task-source",
+        "revision": "1",
+        "content_hash": "65c28f7bc2e5469198b43db8e0bdf81fde6e41551d1e6eb40dff1d3193530b56"
+      },
+      "path": "source.txt"
+    }
+  ],
+  "proposal": "proposal.json"
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "finite-automaton-reference",
+  "version": "1",
+  "task_ref": {
+    "project_id": "foundation-examples",
+    "artifact_id": "finite-automaton-task",
+    "revision": "1",
+    "content_hash": "2de0f8f48e3325ff13770354f76d34f4b220d1383c2b9d82fb490d74fbc9c169"
+  },
+  "model": {
+    "project_id": "foundation-examples",
+    "model_id": "finite-automaton",
+    "metamodel": {
+      "id": "finite-automaton",
+      "version": "0.1"
+    },
+    "metamodel_hash": "d79df3f7ae626375787dcd08ed337bdc797392dd3ccd3dc8589568d5dd703b17"
+  },
+  "cases": [
+    {
+      "id": "accept-required-word",
+      "kind": "finite_acceptance",
+      "target": "machine",
+      "input": "ab",
+      "destination": null,
+      "expected": true
+    },
+    {
+      "id": "reject-changed-word",
+      "kind": "finite_acceptance",
+      "target": "machine",
+      "input": "aa",
+      "destination": null,
+      "expected": false
+    }
+  ]
+}

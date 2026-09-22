@@ -318,6 +318,47 @@ class RunReceipt:
     terminal_status: str
 
 
+@dataclass(frozen=True)
+class TaskStatement:
+    id: str
+    text: str
+    category: Literal["intent", "fact", "hypothesis"]
+    confirmation: Literal["confirmed", "unresolved", "conflicted"]
+    required: bool
+    source_refs: tuple[EvidenceRef, ...]
+    pending_reason: str | None
+
+
+@dataclass(frozen=True)
+class TaskBinding:
+    obligation_id: str
+    obligation_version: str
+    statement_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TaskContract:
+    schema_version: Literal["task-contract/0.1"]
+    id: str
+    version: str
+    base: SnapshotRef
+    statements: tuple[TaskStatement, ...]
+    plan: CheckPlan | None
+    bindings: tuple[TaskBinding, ...]
+
+
+@dataclass(frozen=True)
+class TaskAssessment:
+    schema_version: Literal["task-assessment/0.1"]
+    task_ref: ArtifactRef
+    candidate: SnapshotRef | None
+    report: ValidationReport | None
+    intent_status: Literal["ready", "unresolved"]
+    goal_status: Literal["satisfied", "violated", "unknown", "error", "not_checked"]
+    mapped_statements: tuple[str, ...]
+    unresolved: tuple[str, ...]
+
+
 def to_data(value):
     if is_dataclass(value) and not isinstance(value, type):
         return {f.name: to_data(getattr(value, f.name)) for f in fields(value)}
@@ -399,14 +440,31 @@ def properties(items: tuple[Property, ...]) -> dict[str, Scalar]:
     return {p.name: p.value for p in items}
 
 
+def validate_artifact_ref(reference: ArtifactRef) -> ArtifactRef:
+    reference = checked(reference, ArtifactRef)
+    require(bool(reference.project_id and reference.artifact_id and reference.revision),
+            "incomplete artifact reference")
+    require(len(reference.content_hash) == 64
+            and all(c in "0123456789abcdef" for c in reference.content_hash), "invalid source SHA-256")
+    return reference
+
+
+def validate_snapshot_ref(reference: SnapshotRef) -> SnapshotRef:
+    reference = checked(reference, SnapshotRef)
+    require(bool(reference.project_id and reference.model_id) and reference.revision >= 0,
+            "invalid model identity/revision")
+    require(bool(reference.metamodel.id and reference.metamodel.version), "invalid metamodel identity")
+    for value in (reference.metamodel_hash, reference.content_hash):
+        require(len(value) == 64 and all(c in "0123456789abcdef" for c in value),
+                "invalid snapshot reference SHA-256")
+    return reference
+
+
 def validate_evidence_refs(references: tuple[EvidenceRef, ...]) -> None:
     """Check reference content after the containing value's strict shape decoding."""
     for reference in references:
-        source = reference.source
-        require(bool(reference.locator and reference.origin and source.project_id
-                     and source.artifact_id and source.revision), "incomplete source reference")
-        require(len(source.content_hash) == 64
-                and all(c in "0123456789abcdef" for c in source.content_hash), "invalid source SHA-256")
+        validate_artifact_ref(reference.source)
+        require(bool(reference.locator and reference.origin), "incomplete source reference")
 
 
 def validate_model(snapshot: Snapshot, metamodel: Metamodel) -> None:
@@ -454,3 +512,34 @@ def validate_plan(plan: CheckPlan) -> CheckPlan:
         require(bool(obligation.id and obligation.version and obligation.target and obligation.field), "empty obligation identity")
         properties(obligation.parameters)
     return plan
+
+
+def select_scope(plan: CheckPlan, scope: tuple[str, ...] | None = None) -> tuple[str, ...]:
+    """Normalize a caller-selected scope; None selects all targets in the plan."""
+    plan = validate_plan(plan)
+    targets = {obligation.target for obligation in plan.obligations}
+    scope = tuple(sorted(targets)) if scope is None else scope
+    require(type(scope) is tuple and bool(scope) and all(type(item) is str for item in scope),
+            "invalid check scope")
+    require(len(set(scope)) == len(scope) and set(scope) <= targets, "invalid check scope")
+    return tuple(sorted(scope))
+
+
+def validate_report(report: ValidationReport, snapshot: Snapshot, plan: CheckPlan,
+                    scope: tuple[str, ...]) -> ValidationReport:
+    """Validate report binding/coverage against caller expectations, not rule truth."""
+    snapshot, plan = checked(snapshot, Snapshot), validate_plan(plan)
+    require(scope is not None, "expected report scope must be explicit")
+    scope = select_scope(plan, scope)
+    report = checked(report, ValidationReport)
+    binding = report.binding
+    require((binding.candidate_hash, binding.plan_hash, binding.scope, binding.assumptions) == (
+        digest(snapshot), digest(plan), scope, plan.assumptions),
+        "checker returned mismatched report binding", "conflict")
+    require(bool(binding.tool and binding.tool_version), "checker identity/version missing", "conflict")
+    expected = {obligation.id: obligation.version for obligation in plan.obligations
+                if obligation.target in scope}
+    actual = {outcome.obligation_id: outcome.obligation_version for outcome in report.outcomes}
+    require(len(actual) == len(report.outcomes) and actual == expected,
+            "checker returned incomplete, duplicate or mismatched obligation coverage", "conflict")
+    return report

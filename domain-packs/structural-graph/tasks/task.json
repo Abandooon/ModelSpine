@@ -1,0 +1,162 @@
+{
+  "schema_version": "task-contract/0.1",
+  "id": "structural-graph-task",
+  "version": "1",
+  "base": {
+    "project_id": "foundation-examples",
+    "model_id": "structural-graph",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "a5a7e0ac5921057fe2c4c4f4074c13f332d03bdeada2f5d306e8c68763bf49c2"
+  },
+  "statements": [
+    {
+      "id": "goal-1",
+      "text": "Preserve a valid finite directed acyclic graph.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "foundation-examples",
+            "artifact_id": "structural-graph-task-source",
+            "revision": "1",
+            "content_hash": "6afd5e3940cc725bd9ecc08de057bef783af22accb6df76825b39a9be81f3667"
+          },
+          "locator": "lines:2-2",
+          "origin": "engineering-task-author"
+        }
+      ],
+      "pending_reason": null
+    },
+    {
+      "id": "goal-2",
+      "text": "Keep node-a able to reach node-c.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "foundation-examples",
+            "artifact_id": "structural-graph-task-source",
+            "revision": "1",
+            "content_hash": "6afd5e3940cc725bd9ecc08de057bef783af22accb6df76825b39a9be81f3667"
+          },
+          "locator": "lines:3-3",
+          "origin": "engineering-task-author"
+        }
+      ],
+      "pending_reason": null
+    },
+    {
+      "id": "goal-3",
+      "text": "Keep node-c unable to reach node-a.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "foundation-examples",
+            "artifact_id": "structural-graph-task-source",
+            "revision": "1",
+            "content_hash": "6afd5e3940cc725bd9ecc08de057bef783af22accb6df76825b39a9be81f3667"
+          },
+          "locator": "lines:4-4",
+          "origin": "engineering-task-author"
+        }
+      ],
+      "pending_reason": null
+    }
+  ],
+  "plan": {
+    "id": "structural-graph-task-checks",
+    "version": "1",
+    "rule_version": "task-checks/0.1",
+    "assumptions": [
+      "finite supported profile only",
+      "explicit author mapping; semantic fidelity unproven"
+    ],
+    "obligations": [
+      {
+        "id": "structure",
+        "version": "1",
+        "kind": "directed_acyclic_graph",
+        "target": "graph",
+        "field": "root",
+        "parameters": []
+      },
+      {
+        "id": "fixed-positive",
+        "version": "1",
+        "kind": "graph_reachability",
+        "target": "graph",
+        "field": "root",
+        "parameters": [
+          {
+            "name": "source",
+            "value": "node-a"
+          },
+          {
+            "name": "destination",
+            "value": "node-c"
+          },
+          {
+            "name": "expected_reachable",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "fixed-negative",
+        "version": "1",
+        "kind": "graph_reachability",
+        "target": "graph",
+        "field": "root",
+        "parameters": [
+          {
+            "name": "source",
+            "value": "node-c"
+          },
+          {
+            "name": "destination",
+            "value": "node-a"
+          },
+          {
+            "name": "expected_reachable",
+            "value": false
+          }
+        ]
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "obligation_id": "structure",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-1"
+      ]
+    },
+    {
+      "obligation_id": "fixed-positive",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-2"
+      ]
+    },
+    {
+      "obligation_id": "fixed-negative",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-3"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "engineering-task-card/0.1",
+  "task": "task.json",
+  "task_ref": {
+    "project_id": "foundation-examples",
+    "artifact_id": "structural-graph-task",
+    "revision": "1",
+    "content_hash": "38a5b1ed21cfbdb03c1019acef9e27cd396ceabf4a481c9fba9897b05b39b348"
+  },
+  "sources": [
+    {
+      "ref": {
+        "project_id": "foundation-examples",
+        "artifact_id": "structural-graph-task-source",
+        "revision": "1",
+        "content_hash": "6afd5e3940cc725bd9ecc08de057bef783af22accb6df76825b39a9be81f3667"
+      },
+      "path": "source.txt"
+    }
+  ],
+  "proposal": "proposal.json"
+}

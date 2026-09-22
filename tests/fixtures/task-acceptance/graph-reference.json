@@ -1,0 +1,38 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "structural-graph-reference",
+  "version": "1",
+  "task_ref": {
+    "project_id": "foundation-examples",
+    "artifact_id": "structural-graph-task",
+    "revision": "1",
+    "content_hash": "38a5b1ed21cfbdb03c1019acef9e27cd396ceabf4a481c9fba9897b05b39b348"
+  },
+  "model": {
+    "project_id": "foundation-examples",
+    "model_id": "structural-graph",
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8"
+  },
+  "cases": [
+    {
+      "id": "required-forward-path",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-a",
+      "destination": "node-c",
+      "expected": true
+    },
+    {
+      "id": "no-reverse-path",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-c",
+      "destination": "node-a",
+      "expected": false
+    }
+  ]
+}

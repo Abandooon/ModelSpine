@@ -1,0 +1,4 @@
+Task author confirms this finite engineering task; no end-user or research ground truth is claimed.
+Preserve a valid flat deterministic finite automaton.
+Accept the fixed input ab.
+Reject the fixed input aa.

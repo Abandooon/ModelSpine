@@ -6,6 +6,8 @@
 
 检查器实现 `protocols.Checker`，同步返回确定性报告；kernel 的统一边界验证报告结构、候选/计划/范围/前提绑定、工具身份及义务 ID/版本完整唯一覆盖。错绑定/覆盖返回 conflict，错误结构返回 invalid，执行器异常传播且无部分提交。decide/apply/record_evidence/evidence_status 均通过此边界；提交中证据适用性使用本次已经验证的报告绑定，不额外重复执行检查。此加强行为属于包版本 0.1.1-experimental，JSON api_version 保持 0.1。
 
+报告返回值校验现在复用 protocols 的 `select_scope` 和 `validate_report`：内核先选择预期范围、执行注入 Checker，再对照该范围校验结果，原有 invalid/conflict 及执行器异常语义不变。内核没有 TaskContract/TaskAssessment 分支，不解释任务来源、目标授权或任务完成；任务评估方可调用同一个公共完整性校验，模型保存权仍由 kernel 独占。
+
 公开操作：snapshot(revision=None)、resolve(ElementRef)、preview(ChangeProposal)、decide(proposal,report,actor,policy)、apply(proposal,decision,actor)、record_evidence(report)、evidence_status()、add_note(text)。输出为隔离快照、严格引用、Preview、Decision、Commit、EvidenceRecord、Applicability 或文本注记；没有 metadata 全状态回调。
 
 预览校验项目/模型/修订/元模型/哈希；提交锁覆盖重预览、许可核对、版本比较及快照/收据写入。同 proposal ID+内容+actor 的重试返回原收据，不同内容 conflict。失败不增版本、不改变历史或证据。只承诺单进程同一实例的并发线程内存事务，无持久化、跨进程 CAS 或崩溃恢复。权限在决定与提交两处验证。
