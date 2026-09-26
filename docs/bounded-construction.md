@@ -26,7 +26,15 @@ GenerationPlan 必须覆盖固定 CheckPlan 的所有义务及版本，声明 co
 
 后继将模板 task/space 的 base 绑定为前序实际 accepted，并以模板版本加 `/bound-` 和完整基准引用摘要派生新 task/space 身份，重新固定字节/哈希并调用 prepare_task；目标、完整 plan 和编辑权限仍来自原模板。模板与派生记录区分，原文件不改。不同条件使用自己的实际快照，不强制对齐或重跑前序；前序未提交时由研究装配记录后继未启动。
 
-这仍是可信本机应用装配，不是跨进程提交凭据认证或一般工作流。每一步经既有 run_construction 的完整终验和模型接纳；没有持久化或跨阶段全局事务。未来真实候选后端的[接入合同](candidate-backend-contract.md)目前仅为 draft，尚无 API 调用能力。
+这仍是可信本机应用装配，不是跨进程提交凭据认证或一般工作流。每一步经既有 run_construction 的完整终验和模型接纳；没有持久化或跨阶段全局事务。
+
+## 候选批次的宿主边界
+
+[candidate_batch.py](../apps/candidate_batch.py) 已提供请求准备、严格选择解析和同批执行入口。准备前限定完整目录规模；请求固定task/model/metamodel/space、来源片段和无答案标签目录，UTF-8字节上限不代表token或费用预算。仅接受`candidate-selection/0.1`的完整JSON；坏项、重复键/ID、额外字段、错request和目录外ID均拒绝，不修复、不部分执行。
+
+执行先核对完整请求/原响应/选项哈希及当前任务、基准、空间、计划和目录，再从原目录映射返回顺序的子集。每次从同一base新建kernel，复用原search和完整接纳；空批次实际执行为空元组，外层穷尽范围限定`backend_batch`。原`run_construction`仍使用完整固定目录。请求/选择是可信本机值，不是可移交的授权凭据。
+
+真实传输、供应商收据和API/token/费用预算仍未接入，配置尚缺；模拟载荷的宿主验收不算真实后端运行。接口和剩余要求见[候选后端合同](candidate-backend-contract.md)。
 
 ## 验收与研究边界
 

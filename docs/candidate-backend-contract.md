@@ -1,6 +1,6 @@
 # 单一候选后端接入合同
 
-状态：**draft / unimplemented**，2026-09-27。本文件只固定下一轮可评审的最小接入设计；未选择商业模型或 SDK，未调用外部 API，未新增运行接口、依赖或实验结果。当前可运行合同仍以[有界构造](bounded-construction.md)及源码为准。
+状态：**宿主载荷与重放子集已实现；真实后端仍未接入**，2026-09-27。供应商、模型、端点、认证环境变量与实际调用预算尚待确定，没有调用外部API，也没有真实后端结果。下文明确区分当前宿主接口与后续传输/收据设计；当前代码仍以[有界构造](bounded-construction.md)及源码为准。
 
 ## 目标与真实干预
 
@@ -14,17 +14,19 @@
 
 ## 当前边界与最小挂接
 
-现有 `modelspine_generation.bounded.search` 只接受完整的 `tuple[EditOption, ...]`，会先验证元组，再依次 control/build/evaluate。它没有异步输入、流式候选、工具消息或 API 预算。`apps/bounded_generation.py` 当前总是传入 `prepare_dag(...).options` 的完整固定顺序；仅注入 controller/plan 不能接入后端选项顺序。
+现有 `modelspine_generation.bounded.search` 只接受完整的 `tuple[EditOption, ...]`，会先验证元组，再依次 control/build/evaluate。它没有异步输入、流式候选、工具消息或 API 预算。原 `run_construction` 继续传入 `prepare_dag(...).options` 的完整固定顺序；新宿主入口可把经过绑定验证的有序选项子集送入同一执行步骤，允许按响应顺序重排。
 
-下一实现只需要以下三个有限变化，均未在本轮实现：
+接入分为以下三个有限变化，当前仅完成第2项及其载荷边界：
 
 1. 单一外部后端适配器执行一次请求，返回响应和执行收据。适配器只依赖需要的公共值对象；不导入 apps、studies、测试或参考评价，不建立多后端注册／自动路由框架。
-2. apps 将现有输入验证／constructor 准备与“对选定 options 执行 search 并接纳”分为共享的内部步骤。原 `run_construction` 继续使用完整固定元组；新增后端入口在同一准备结果上取得提议，再将宿主映射的子序列送到同一执行步骤。这样原 API、`BoundedTaskRun` 与 deterministic 条件保持语义，输入验证、builder、终验和保存只由原有宿主层负责。
+2. apps 已将输入验证／constructor 准备与“对选定 options 执行 search 并接纳”分为共享的内部步骤。原 `run_construction` 继续使用完整固定元组；`candidate_batch.run_candidate_selection` 核对绑定，再将从当前完整目录映射的原选项对象送到同一执行步骤。每次执行从固定base新建kernel；原 API、`BoundedTaskRun` 与 deterministic 条件保持语义。
 3. 新增 apps 层后端结果信封，分别保存 `backend` 收据、`selection` 及可为空的 `app_result: BoundedTaskRun`。失败发生在后端／解析阶段时 `app_result=null`，不能制造一个未运行的 `ConstructionRun`。宿主执行异常另记 `execution_error`；若没有返回保存收据，保存状态保持未知，不能推断回滚。
+
+当前 [candidate_batch.py](../apps/candidate_batch.py) 提供 `prepare_candidate_request(inputs, source_contents, *, request_id, limits)`、`parse_candidate_selection(request, response_bytes)`、`run_candidate_selection(inputs, request, selection, *, controller=None, construction_plan=None)`。`CandidateLimits` 只管理物化前目录规模及提议条数、请求正文和响应载荷的UTF-8字节上限。来源仍按原字节哈希核对，提取已声明行定位；请求包含完整任务/模型/元模型/空间及无答案标签的选项目录。选择记录包含原响应文本/哈希、完整请求哈希及按序选项ID/哈希；重放重新核对实际输入、规则与完整目录。`CandidateBatchRun` 只记录该批次的真实宿主执行及`backend_batch`范围，不代表后端收据或API已经发生。值对象是可信本机装配，不是可移交的授权凭据。
 
 其中 `backend.status` 为 not_started/returned/timeout/error，error 另带 transport_error/service_error 等实际错误类型；`selection.status` 为 not_run/valid/response_invalid。例如 HTTP 调用正常返回但 JSON 非法，必须同时记录 backend=returned、selection=response_invalid。`app_started` 显式区分“尚未调用”和“调用后未返回”；真实返回的搜索和保存字段保留在 app_result 中，不合并为一个 success。
 
-设计入口为 `run_backend_construction(fixed_inputs, backend_config, *, controller=None, construction_plan=None)`；此签名是职责示意，尚不是可调用 API。相同的内部准备／执行步骤也供研究侧重放已记录的选项提议。研究条件选择与跨条件重放归 studies；不向运行包增加 condition 枚举。generation.search 及其 DTO 本阶段无需改变，protocols 无需增加供应商字段。
+完整后端的设计入口仍为 `run_backend_construction(fixed_inputs, backend_config, *, controller=None, construction_plan=None)`；此签名尚不是可调用 API。已实现的宿主准备／执行步骤供研究侧重放已记录的选项提议。研究条件选择与跨条件重放归 studies；不向运行包增加 condition 枚举。generation.search 及其 DTO 不变，protocols 未增加供应商字段。
 
 若未来需要根据终验反馈逐次请求新候选，必须另定预算、重复候选、反馈权限和跨请求状态合同；不能在本次接入中暗加循环，也不能把每次重新调用现有 search 的局部预算冒充总预算。
 
@@ -97,7 +99,7 @@
 
 共享响应的三个记录引用同一个 backend receipt；实际调用和费用在合并分母中只计一次，不能重复记三次，也不能称某组免费获得候选。若另报告每条件独立执行的估算费用，必须显式标为估算，不能和真实总费用相加。将来如比较各条件独立在线生成，须另固定提示干预、随机化／重复及真实调用预算，不能把此重放改名为该实验。
 
-两个消费者共用同一严格解析／绑定和宿主执行路径。反例至少能核验：返回目录外 ID 时 API 成本已发生但 search 没启动；跨任务重放被拒；空批次不证明空间无解；超时未重试；reference 异常保留真实保存。这些是下一实现的验收要求，本次没有新增测试或执行结果。
+两个消费者共用同一严格解析／绑定和宿主执行路径。宿主工程验收覆盖跨任务重放拒绝、严格载荷校验、空批次范围及完整终验/保存。真实传输尚未接入，因此“目录外ID返回时已有API成本”“超时未重试”等传输验收仍待实现，不能由固定响应测试冒充。
 
 ## 证据与公平比较
 
@@ -113,4 +115,4 @@
 
 必须选定一个真实后端及其可固定版本、端点／认证获取方式、确切请求与响应提取方式、token／费用／超时能力、提示全文和采样参数。再固定本轮任务集、一次请求的选项上限、每阶段和整条轨迹预算、实际输入资源上限、原始响应保存位置与发布范围。缺少这些配置仍为未就绪，不能开始付费实验或报告真实后端结果。
 
-不要求此时新增通用元模型编译器、流式搜索、多后端兼容层、工具调用循环、NL→合同生成或 Studio UI。下一实施完成的判据是上述两个消费者通过真实边界与失败验收，并至少保留一次实际后端请求到候选执行的可核验收据；是否开展实际收费调用由对应任务授权决定。本文件完成只代表合同设计完成，generation 的 implemented-slice 与研究假设状态不因此升级。
+不要求此时新增通用元模型编译器、流式搜索、多后端兼容层、工具调用循环、NL→合同生成或 Studio UI。完整接入完成的判据仍是上述两个消费者通过真实边界与失败验收，并至少保留一次实际后端请求到候选执行的可核验收据。当前只完成不依赖供应商的宿主子集，模拟响应验收不能代替该出口；generation 的 implemented-slice 与研究假设状态不升级。

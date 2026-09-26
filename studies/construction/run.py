@@ -76,7 +76,8 @@ def execute_condition(condition, inputs, fault=None):
                                                            ordinary=condition == "ordinary-rule"))
 
 
-def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=None, result_sink=None):
+def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=None, result_sink=None,
+                  execute_app=None):
     pinned = pin_evaluation_spec(pinned.content, pinned.spec_ref)
     require(loads(EvaluationSpec, pinned.content.decode("utf-8")).task_ref == inputs[0].task_ref,
             "reference task does not match prepared task", "conflict")
@@ -99,7 +100,8 @@ def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=No
     start = perf_counter()
     try:
         with patch.object(bounded_generation, "check_tasks", counted_checker):
-            result = execute_condition(condition, inputs, fault)
+            executor = execute_condition if execute_app is None else execute_app
+            result = executor(condition, inputs, fault)
         elapsed = perf_counter() - start
     except Exception as exc:
         elapsed = perf_counter() - start

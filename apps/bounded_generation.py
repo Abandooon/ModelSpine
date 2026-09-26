@@ -70,21 +70,41 @@ def run_construction(prepared_task, metamodel, snapshot, space_bytes, space_ref,
     A controller and its plan may be explicitly injected together. They change
     preconstruction decisions only; the builder and final checker stay fixed.
     """
+    inputs = prepared_task, metamodel, snapshot, space_bytes, space_ref
+    space, constructor = _prepare_construction(inputs)
+    return _execute_construction(inputs, space, constructor, constructor.options,
+                                 controller=controller, construction_plan=construction_plan)
+
+
+def _prepare_construction(inputs, *, max_catalog_options=None):
+    prepared_task, metamodel, snapshot, space_bytes, space_ref = inputs
     require(type(prepared_task) is PreparedTask, "expected prepared task")
     check_plan = prepared_task.contract.plan
     require(check_plan is not None, "construction requires a fixed task check plan", "unsupported")
     require(digest(check_plan) == prepared_task.plan_hash, "prepared plan changed", "conflict")
-    require((controller is None) == (construction_plan is None),
-            "controller and construction plan must be provided together")
     space = _pinned_space(prepared_task, snapshot, space_bytes, space_ref)
-    actor = "bounded-construction-host"
-    kernel = ModelKernel(snapshot, metamodel, check_plan, check_tasks, frozenset({actor}))
+    validate_model(snapshot, metamodel)
+    if max_catalog_options is not None:
+        require(type(max_catalog_options) is int and max_catalog_options >= 0, "invalid catalog limit")
+        require(len(space.edges) * len(space.sources) * len(space.destinations) <= max_catalog_options,
+                "candidate catalog exceeds preparation limit", "unsupported")
     intent_refs = tuple(dict.fromkeys((
         EvidenceRef(prepared_task.task_ref, "artifact", "fixed-task-contract"),
         EvidenceRef(space_ref, "artifact", "fixed-edit-space"),
         *(e for s in prepared_task.contract.statements for e in s.source_refs),
     )))
     constructor = prepare_dag(snapshot, check_plan, space, intent_refs)
+    return space, constructor
+
+
+def _execute_construction(inputs, space, constructor, options, *, controller=None, construction_plan=None):
+    """Execute host-mapped options; each call owns a fresh kernel at the fixed base."""
+    prepared_task, metamodel, snapshot, _, space_ref = inputs
+    require((controller is None) == (construction_plan is None),
+            "controller and construction plan must be provided together")
+    check_plan = prepared_task.contract.plan
+    actor = "bounded-construction-host"
+    kernel = ModelKernel(snapshot, metamodel, check_plan, check_tasks, frozenset({actor}))
 
     def evaluate(proposal):
         # Only kernel.preview creates candidates; the search core trusts this
@@ -94,7 +114,7 @@ def run_construction(prepared_task, metamodel, snapshot, space_bytes, space_ref,
 
     result = search(snapshot, prepared_task.task_ref, check_plan,
                     constructor.plan if construction_plan is None else construction_plan,
-                    constructor.options, space.max_options,
+                    options, space.max_options,
                     constructor.control if controller is None else controller,
                     constructor.build, evaluate)
     run = None

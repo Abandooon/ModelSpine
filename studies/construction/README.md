@@ -1,5 +1,7 @@
 # 有限构造机制工程先导
 
+新增[候选载荷重放协议](backend-protocol.md)与`replay_candidates.replay_candidates(...)`库入口：固定原请求hash和caller-supplied原字节，严格解析后将同一批次交三条件独立执行，复用原计数/检查点/参考验收。新11项与宿主14项进入本轮**290/290**完整回归。测试中的固定工程响应不是实际后端结果；没有新API/pilot，原生成用量/费用未知，重放本身调用为0。完整后端仍缺配置及真实传输/请求证据。下方15条和更早24条保留原提交与实验身份。
+
 当前使用[多任务与两阶段协议](multitask-protocol.md)，入口为 `python -B studies/construction/run_multitask.py --output studies/construction/runs/<new-unique-name>.json`。固定三类拓扑任务、一个依赖后继和一个初始成环边界，共15个计划条目；阶段1只执行一次，不把阶段或条件当作独立项目。每条件从自己的真实accepted进入阶段2，保留全部父目标，只追加预先固定的d→c可达目标。参考在执行前核对任务身份，后继参考保留模板来源并使用独立派生版本。
 
 完整回归 **265/265** 通过后，统一采集[本轮正式运行](runs/2026-09-26T173726308106Z.json)：15计划/启动/终态，12 app返回，9保存且独立验收均满足；3空间耗尽，3不支持成环初始状态错误（实际code=invalid），无参考错误。三条件各完成真实revision1→2；运行93项来源哈希前后一致。fork两个阶段搜索检查各为仅终验4次、两前控各2次；diamond 2/1/1，disconnected 3/1/1。成功接纳另各3次检查。DAG和普通Kahn仍为零差异；单图有限空间复用不证明元模型组织优势。人工首次/增量时间和计算费用仍未计量。原始输出见同前缀`.pilot.stdout.txt`/`.pilot.stderr.txt`，命令身份见同前缀`.execution.json`。
