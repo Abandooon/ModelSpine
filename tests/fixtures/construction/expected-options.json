@@ -1,0 +1,16 @@
+{
+  "fixed_before_integration": true,
+  "reference_index": "../task-acceptance/reference-index.json",
+  "reference": "graph-reference.json",
+  "options": [
+    {"source": "node-a", "target": "node-a", "control": "exclude", "reference": "violated"},
+    {"source": "node-a", "target": "node-b", "control": "allow", "reference": "violated"},
+    {"source": "node-a", "target": "node-c", "control": "allow", "reference": "satisfied"},
+    {"source": "node-b", "target": "node-a", "control": "exclude", "reference": "violated"},
+    {"source": "node-b", "target": "node-b", "control": "exclude", "reference": "violated"},
+    {"source": "node-b", "target": "node-c", "control": "no_change", "reference": "satisfied"},
+    {"source": "node-c", "target": "node-a", "control": "allow", "reference": "violated"},
+    {"source": "node-c", "target": "node-b", "control": "allow", "reference": "violated"},
+    {"source": "node-c", "target": "node-c", "control": "exclude", "reference": "violated"}
+  ]
+}

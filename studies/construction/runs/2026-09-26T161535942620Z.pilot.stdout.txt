@@ -1,0 +1,15 @@
+{
+  "planned": 24,
+  "started": 24,
+  "returned": 23,
+  "terminal": 24,
+  "saved": 9,
+  "status_counts": {
+    "candidate_found": 9,
+    "exhausted": 6,
+    "budget_exhausted": 6,
+    "unknown": 1,
+    "error": 2
+  },
+  "source_stable_during_run": true
+}

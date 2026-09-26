@@ -1,0 +1,20 @@
+{
+  "source": {
+    "project_id": "foundation-examples",
+    "artifact_id": "construction-diagnostic-source",
+    "revision": "1",
+    "content_hash": "a336e2187067e701dc3230b3d240433b6cb0149257076722705e380c90b29efd"
+  },
+  "source_locator": "lines:2-2",
+  "origin": "engineering-evaluator",
+  "statement": {"id": "R1", "relation_identity": "direct-ac", "source": "node-a", "target": "node-c", "confirmed": true},
+  "cases": [
+    {"id": "mapping-positive", "base": "existing-bc", "association": "edge-bc", "inventory_complete": true, "expected": "mapping_error", "repair": "redirect-existing"},
+    {"id": "gap-positive", "base": "missing-bc", "association": null, "inventory_complete": true, "expected": "model_gap", "repair": "add-edge-ac"},
+    {"id": "unassociated", "base": "existing-bc", "association": null, "inventory_complete": false, "expected": "unknown", "repair": "two-possible-witnesses"},
+    {"id": "already-faithful", "base": "existing-ac", "association": "edge-bc", "inventory_complete": true, "expected": "no-defect-evidence", "repair": "none"},
+    {"id": "scope-blocked", "base": "existing-bc", "association": "edge-bc", "inventory_complete": true, "expected": "mapping_error", "repair": "outside-authorized-edit-space", "representation_gap": false},
+    {"id": "budget-zero", "base": "existing-bc", "association": "edge-bc", "inventory_complete": true, "expected": "mapping_error", "repair": "budget-exhausted", "representation_gap": false},
+    {"id": "intent-unresolved", "statement": "R4", "source_locator": "lines:5-5", "expected": "intent_undetermined", "repair": "needs-answer"}
+  ]
+}

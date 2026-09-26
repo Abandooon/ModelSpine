@@ -10,7 +10,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；无持久化或跨进程事务 |
 | [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释集的行为澄清与提案；无直接模型写权，通用诊断/扩展建议仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
-| [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段候选控制和纯报告比较；无 LLM 或完整修复循环 |
+| [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录和纯报告比较；DAG 语义留在适配器，无 LLM 或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |
 | [interaction](../packages/interaction/contracts/design.md) | TaskView、交互计划、用户请求 | planned；业务界面与开发审查台分开，无模型或业务授权权力 |
 | [code-intelligence](../packages/code-intelligence/contracts/design.md) | 实现事实、恢复假设、追踪、语义差异 | planned；必须记录来源和未覆盖部分，不能以代码事实覆盖意图 |
@@ -74,4 +74,4 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 研究运行要求见[公开协议摘要](../studies/lifecycle/protocol.md)，工程验收见[validation.md](validation.md)。
 
-generation 没有新增图或行为生成算法。requirements 的有限消费者已实现，interaction、implementation、code-intelligence、component-reuse 仍为 planned；工程实现不升级论文结论。显式候选集不等于元模型表达空间的穷尽搜索，无可区分探针不证明 representation_gap。
+generation 的[有界构造](bounded-construction.md)通过领域回调消费固定编辑空间，DAG 适配器在提案前排除成环端点，所有任务义务继续终验；行为构造尚未实现。requirements 的有限消费者已实现，interaction、implementation、code-intelligence、component-reuse 仍为 planned；工程实现不升级论文结论。固定编辑/候选空间不等于元模型表达空间的穷尽搜索，无可区分探针或有限无解不证明 representation_gap。

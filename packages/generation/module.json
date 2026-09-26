@@ -2,7 +2,7 @@
   "id": "generation",
   "title": "约束编译与生成修复",
   "status": "implemented-slice",
-  "version": "0.1.1-experimental",
+  "version": "0.1.2-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -15,11 +15,17 @@
     "GenerationPlan",
     "construct",
     "compare_reports",
-    "RepairComparison"
+    "RepairComparison",
+    "bounded.search",
+    "EditOption",
+    "ConstructionDecision",
+    "CandidateEvaluation",
+    "ConstructionRun"
   ],
   "scope": "承接 ATLAS 可复用机制；记录生成期约束、剩余义务和实际干预，未知不算通过。",
   "implementation_entrypoints": [
-    "src/modelspine_generation/__init__.py"
+    "src/modelspine_generation/__init__.py",
+    "src/modelspine_generation/bounded.py"
   ],
   "validation_evidence": [
     "../../docs/validation.md"
@@ -40,7 +46,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "One SetProperty candidate; generation plan scoped to explicit target/field with all obligations requiring terminal checks; pure repair report regression gate; no LLM or repair loop",
+  "implemented_scope": "Single-field controls; bounded fixed-option control/build/evaluate search with complete terminal checks and step records; DAG edge redirect via explicit adapter; pure report regression gate; no LLM, behavior constructor or repair loop",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft"
 }

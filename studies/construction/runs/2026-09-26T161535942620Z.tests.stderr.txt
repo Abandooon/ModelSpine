@@ -1,0 +1,18 @@
+test_all_nine_options_match_fixed_oracle_and_independent_rule (test_construction_study.ConstructionStudyTests.test_all_nine_options_match_fixed_oracle_and_independent_rule) ... ok
+test_budgets_one_two_three_keep_same_options_and_stop (test_construction_study.ConstructionStudyTests.test_budgets_one_two_three_keep_same_options_and_stop) ... ok
+test_empty_space_and_zero_budget_do_not_prove_representation_gap (test_construction_study.ConstructionStudyTests.test_empty_space_and_zero_budget_do_not_prove_representation_gap) ... ok
+test_faults_stay_in_attempt_denominator_without_fallback (test_construction_study.ConstructionStudyTests.test_faults_stay_in_attempt_denominator_without_fallback) ... ok
+test_leaked_cycle_and_acyclic_wrong_goal_are_terminal_rejected (test_construction_study.ConstructionStudyTests.test_leaked_cycle_and_acyclic_wrong_goal_are_terminal_rejected) ... ok
+test_ordinary_rule_does_not_call_dag_control (test_construction_study.ConstructionStudyTests.test_ordinary_rule_does_not_call_dag_control) ... ok
+test_real_checker_counts_include_assess_decide_and_apply (test_construction_study.ConstructionStudyTests.test_real_checker_counts_include_assess_decide_and_apply) ... ok
+test_reference_cannot_change_search_or_save (test_construction_study.ConstructionStudyTests.test_reference_cannot_change_search_or_save) ... ok
+test_single_valid_invalid_and_no_change_do_not_fake_candidates (test_construction_study.ConstructionStudyTests.test_single_valid_invalid_and_no_change_do_not_fake_candidates) ... ok
+test_faithful_relation_needs_no_fabricated_repair (test_construction_study.DiagnosticWitnessTests.test_faithful_relation_needs_no_fabricated_repair) ... ok
+test_mapping_witness_preserves_identity_source_and_existing_task (test_construction_study.DiagnosticWitnessTests.test_mapping_witness_preserves_identity_source_and_existing_task) ... ok
+test_missing_instance_has_same_metamodel_addition_witness (test_construction_study.DiagnosticWitnessTests.test_missing_instance_has_same_metamodel_addition_witness) ... ok
+test_unassociated_behavior_allows_two_repairs_without_classification (test_construction_study.DiagnosticWitnessTests.test_unassociated_behavior_allows_two_repairs_without_classification) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.059s
+
+OK

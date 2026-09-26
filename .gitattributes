@@ -3,3 +3,7 @@ domain-packs/*/tasks/* -text
 tests/fixtures/task-acceptance/* -text
 domain-packs/*/clarification/* -text
 tests/fixtures/clarification/* -text
+domain-packs/*/construction/* -text
+tests/fixtures/construction/* -text
+# Captured runs retain their original bytes, including Windows line endings.
+studies/construction/runs/* -text

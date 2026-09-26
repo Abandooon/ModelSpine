@@ -1,0 +1,5 @@
+Engineering-authored source for diagnostic witness tests, version 1.
+R1: The identified relation direct-ac goes directly from node-a to node-c.
+R2: Existing relation edge-ab stays directed from node-a to node-b.
+R3: Preserve a flat finite DAG, a path a-to-c, and no path c-to-a.
+R4: Whether a new relation from node-b to node-c is required is unresolved.

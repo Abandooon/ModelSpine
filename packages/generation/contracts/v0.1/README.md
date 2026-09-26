@@ -11,3 +11,5 @@ construct(snapshot,plan,proposal_id,target,field,value) 只构造 SetProperty，
 compare_reports(before,after) 提取 P0 纯比较：同计划/前提/工具/范围才可比，候选哈希可不同。新诊断、覆盖丢失、已评估转未知/错误/不适用均拒绝，必须严格改善。repair_progress 仅替换候选，不能授予提交/交付/业务批准。诊断数下降不能掩盖新错误。
 
 A：合法阈值可构造；负数排除，手造负数仍被终验拒绝。B：旧许可不能借修复进展跨基准；订单/原域报告夹具用同机制。C：组件缺口保留剩余义务。共享版本变化同步 implementation；不声称约束任意 LLM，也不导入旧框架。
+
+新增 `modelspine_generation.bounded` 的有限搜索合同见[有界构造](../../../../docs/bounded-construction.md)。该独立入口不改变上述单字段 construct；接受事先固定选项、GenerationPlan、选项预算及 control/build/evaluate 回调，返回完整步骤与停止原因。只有 allow 才构造候选，unknown/error/不适用停止，全部固定义务仍终验，candidate_found 不授予保存权。DTO 属于 generation，未新增 protocols 共享字段；真实 DAG 语义留在适配器，实际运行依赖仍只有 protocols。

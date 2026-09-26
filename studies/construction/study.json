@@ -1,0 +1,14 @@
+{
+  "id": "construction",
+  "title": "有限构造机制工程先导",
+  "status": "engineering-pilot",
+  "depends_on": [
+    "generation", "E", "bounded-construction-cli", "task-reference-oracle",
+    "task-reference-index", "construction-option-reference", "construction-diagnostic-cases"
+  ],
+  "protocol_ref": "protocol.md",
+  "protocol_scope": "one deterministic engineering task; no LLM/human comparative result",
+  "runner": "run.py",
+  "conditions": ["terminal-only", "dag-construction", "ordinary-rule"],
+  "runs": ["runs/2026-09-26T161535942620Z.json"]
+}

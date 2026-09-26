@@ -48,8 +48,17 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_task_application_does_not_load_reference_evaluator(self):
         paths = [str(PLATFORM / "apps")]
-        script = (f"import sys; sys.path[:0]={paths!r}; import task_acceptance; import clarification; "
+        script = (f"import sys; sys.path[:0]={paths!r}; import task_acceptance; import clarification; import bounded_generation; "
                   "assert not any('oracle' in name or name.startswith('support') for name in sys.modules)")
+        result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_bounded_search_and_adapter_only_need_generation_and_protocols(self):
+        paths = [str(PLATFORM / "packages" / name / "src") for name in ("protocols", "generation")]
+        paths.append(str(PLATFORM / "adapters"))
+        script = (f"import sys; sys.path[:0]={paths!r}; import modelspine_generation.bounded; "
+                  "import dag_construction; assert 'modelspine_kernel' not in sys.modules; "
+                  "assert 'task_checks' not in sys.modules; assert 'bounded_generation' not in sys.modules")
         result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 

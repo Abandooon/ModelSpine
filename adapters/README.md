@@ -1,5 +1,7 @@
 # 适配器
 
+[dag_construction.py](dag_construction.py) 从事先固定的边/端点空间提供 options、plan、control、build。移除旧边后在提案创建前检查是否引入回路；builder 同步端点与依赖，完整任务终验仍独立执行。只依赖 protocols、generation 和有限结构辅助，不导入 kernel/apps 或参考评价；[当前合同](../docs/bounded-construction.md)明确控制、构造与可信宿主的责任。
+
 按实际需要加入 XML/XSD、代码技术栈、LLM/求解器、外部建模工具、既有需求建模原型、资产源等适配器。能力需有版本、支持范围、引用解析和错误状态；适配对象不决定通用框架，不预设应用。具体边界见[框架设计](../docs/architecture.md)。
 
 [finite_models.py](finite_models.py) 提供两个显式 Checker：`check_structure` 验证有限有向结构图，`check_automaton` 验证确定性有限自动机并实际遍历有限输入串。二者仅依赖 protocols，由 [boundary_examples.py](../apps/boundary_examples.py) 装配到相同内核，未增加插件发现或自动后备。
