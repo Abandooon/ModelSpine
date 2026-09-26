@@ -4,10 +4,12 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import platform as host_platform
 import subprocess
 import sys
+import tempfile
 from time import perf_counter
 from unittest.mock import patch
 
@@ -74,7 +76,7 @@ def execute_condition(condition, inputs, fault=None):
                                                            ordinary=condition == "ordinary-rule"))
 
 
-def observe_trial(trial_id, condition, inputs, pinned, fault=None):
+def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=None):
     record = {"id": trial_id, "condition": condition, "fault": fault,
               "stratum": "injected-fault" if fault else "comparison",
               "planned": True, "started": True, "task_ref": to_data(inputs[0].task_ref),
@@ -103,8 +105,7 @@ def observe_trial(trial_id, condition, inputs, pinned, fault=None):
         record.update(status="error", returned=False, exception_type=type(exc).__name__,
                       reason=str(exc), app_result=None, counts=None, saved=None,
                       counts_reason="app raised; no ConstructionRun trace returned",
-                      saved_reason="app raised without returning an acceptance result",
-                      independent_candidates=[], independent_saved=None)
+                      saved_reason="app raised without returning an acceptance result")
     else:
         record.update(status=result.search.status, returned=True, reason=result.search.reason,
                       app_result=to_data(result), saved=bool(result.run and result.run.commit))
@@ -119,14 +120,37 @@ def observe_trial(trial_id, condition, inputs, pinned, fault=None):
         }
     record["wall_seconds"] = elapsed
     record["total_development_checker_calls"] = checker_calls
+    record.update(independent_candidates=[], independent_saved=None,
+                  independent_saved_error=None, reference_errors=[], reference_seconds=None,
+                  reference_status="pending" if record["returned"] else "not_run")
+    # Preserve the returned app/commit facts before invoking the independent oracle.
+    # A checkpoint failure propagates; it must not be relabelled as an app failure.
+    if checkpoint is not None:
+        checkpoint(record)
+
+    def evaluate(candidate, scope, option=None):
+        try:
+            return to_data(evaluate_candidate(candidate, pinned)), None
+        except Exception as exc:
+            error = {"exception_type": type(exc).__name__, "reason": str(exc)}
+            record["reference_errors"].append({"scope": scope, "option": option, **error})
+            return None, error
+
     reference_start = perf_counter()
     if record["returned"]:
         # This is deliberately after the complete app call and its save decision.
-        record["independent_candidates"] = [
-            {"option": s.option.id, "evaluation": to_data(evaluate_candidate(s.evaluation.candidate, pinned))}
-            for s in result.search.steps if s.evaluation is not None]
-        record["independent_saved"] = (to_data(evaluate_candidate(result.run.accepted, pinned))
-                                          if record["saved"] else None)
+        # Each predeclared candidate/save evaluation is attempted once, including
+        # after another reference error. No outcome is fed back into the app.
+        for step in result.search.steps:
+            if step.evaluation is not None:
+                evaluation, error = evaluate(step.evaluation.candidate, "candidate", step.option.id)
+                item = {"option": step.option.id, "evaluation": evaluation}
+                if error is not None:
+                    item["error"] = error
+                record["independent_candidates"].append(item)
+        if record["saved"]:
+            record["independent_saved"], record["independent_saved_error"] = evaluate(result.run.accepted, "saved")
+        record["reference_status"] = "error" if record["reference_errors"] else "complete"
     record["reference_seconds"] = perf_counter() - reference_start if record["returned"] else None
     return record
 
@@ -148,7 +172,7 @@ def source_hashes():
             for p in sorted(paths) if p.is_file()}
 
 
-def collect():
+def collect(checkpoint=None):
     pinned = reference_spec()  # Pin evaluator bytes before any candidate call.
     inputs = load_example()
     planned = [(f"{name}/{condition}", condition, changes, None)
@@ -159,23 +183,61 @@ def collect():
         return subprocess.check_output(["git", "-c", f"safe.directory={ROOT.as_posix()}",
                                         "-C", str(ROOT), *arguments], text=True).strip()
     before = source_hashes()
-    record = {"schema": "construction-pilot/0.1", "started_utc": datetime.now(timezone.utc).isoformat(),
+    record = {"schema": "construction-pilot/0.2", "started_utc": datetime.now(timezone.utc).isoformat(),
               "task_count": 1, "independent_statistical_samples": False,
               "planned_trials": [p[0] for p in planned], "planned": len(planned),
               "git_head": git("rev-parse", "HEAD"), "git_status_before": git("status", "--short"),
               "python": sys.version, "host_platform": host_platform.platform(),
-              "source_hashes_before": before, "trials": []}
+              "source_hashes_before": before, "trials": [], "active_trial": None,
+              "run_status": "in_progress", "source_stable_during_run": None}
+
+    def persist():
+        trials = record["trials"]
+        observed = trials + ([record["active_trial"]] if record["active_trial"] is not None else [])
+        record.update(started=len(observed), returned=sum(t.get("returned") is True for t in observed),
+                      terminal=len(trials), saved=sum(t.get("saved") is True for t in observed),
+                      status_counts={s: sum(t.get("status") == s for t in observed)
+                                     for s in ("candidate_found", "exhausted", "budget_exhausted", "unknown", "error")},
+                      reference_error_trials=sum(t.get("reference_status") == "error" for t in observed))
+        if checkpoint is not None:
+            checkpoint(record)
+
+    def app_checkpoint(trial):
+        record["active_trial"] = trial
+        persist()
+
+    persist()
     for trial_id, condition, changes, fault in planned:
-        record["trials"].append(observe_trial(trial_id, condition, scenario_inputs(inputs, changes), pinned, fault))
-    trials = record["trials"]
-    record.update(started=len(trials), returned=sum(t["returned"] for t in trials),
-                  terminal=len(trials), saved=sum(t["saved"] is True for t in trials),
-                  status_counts={s: sum(t["status"] == s for t in trials)
-                                 for s in ("candidate_found", "exhausted", "budget_exhausted", "unknown", "error")},
+        record["active_trial"] = {"id": trial_id, "condition": condition, "fault": fault,
+                                  "started": True, "reference_status": "not_run"}
+        persist()
+        trial = observe_trial(trial_id, condition, scenario_inputs(inputs, changes), pinned, fault,
+                              checkpoint=app_checkpoint)
+        record["trials"].append(trial)
+        record["active_trial"] = None
+        persist()
+    record.update(run_status="reference_error" if record["reference_error_trials"] else "complete",
                   finished_utc=datetime.now(timezone.utc).isoformat())
     record["source_hashes_after"] = source_hashes()
     record["source_stable_during_run"] = before == record["source_hashes_after"]
+    persist()
     return record
+
+
+def _write_checkpoint(path, record):
+    # Serialize first: a later bad value cannot truncate the last valid record.
+    payload = json.dumps(record, ensure_ascii=False, indent=2) + "\n"
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         dir=path.parent, prefix=path.name + ".", suffix=".tmp",
+                                         delete=False) as output:
+            temporary = Path(output.name)
+            output.write(payload)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def main():
@@ -184,12 +246,22 @@ def main():
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
-        record = collect()
-        json.dump(record, output, ensure_ascii=False, indent=2)
+        json.dump({"schema": "construction-pilot/0.2", "run_status": "initializing", "trials": []}, output)
         output.write("\n")
+    try:
+        record = collect(checkpoint=lambda record: _write_checkpoint(args.output, record))
+    except Exception as exc:
+        # Start from the last valid checkpoint, even if serializing a later
+        # in-memory result failed. Preserve its trials and any returned app facts.
+        record = json.loads(args.output.read_text(encoding="utf-8"))
+        record.update(run_status="error", run_error={"exception_type": type(exc).__name__, "reason": str(exc)},
+                      finished_utc=datetime.now(timezone.utc).isoformat())
+        _write_checkpoint(args.output, record)
+        raise
     print(json.dumps({k: record[k] for k in ("planned", "started", "returned", "terminal", "saved",
-                                            "status_counts", "source_stable_during_run")}, indent=2))
-    return 0 if record["source_stable_during_run"] else 2
+                                            "status_counts", "reference_error_trials", "run_status",
+                                            "source_stable_during_run")}, indent=2))
+    return 0 if record["source_stable_during_run"] and record["run_status"] == "complete" else 2
 
 
 if __name__ == "__main__":

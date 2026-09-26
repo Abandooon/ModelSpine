@@ -1,9 +1,12 @@
 """Independent pinned engineering expectations and source-associated witnesses."""
+from contextlib import redirect_stdout
 from dataclasses import replace
 from hashlib import sha256
+import io
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -21,10 +24,11 @@ from modelspine_protocols import (
     SetDependencies, SetProperty, decode, loads, properties, ref,
 )
 from studies.construction.controls import ordinary_control
+from studies.construction import run as construction_run
 from studies.construction.run import (
     CONDITIONS, SCENARIOS, execute_condition, observe_trial, reference_spec, scenario_inputs,
 )
-from support.task_oracle import evaluate_candidate
+from support.task_oracle import EvaluationResult, evaluate_candidate
 from task_checks import check_tasks
 
 FIXTURES = ROOT / "tests" / "fixtures" / "construction"
@@ -149,6 +153,196 @@ class ConstructionStudyTests(unittest.TestCase):
                 self.assertEqual(result.search.status, expected)
                 self.assertEqual(result.search.steps, ())
                 self.assertIsNone(result.run)
+
+
+class ConstructionRecordingTests(unittest.TestCase):
+    def setUp(self):
+        self.inputs = scenario_inputs(load_example(), {"max_options": 3})
+        self.pinned = reference_spec()
+
+    def assert_saved_app(self, record):
+        self.assertTrue(record["returned"])
+        self.assertTrue(record["saved"])
+        self.assertEqual(record["status"], "candidate_found")
+        self.assertIsNotNone(record["app_result"]["run"]["commit"])
+        self.assertEqual(record["app_result"]["run"]["accepted"]["revision"], 1)
+        self.assertEqual(record["counts"]["search_candidate_checks"], 2)
+        self.assertEqual(record["counts"]["final_acceptance_checker_calls"], 3)
+        self.assertEqual(record["total_development_checker_calls"], 5)
+
+    def test_candidate_reference_exception_keeps_save_and_attempts_remaining_evaluations_once(self):
+        evaluations = 0
+
+        def reference(candidate, pinned):
+            nonlocal evaluations
+            evaluations += 1
+            if evaluations == 1:
+                raise RuntimeError("candidate reference failed")
+            return evaluate_candidate(candidate, pinned)
+
+        with patch.object(construction_run, "evaluate_candidate", side_effect=reference), \
+                patch.object(construction_run, "execute_condition", wraps=execute_condition) as app:
+            record = observe_trial("candidate-fault", "ordinary-rule", self.inputs, self.pinned)
+        app.assert_called_once()
+        self.assert_saved_app(record)
+        self.assertEqual(evaluations, 3)
+        self.assertEqual(record["reference_status"], "error")
+        first, second = record["independent_candidates"]
+        self.assertIsNone(first["evaluation"])
+        self.assertEqual(first["error"], {"exception_type": "RuntimeError", "reason": "candidate reference failed"})
+        self.assertTrue(decode(EvaluationResult, second["evaluation"]).satisfied)
+        self.assertTrue(decode(EvaluationResult, record["independent_saved"]).satisfied)
+        self.assertIsNone(record["independent_saved_error"])
+        self.assertEqual(record["reference_errors"], [
+            {"scope": "candidate", "option": first["option"], **first["error"]},
+        ])
+
+    def test_saved_reference_exception_does_not_erase_candidate_evaluations_or_commit(self):
+        evaluations = 0
+
+        def reference(candidate, pinned):
+            nonlocal evaluations
+            evaluations += 1
+            if evaluations == 3:
+                raise ValueError("saved reference failed")
+            return evaluate_candidate(candidate, pinned)
+
+        with patch.object(construction_run, "evaluate_candidate", side_effect=reference), \
+                patch.object(construction_run, "execute_condition", wraps=execute_condition) as app:
+            record = observe_trial("saved-fault", "ordinary-rule", self.inputs, self.pinned)
+        app.assert_called_once()
+        self.assert_saved_app(record)
+        self.assertEqual(evaluations, 3)
+        self.assertEqual(record["reference_status"], "error")
+        self.assertEqual([decode(EvaluationResult, item["evaluation"]).satisfied
+                          for item in record["independent_candidates"]],
+                         [False, True])
+        self.assertIsNone(record["independent_saved"])
+        self.assertEqual(record["independent_saved_error"],
+                         {"exception_type": "ValueError", "reason": "saved reference failed"})
+        self.assertEqual(record["reference_errors"], [
+            {"scope": "saved", "option": None, **record["independent_saved_error"]},
+        ])
+
+    def test_app_checkpoint_precedes_every_independent_reference_call(self):
+        checkpoints = []
+
+        def checkpoint(record):
+            checkpoints.append(json.loads(json.dumps(record)))
+
+        def reference(candidate, pinned):
+            self.assertTrue(checkpoints)
+            self.assert_saved_app(checkpoints[0])
+            self.assertEqual(checkpoints[0]["reference_status"], "pending")
+            self.assertEqual(checkpoints[0]["independent_candidates"], [])
+            return evaluate_candidate(candidate, pinned)
+
+        with patch.object(construction_run, "evaluate_candidate", side_effect=reference) as oracle:
+            record = observe_trial("checkpoint", "ordinary-rule", self.inputs, self.pinned,
+                                   checkpoint=checkpoint)
+        self.assertEqual(oracle.call_count, 3)
+        self.assertEqual(record["reference_status"], "complete")
+        self.assertEqual(record["reference_errors"], [])
+
+    def test_later_trial_exception_preserves_completed_and_current_app_results(self):
+        def observed(trial_id, condition, inputs, pinned, fault=None, checkpoint=None):
+            def after_app(record):
+                checkpoint(record)
+                if trial_id == "second/ordinary-rule":
+                    raise RuntimeError("interrupted after app checkpoint")
+            return observe_trial(trial_id, condition, inputs, pinned, fault, checkpoint=after_app)
+
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "run.json"
+            with patch.object(sys, "argv", ["study", "--output", str(output)]), \
+                    patch.object(construction_run, "SCENARIOS", (("first", {"max_options": 3}),
+                                                               ("second", {"max_options": 3}))), \
+                    patch.object(construction_run, "CONDITIONS", ("ordinary-rule",)), \
+                    patch.object(construction_run, "observe_trial", side_effect=observed) as observe:
+                with self.assertRaisesRegex(RuntimeError, "interrupted after app checkpoint"):
+                    construction_run.main()
+            record = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(observe.call_count, 2)
+        self.assertEqual(record["run_status"], "error")
+        self.assertEqual(record["run_error"]["exception_type"], "RuntimeError")
+        self.assertEqual(record["planned"], 5)
+        self.assertEqual((record["started"], record["returned"], record["terminal"], record["saved"]),
+                         (2, 2, 1, 2))
+        self.assertEqual(record["trials"][0]["id"], "first/ordinary-rule")
+        self.assertEqual(record["trials"][0]["reference_status"], "complete")
+        self.assert_saved_app(record["trials"][0])
+        self.assertEqual(record["active_trial"]["id"], "second/ordinary-rule")
+        self.assertEqual(record["active_trial"]["reference_status"], "pending")
+        self.assert_saved_app(record["active_trial"])
+        self.assertIsNone(record["source_stable_during_run"])
+
+    def test_serialization_failure_keeps_last_valid_checkpoint_and_reports_error(self):
+        write_checkpoint = construction_run._write_checkpoint
+        last_valid = None
+
+        def write(path, record):
+            nonlocal last_valid
+            if len(record["trials"]) == 2 and record["active_trial"] is None:
+                last_valid = json.loads(path.read_text(encoding="utf-8"))
+                record = {**record, "unserializable": object()}
+            write_checkpoint(path, record)
+
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "run.json"
+            with patch.object(sys, "argv", ["study", "--output", str(output)]), \
+                    patch.object(construction_run, "SCENARIOS", (("first", {"max_options": 3}),
+                                                               ("second", {"max_options": 3}))), \
+                    patch.object(construction_run, "CONDITIONS", ("ordinary-rule",)), \
+                    patch.object(construction_run, "_write_checkpoint", side_effect=write):
+                with self.assertRaisesRegex(TypeError, "not JSON serializable"):
+                    construction_run.main()
+            record = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(list(Path(folder).iterdir()), [output])
+        self.assertIsNotNone(last_valid)
+        self.assertEqual(record["run_status"], "error")
+        self.assertEqual(record["run_error"]["exception_type"], "TypeError")
+        self.assertNotIn("unserializable", record)
+        self.assertEqual(record["trials"], last_valid["trials"])
+        self.assertEqual(record["active_trial"], last_valid["active_trial"])
+        self.assertEqual(len(record["trials"]), 1)
+        self.assert_saved_app(record["active_trial"])
+
+    def test_existing_output_is_never_overwritten_or_executed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "run.json"
+            original = b'{"historical": "frozen"}\n'
+            output.write_bytes(original)
+            with patch.object(sys, "argv", ["study", "--output", str(output)]), \
+                    patch.object(construction_run, "collect") as collect:
+                with self.assertRaises(FileExistsError):
+                    construction_run.main()
+            self.assertEqual(output.read_bytes(), original)
+            collect.assert_not_called()
+
+    def test_reference_failure_finishes_denominator_but_returns_nonzero(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "run.json"
+            with patch.object(sys, "argv", ["study", "--output", str(output)]), \
+                    patch.object(construction_run, "SCENARIOS", (("budget-3", {"max_options": 3}),)), \
+                    patch.object(construction_run, "CONDITIONS", ("ordinary-rule",)), \
+                    patch.object(construction_run, "source_hashes", return_value={"fixed-test-source": "hash"}), \
+                    patch.object(construction_run, "evaluate_candidate", side_effect=RuntimeError("oracle unavailable")), \
+                    redirect_stdout(io.StringIO()) as stdout:
+                exit_code = construction_run.main()
+            record = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(record["run_status"], "reference_error")
+        self.assertTrue(record["source_stable_during_run"])
+        self.assertEqual(record["reference_error_trials"], 1)
+        self.assertEqual((record["planned"], record["started"], record["terminal"]), (4, 4, 4))
+        self.assertEqual(record["returned"], 3)
+        self.assertEqual(record["saved"], 1)
+        self.assertIsNone(record["active_trial"])
+        self.assert_saved_app(record["trials"][0])
+        self.assertEqual(len(record["trials"][0]["reference_errors"]), 3)
+        self.assertEqual(record["trials"][-1]["reference_status"], "not_run")
+        self.assertIsNone(record["trials"][-1]["saved"])
+        self.assertEqual(json.loads(stdout.getvalue())["run_status"], "reference_error")
 
 
 class DiagnosticWitnessTests(unittest.TestCase):

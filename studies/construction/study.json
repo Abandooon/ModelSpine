@@ -10,5 +10,8 @@
   "protocol_scope": "one deterministic engineering task; no LLM/human comparative result",
   "runner": "run.py",
   "conditions": ["terminal-only", "dag-construction", "ordinary-rule"],
-  "runs": ["runs/2026-09-26T161535942620Z.json"]
+  "runs": [
+    "runs/2026-09-26T161535942620Z.json",
+    "runs/2026-09-26T164942482157Z.json"
+  ]
 }

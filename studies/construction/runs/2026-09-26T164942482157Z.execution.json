@@ -1,0 +1,19 @@
+{
+  "executions": [
+    {
+      "name": "pilot",
+      "command": [
+        "C:\\Users\\54239\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+        "-B",
+        "studies/construction/run.py",
+        "--output",
+        "E:\\Desktop\\ModelSpine\\platform\\studies\\construction\\runs\\2026-09-26T164942482157Z.json"
+      ],
+      "cwd": "platform",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "2026-09-26T164942482157Z.pilot.stdout.txt",
+      "stderr": "2026-09-26T164942482157Z.pilot.stderr.txt"
+    }
+  ]
+}
