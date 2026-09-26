@@ -1,0 +1,5 @@
+Fixed engineering task fork-stage1; authored before execution.
+Preserve a valid finite directed acyclic graph.
+Require node-a to reach node-d.
+Require node-b to reach node-d.
+Require node-c to not reach node-d.

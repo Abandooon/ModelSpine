@@ -1,0 +1,5 @@
+Fixed engineering task diamond; authored before execution.
+Preserve a valid finite directed acyclic graph.
+Require node-a to reach node-d.
+Require node-b to not reach node-d.
+Require node-a to reach node-b.

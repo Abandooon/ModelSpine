@@ -1,0 +1,20 @@
+{
+  "name": "pilot",
+  "command": [
+    "python",
+    "-B",
+    "studies/construction/run_multitask.py",
+    "--output",
+    "studies/construction/runs/2026-09-26T173726308106Z.json"
+  ],
+  "cwd": "platform",
+  "exit_code": 0,
+  "expected_exit_code": 0,
+  "stdout": "studies/construction/runs/2026-09-26T173726308106Z.pilot.stdout.txt",
+  "stderr": "studies/construction/runs/2026-09-26T173726308106Z.pilot.stderr.txt",
+  "stdout_sha256": "98532168c3117a791088836a7f0bb29815881dddc83c1656db3ce97ac7ed8a71",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "pilot_sha256": "8f08c7d5af9bcabe450f1f7d05c5b465dac2360c5d1eba510081901e543a04b3",
+  "validation_test_count": 265,
+  "source_identity": "Exact local bytes and before/after hashes are in the pilot; Git publication identity is recorded separately."
+}

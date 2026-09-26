@@ -1,0 +1,58 @@
+{
+  "schema": "construction-multitask-semantics/0.1",
+  "scope": "single flat graph; four nodes; existing single-edge redirect",
+  "nodes": ["node-a", "node-b", "node-c", "node-d"],
+  "graph": "graph",
+  "root": "node-a",
+  "tasks": [
+    {
+      "id": "fork-stage1",
+      "predecessor": null,
+      "edges": {"edge-ab": ["node-a", "node-b"], "edge-ac": ["node-a", "node-c"], "edge-cd": ["node-c", "node-d"]},
+      "goals": [["node-a", "node-d", true], ["node-b", "node-d", true], ["node-c", "node-d", false]],
+      "edit": "edge-cd", "sources": ["node-a", "node-b", "node-c"], "destinations": ["node-a", "node-d"], "budget": 4,
+      "expected_status": "candidate_found", "expected_selected": ["node-b", "node-d"],
+      "expected_controls": ["exclude", "allow", "exclude", "allow", "exclude", "no_change"],
+      "expected_reference": [false, false, false, true, false, false]
+    },
+    {
+      "id": "diamond",
+      "predecessor": null,
+      "edges": {"edge-ab": ["node-a", "node-b"], "edge-ac": ["node-a", "node-c"], "edge-bd": ["node-b", "node-d"], "edge-cd": ["node-c", "node-d"]},
+      "goals": [["node-a", "node-d", true], ["node-b", "node-d", false], ["node-a", "node-b", true]],
+      "edit": "edge-bd", "sources": ["node-b", "node-d"], "destinations": ["node-b", "node-d"], "budget": 3,
+      "expected_status": "candidate_found", "expected_selected": ["node-d", "node-b"],
+      "expected_controls": ["exclude", "no_change", "allow", "exclude"],
+      "expected_reference": [false, false, true, false]
+    },
+    {
+      "id": "disconnected",
+      "predecessor": null,
+      "edges": {"edge-ab": ["node-a", "node-b"], "edge-cd": ["node-c", "node-d"]},
+      "goals": [["node-a", "node-d", true], ["node-c", "node-d", true], ["node-d", "node-a", false]],
+      "edit": "edge-ab", "sources": ["node-a", "node-b"], "destinations": ["node-a", "node-b"], "budget": 4,
+      "expected_status": "exhausted", "expected_selected": null,
+      "expected_controls": ["exclude", "no_change", "allow", "exclude"],
+      "expected_reference": [false, false, false, false]
+    },
+    {
+      "id": "fork-stage2",
+      "predecessor": "fork-stage1",
+      "edges": {"edge-ab": ["node-a", "node-b"], "edge-ac": ["node-a", "node-c"], "edge-cd": ["node-b", "node-d"]},
+      "goals": [["node-a", "node-d", true], ["node-b", "node-d", true], ["node-c", "node-d", false], ["node-d", "node-c", true]],
+      "edit": "edge-ac", "sources": ["node-b", "node-d"], "destinations": ["node-a", "node-c"], "budget": 4,
+      "expected_status": "candidate_found", "expected_selected": ["node-d", "node-c"],
+      "expected_controls": ["exclude", "allow", "exclude", "allow"],
+      "expected_reference": [false, false, false, true]
+    },
+    {
+      "id": "unsupported-cycle",
+      "predecessor": null,
+      "edges": {"edge-ab": ["node-a", "node-b"], "edge-bc": ["node-b", "node-c"], "edge-ca": ["node-c", "node-a"]},
+      "goals": [["node-a", "node-c", true]],
+      "edit": "edge-ca", "sources": ["node-a"], "destinations": ["node-d"], "budget": 1,
+      "expected_status": "error", "expected_selected": null,
+      "expected_controls": null, "expected_reference": null
+    }
+  ]
+}

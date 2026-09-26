@@ -40,7 +40,7 @@ python -B apps/clarification.py --profile finite-automaton
 
 ## 框架与研究入口
 
-有界构造入口：`python -B -I apps/bounded_generation.py`。从固定端点空间构造真实边编辑，构造前排除成环选项，全部任务义务终验满足后才提交；输出保留每步结果与停止原因。详见[有界构造控制](docs/bounded-construction.md)。
+有界构造入口：`python -B -I apps/bounded_generation.py`，或追加 `--case domain-packs/structural-graph/construction/multitask/fork-stage1/card.json` 加载显式输入。从固定端点空间构造真实边编辑，构造前排除成环选项，全部任务义务终验满足后才提交；输出保留每步结果与停止原因。有限后继由真实前序接受快照继续并保留父目标。详见[有界构造控制](docs/bounded-construction.md)及[三条件多任务先导](studies/construction/README.md)；[候选后端合同](docs/candidate-backend-contract.md)仍为未实现草案。
 
 - [九模块职责、解耦规则与方向实验入口](docs/architecture.md)
 - [共享接口与当前支持范围](packages/protocols/contracts/v0.1/README.md)

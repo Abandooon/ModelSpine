@@ -22,9 +22,9 @@ import bounded_generation
 from bounded_generation import load_example, run_construction
 from dag_construction import DagEditSpace
 from modelspine_generation.bounded import ConstructionDecision
-from modelspine_protocols import ArtifactRef, decode, digest, dumps, loads, to_data
+from modelspine_protocols import ArtifactRef, decode, digest, dumps, loads, require, to_data
 from studies.construction.controls import control_plan, ordinary_control
-from support.task_oracle import evaluate_candidate, pin_evaluation_spec
+from support.task_oracle import EvaluationSpec, evaluate_candidate, pin_evaluation_spec
 
 CONDITIONS = ("terminal-only", "dag-construction", "ordinary-rule")
 SCENARIOS = (
@@ -76,7 +76,10 @@ def execute_condition(condition, inputs, fault=None):
                                                            ordinary=condition == "ordinary-rule"))
 
 
-def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=None):
+def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=None, result_sink=None):
+    pinned = pin_evaluation_spec(pinned.content, pinned.spec_ref)
+    require(loads(EvaluationSpec, pinned.content.decode("utf-8")).task_ref == inputs[0].task_ref,
+            "reference task does not match prepared task", "conflict")
     record = {"id": trial_id, "condition": condition, "fault": fault,
               "stratum": "injected-fault" if fault else "comparison",
               "planned": True, "started": True, "task_ref": to_data(inputs[0].task_ref),
@@ -103,6 +106,7 @@ def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=No
         # An experiment boundary must preserve failed attempts. No replacement,
         # retry, fabricated trace, success or suppressed exception information.
         record.update(status="error", returned=False, exception_type=type(exc).__name__,
+                      exception_code=getattr(exc, "code", None),
                       reason=str(exc), app_result=None, counts=None, saved=None,
                       counts_reason="app raised; no ConstructionRun trace returned",
                       saved_reason="app raised without returning an acceptance result")
@@ -127,6 +131,8 @@ def observe_trial(trial_id, condition, inputs, pinned, fault=None, checkpoint=No
     # A checkpoint failure propagates; it must not be relabelled as an app failure.
     if checkpoint is not None:
         checkpoint(record)
+    if result_sink is not None and record["returned"]:
+        result_sink(result)
 
     def evaluate(candidate, scope, option=None):
         try:

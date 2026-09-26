@@ -1,0 +1,35 @@
+{
+  "schema_version": "dag-edit-space/0.1",
+  "id": "fork-stage2-space",
+  "version": "2-template",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-task",
+    "revision": "2-template",
+    "content_hash": "3ce16946ebb8e0571535f8dcfdbb7b1ce1b5ac2fe0af2e9adcbae171100ca18e"
+  },
+  "base": {
+    "project_id": "construction-multitask",
+    "model_id": "fork-stage1",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "9fb85969558632ebbe32c7ef7a973715ee24ee523da802e5e6ec0e1d9a7037d5"
+  },
+  "graph": "graph",
+  "edges": [
+    "edge-ac"
+  ],
+  "sources": [
+    "node-b",
+    "node-d"
+  ],
+  "destinations": [
+    "node-a",
+    "node-c"
+  ],
+  "max_options": 4
+}

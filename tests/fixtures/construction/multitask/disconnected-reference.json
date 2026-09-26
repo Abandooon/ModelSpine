@@ -1,0 +1,46 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "disconnected-reference",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "disconnected-task",
+    "revision": "1",
+    "content_hash": "e7391d99db91cd2bfd609c15cbe394d282ea735593e6f575112a0ad003637ec6"
+  },
+  "model": {
+    "project_id": "construction-multitask",
+    "model_id": "disconnected",
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8"
+  },
+  "cases": [
+    {
+      "id": "fixed-goal-1",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-a",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-2",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-c",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-3",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-d",
+      "destination": "node-a",
+      "expected": false
+    }
+  ]
+}

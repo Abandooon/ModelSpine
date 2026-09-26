@@ -1,0 +1,39 @@
+{
+  "ref": {
+    "id": "structural-graph",
+    "version": "0.1"
+  },
+  "kinds": [
+    {
+      "name": "graph",
+      "fields": [
+        {
+          "name": "root",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "node",
+      "fields": [
+        {
+          "name": "label",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "edge",
+      "fields": [
+        {
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

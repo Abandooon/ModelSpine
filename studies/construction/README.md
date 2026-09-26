@@ -1,5 +1,11 @@
 # 有限构造机制工程先导
 
+当前使用[多任务与两阶段协议](multitask-protocol.md)，入口为 `python -B studies/construction/run_multitask.py --output studies/construction/runs/<new-unique-name>.json`。固定三类拓扑任务、一个依赖后继和一个初始成环边界，共15个计划条目；阶段1只执行一次，不把阶段或条件当作独立项目。每条件从自己的真实accepted进入阶段2，保留全部父目标，只追加预先固定的d→c可达目标。参考在执行前核对任务身份，后继参考保留模板来源并使用独立派生版本。
+
+完整回归 **265/265** 通过后，统一采集[本轮正式运行](runs/2026-09-26T173726308106Z.json)：15计划/启动/终态，12 app返回，9保存且独立验收均满足；3空间耗尽，3不支持成环初始状态错误（实际code=invalid），无参考错误。三条件各完成真实revision1→2；运行93项来源哈希前后一致。fork两个阶段搜索检查各为仅终验4次、两前控各2次；diamond 2/1/1，disconnected 3/1/1。成功接纳另各3次检查。DAG和普通Kahn仍为零差异；单图有限空间复用不证明元模型组织优势。人工首次/增量时间和计算费用仍未计量。原始输出见同前缀`.pilot.stdout.txt`/`.pilot.stderr.txt`，命令身份见同前缀`.execution.json`。
+
+新验收见 [test_construction_multitask.py](../../tests/test_construction_multitask.py)，固定答案见 [semantics.json](../../tests/fixtures/construction/multitask/semantics.json)。原普通Kahn规则跨任务参数化复用，没有逐任务控制分支。新增记录使用旧 observe_trial 的可选真实结果回调与原子检查点，不另建提交流程。下文均为此前单任务运行的历史说明，原始runs未修改。
+
 本目录实际装配三个可运行条件：terminal-only、DAG construction + terminal、ordinary-rule + terminal。它们使用同一个固定任务、端点选项、顺序、预算、构造器、终验与 kernel 保存入口。普通程序以 Kahn 拓扑消除独立判环，不调用 DAG 控制器。[协议](protocol.md)在集成前固定目标、九选项答案、21 对照执行与 3 故障探针。
 
 独立验收复用测试侧 task_oracle 和既有固定 graph-reference；只在 app 返回后评价各候选和已保存模型。基础模型本已满足路径任务，本例探索合法的实际端点变更。有限选项及不同预算不是独立统计样本；没有 LLM、真人或方法优势结论。

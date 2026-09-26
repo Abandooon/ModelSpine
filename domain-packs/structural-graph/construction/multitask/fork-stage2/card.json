@@ -1,0 +1,45 @@
+{
+  "schema_version": "construction-case/0.1",
+  "metamodel": "metamodel.json",
+  "model": "model.json",
+  "task": "task.json",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-task",
+    "revision": "2-template",
+    "content_hash": "3ce16946ebb8e0571535f8dcfdbb7b1ce1b5ac2fe0af2e9adcbae171100ca18e"
+  },
+  "sources": [
+    {
+      "ref": {
+        "project_id": "construction-multitask",
+        "artifact_id": "fork-stage1-source",
+        "revision": "1",
+        "content_hash": "add646716c8d7b314e766a7e92507207862cbe3b25e7f865f72995f3fd0c88a3"
+      },
+      "path": "parent-source.txt"
+    },
+    {
+      "ref": {
+        "project_id": "construction-multitask",
+        "artifact_id": "fork-stage2-source",
+        "revision": "1",
+        "content_hash": "5e96bd1e6ae5841edf56ef31a20ae9274d3b4030eb669b154215891654410d80"
+      },
+      "path": "source.txt"
+    }
+  ],
+  "space": "space.json",
+  "space_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage2-space",
+    "revision": "2-template",
+    "content_hash": "5efa6d51bdfaac1d29892d66c0effd6f434541ae1de4d21f26dd554b1c665b83"
+  },
+  "predecessor": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-task",
+    "revision": "1",
+    "content_hash": "639dd0fbd6695b55106cdb1dc4c1378598a7d2a32d3718c0f47932e537ea1016"
+  }
+}

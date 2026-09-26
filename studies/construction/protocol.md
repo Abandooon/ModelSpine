@@ -1,5 +1,7 @@
 # Finite construction mechanism pilot
 
+This document governs the historical single-task runs. The current separately fixed batch is in [multitask-protocol.md](multitask-protocol.md). Its recorder reuses observe_trial and the atomic checkpoint writer; observe_trial now verifies the pinned reference task before app execution and optionally returns the original typed app result to a successor consumer after the app checkpoint. The original conditions, goals and run bytes remain unchanged.
+
 This is one deterministic engineering task, not a sample of independent tasks or an LLM experiment. No comparative advantage is established. The evaluator fixes these expectations before running any condition. Shared authorship and public fixtures do not establish blind independent truth.
 
 ## Fixed task and reference

@@ -1,0 +1,46 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "fork-stage1-reference",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-task",
+    "revision": "1",
+    "content_hash": "639dd0fbd6695b55106cdb1dc4c1378598a7d2a32d3718c0f47932e537ea1016"
+  },
+  "model": {
+    "project_id": "construction-multitask",
+    "model_id": "fork-stage1",
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8"
+  },
+  "cases": [
+    {
+      "id": "fixed-goal-1",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-a",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-2",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-b",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-3",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-c",
+      "destination": "node-d",
+      "expected": false
+    }
+  ]
+}

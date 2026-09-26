@@ -1,0 +1,30 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "unsupported-cycle-reference",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "unsupported-cycle-task",
+    "revision": "1",
+    "content_hash": "f0048d142d9c43f2860555bb1ba7455f456653dba976c13978bac5f52c854284"
+  },
+  "model": {
+    "project_id": "construction-multitask",
+    "model_id": "unsupported-cycle",
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8"
+  },
+  "cases": [
+    {
+      "id": "fixed-goal-1",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-a",
+      "destination": "node-c",
+      "expected": true
+    }
+  ]
+}

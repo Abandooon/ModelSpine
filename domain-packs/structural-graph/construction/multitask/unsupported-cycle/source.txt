@@ -1,0 +1,3 @@
+Fixed engineering task unsupported-cycle; authored before execution.
+Preserve a valid finite directed acyclic graph.
+Require node-a to reach node-c.

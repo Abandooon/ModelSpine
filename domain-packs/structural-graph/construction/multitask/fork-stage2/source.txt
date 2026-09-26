@@ -1,0 +1,3 @@
+Fixed fork successor goal, declared before any stage executes.
+Preserve all parent statements and obligations.
+Require node-d to reach node-c.

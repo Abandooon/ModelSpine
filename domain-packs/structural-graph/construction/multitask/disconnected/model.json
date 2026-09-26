@@ -1,0 +1,152 @@
+{
+  "project_id": "construction-multitask",
+  "model_id": "disconnected",
+  "revision": 0,
+  "metamodel": {
+    "id": "structural-graph",
+    "version": "0.1"
+  },
+  "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+  "elements": [
+    {
+      "id": "graph",
+      "kind": "graph",
+      "name": "graph",
+      "parent": null,
+      "properties": [
+        {
+          "name": "root",
+          "value": "node-a"
+        }
+      ],
+      "dependencies": [
+        "node-a",
+        "node-b",
+        "node-c",
+        "node-d",
+        "edge-ab",
+        "edge-cd"
+      ],
+      "dependencies_complete": false,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "node-a",
+      "kind": "node",
+      "name": "node-a",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "label",
+          "value": "A"
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "node-b",
+      "kind": "node",
+      "name": "node-b",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "label",
+          "value": "B"
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "node-c",
+      "kind": "node",
+      "name": "node-c",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "label",
+          "value": "C"
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "node-d",
+      "kind": "node",
+      "name": "node-d",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "label",
+          "value": "D"
+        }
+      ],
+      "dependencies": [],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "edge-ab",
+      "kind": "edge",
+      "name": "edge-ab",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "source",
+          "value": "node-a"
+        },
+        {
+          "name": "target",
+          "value": "node-b"
+        }
+      ],
+      "dependencies": [
+        "node-a",
+        "node-b"
+      ],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    },
+    {
+      "id": "edge-cd",
+      "kind": "edge",
+      "name": "edge-cd",
+      "parent": "graph",
+      "properties": [
+        {
+          "name": "source",
+          "value": "node-c"
+        },
+        {
+          "name": "target",
+          "value": "node-d"
+        }
+      ],
+      "dependencies": [
+        "node-c",
+        "node-d"
+      ],
+      "dependencies_complete": true,
+      "category": "hypothesis",
+      "confirmed": true,
+      "sources": []
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": "construction-case/0.1",
+  "metamodel": "metamodel.json",
+  "model": "model.json",
+  "task": "task.json",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "unsupported-cycle-task",
+    "revision": "1",
+    "content_hash": "f0048d142d9c43f2860555bb1ba7455f456653dba976c13978bac5f52c854284"
+  },
+  "sources": [
+    {
+      "ref": {
+        "project_id": "construction-multitask",
+        "artifact_id": "unsupported-cycle-source",
+        "revision": "1",
+        "content_hash": "12f4cc93da4153c30425ac9b170620a6ab6ddfd70ddbb6a39868a63dfb49ec28"
+      },
+      "path": "source.txt"
+    }
+  ],
+  "space": "space.json",
+  "space_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "unsupported-cycle-space",
+    "revision": "1",
+    "content_hash": "26ebd3aa12951af1e6530437870c8c42f21a1661267a3212428dbc522d7f233f"
+  },
+  "predecessor": null
+}

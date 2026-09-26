@@ -1,0 +1,54 @@
+{
+  "schema": "task-evaluation/0.1",
+  "id": "fork-stage2-reference",
+  "version": "1-template",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-task",
+    "revision": "2-template",
+    "content_hash": "3ce16946ebb8e0571535f8dcfdbb7b1ce1b5ac2fe0af2e9adcbae171100ca18e"
+  },
+  "model": {
+    "project_id": "construction-multitask",
+    "model_id": "fork-stage1",
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8"
+  },
+  "cases": [
+    {
+      "id": "fixed-goal-1",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-a",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-2",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-b",
+      "destination": "node-d",
+      "expected": true
+    },
+    {
+      "id": "fixed-goal-3",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-c",
+      "destination": "node-d",
+      "expected": false
+    },
+    {
+      "id": "fixed-goal-4",
+      "kind": "graph_reachability",
+      "target": "graph",
+      "input": "node-d",
+      "destination": "node-c",
+      "expected": true
+    }
+  ]
+}

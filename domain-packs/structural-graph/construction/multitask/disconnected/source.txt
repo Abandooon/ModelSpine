@@ -1,0 +1,5 @@
+Fixed engineering task disconnected; authored before execution.
+Preserve a valid finite directed acyclic graph.
+Require node-a to reach node-d.
+Require node-c to reach node-d.
+Require node-d to not reach node-a.

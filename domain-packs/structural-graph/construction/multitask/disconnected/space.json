@@ -1,0 +1,35 @@
+{
+  "schema_version": "dag-edit-space/0.1",
+  "id": "disconnected-space",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "disconnected-task",
+    "revision": "1",
+    "content_hash": "e7391d99db91cd2bfd609c15cbe394d282ea735593e6f575112a0ad003637ec6"
+  },
+  "base": {
+    "project_id": "construction-multitask",
+    "model_id": "disconnected",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "bc4401cc32b0ce628835e1f8a27974923e73dd54cf36056c5de382f66926b3f4"
+  },
+  "graph": "graph",
+  "edges": [
+    "edge-ab"
+  ],
+  "sources": [
+    "node-a",
+    "node-b"
+  ],
+  "destinations": [
+    "node-a",
+    "node-b"
+  ],
+  "max_options": 4
+}

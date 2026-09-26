@@ -1,0 +1,210 @@
+{
+  "schema_version": "task-contract/0.1",
+  "id": "disconnected-task",
+  "version": "1",
+  "base": {
+    "project_id": "construction-multitask",
+    "model_id": "disconnected",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "bc4401cc32b0ce628835e1f8a27974923e73dd54cf36056c5de382f66926b3f4"
+  },
+  "statements": [
+    {
+      "id": "goal-1",
+      "text": "Preserve a valid finite directed acyclic graph.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "construction-multitask",
+            "artifact_id": "disconnected-source",
+            "revision": "1",
+            "content_hash": "ca22e8ee01aec2c2dcfe7b439f1db8c2f98d6f1040d829f281b1aefe4fcbfdae"
+          },
+          "locator": "lines:2-2",
+          "origin": "predeclared-engineering-task"
+        }
+      ],
+      "pending_reason": null
+    },
+    {
+      "id": "goal-2",
+      "text": "Require node-a to reach node-d.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "construction-multitask",
+            "artifact_id": "disconnected-source",
+            "revision": "1",
+            "content_hash": "ca22e8ee01aec2c2dcfe7b439f1db8c2f98d6f1040d829f281b1aefe4fcbfdae"
+          },
+          "locator": "lines:3-3",
+          "origin": "predeclared-engineering-task"
+        }
+      ],
+      "pending_reason": null
+    },
+    {
+      "id": "goal-3",
+      "text": "Require node-c to reach node-d.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "construction-multitask",
+            "artifact_id": "disconnected-source",
+            "revision": "1",
+            "content_hash": "ca22e8ee01aec2c2dcfe7b439f1db8c2f98d6f1040d829f281b1aefe4fcbfdae"
+          },
+          "locator": "lines:4-4",
+          "origin": "predeclared-engineering-task"
+        }
+      ],
+      "pending_reason": null
+    },
+    {
+      "id": "goal-4",
+      "text": "Require node-d to not reach node-a.",
+      "category": "intent",
+      "confirmation": "confirmed",
+      "required": true,
+      "source_refs": [
+        {
+          "source": {
+            "project_id": "construction-multitask",
+            "artifact_id": "disconnected-source",
+            "revision": "1",
+            "content_hash": "ca22e8ee01aec2c2dcfe7b439f1db8c2f98d6f1040d829f281b1aefe4fcbfdae"
+          },
+          "locator": "lines:5-5",
+          "origin": "predeclared-engineering-task"
+        }
+      ],
+      "pending_reason": null
+    }
+  ],
+  "plan": {
+    "id": "disconnected-checks",
+    "version": "1",
+    "rule_version": "task-checks/0.1",
+    "assumptions": [
+      "finite flat graph; one existing edge redirected",
+      "explicit author mapping; semantic fidelity unproven"
+    ],
+    "obligations": [
+      {
+        "id": "structure",
+        "version": "1",
+        "kind": "directed_acyclic_graph",
+        "target": "graph",
+        "field": "root",
+        "parameters": []
+      },
+      {
+        "id": "path-1",
+        "version": "1",
+        "kind": "graph_reachability",
+        "target": "graph",
+        "field": "root",
+        "parameters": [
+          {
+            "name": "source",
+            "value": "node-a"
+          },
+          {
+            "name": "destination",
+            "value": "node-d"
+          },
+          {
+            "name": "expected_reachable",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "path-2",
+        "version": "1",
+        "kind": "graph_reachability",
+        "target": "graph",
+        "field": "root",
+        "parameters": [
+          {
+            "name": "source",
+            "value": "node-c"
+          },
+          {
+            "name": "destination",
+            "value": "node-d"
+          },
+          {
+            "name": "expected_reachable",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "path-3",
+        "version": "1",
+        "kind": "graph_reachability",
+        "target": "graph",
+        "field": "root",
+        "parameters": [
+          {
+            "name": "source",
+            "value": "node-d"
+          },
+          {
+            "name": "destination",
+            "value": "node-a"
+          },
+          {
+            "name": "expected_reachable",
+            "value": false
+          }
+        ]
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "obligation_id": "structure",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-1"
+      ]
+    },
+    {
+      "obligation_id": "path-1",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-2"
+      ]
+    },
+    {
+      "obligation_id": "path-2",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-3"
+      ]
+    },
+    {
+      "obligation_id": "path-3",
+      "obligation_version": "1",
+      "statement_ids": [
+        "goal-4"
+      ]
+    }
+  ]
+}

@@ -10,13 +10,23 @@
 
 控制结果 `ConstructionDecision` 绑定选项哈希，状态为 allow/exclude/no_change/unknown/error。`CandidateEvaluation` 保留候选和完整 ValidationReport；`ConstructionStep` 保留每个已考虑选项及其决定、提案、评价。`ConstructionRun` 绑定 task_ref、base、GenerationPlan，停止为 candidate_found/exhausted/budget_exhausted/unknown/error。unknown/error 立即停止；异常传播，不自动换控制器或终验器。not_applicable 不作为满足，停止为 unknown。未变化选项不构造提案或伪造提交。
 
-当前宿主预先物化完整笛卡尔编辑空间，core 在开始控制前核对全部选项；时间与内存随总选项数增长，即使预算为零也有准备成本。max_options 只限制控制调用，不是总时间或内存上限。当前工程消费者仅 9 项；更大空间的资源限制或惰性处理需另定合同和验收，当前未实现。
+当前宿主预先物化完整笛卡尔编辑空间，core 在开始控制前核对全部选项；时间与内存随总选项数增长，即使预算为零也有准备成本。max_options 只限制控制调用，不是总时间或内存上限。当前工程输入均为个位数选项；更大空间的资源限制或惰性处理需另定合同和验收，当前未实现。
 
 GenerationPlan 必须覆盖固定 CheckPlan 的所有义务及版本，声明 construction 或 terminal-only；residual 恰列未前置控制的义务。所有义务仍需终验，包括前置受控项。候选必须属于原项目/模型/元模型且 revision=base+1，报告须匹配实际候选、原计划、全部范围与义务。核心不重复执行领域语义：control/build 的领域正确性及 evaluate 的提案到候选语义属于可信宿主责任；完整性绑定不证明语义正确。
 
 [dag_construction.py](../adapters/dag_construction.py) 解释 `DagEditSpace` 与 DAG 义务，`prepare_dag(...)` 返回 options/plan/control/build。初始图必须符合现有扁平 DAG 支持范围；固定允许边和端点必须属于该图，列表可为空。控制移除待编辑旧边后检查新目标是否可达新源，保留其他平行边；自环或回路被前置排除。builder 同步两个 SetProperty 与端点 SetDependencies，不偷偷执行前置规则，让明确的仅终验对照可复用相同构造器。根的成员依赖仍为 incomplete，不宣称解决全图增量证据完备性。
 
 [bounded_generation.py](../apps/bounded_generation.py) 核对编辑空间原字节哈希、身份、任务与基准，装配真实 kernel.preview 和 check_tasks，再调用原有 run_task 接受候选。`run_construction(..., *, controller=None, construction_plan=None)` 只允许同时显式注入控制器和计划；builder、终验与保存流程固定。`BoundedTaskRun` 分开记录空间引用、搜索和最终 TaskRunResult；candidate_found 不等于已保存，保存以 run.commit 为准。CLI 成功保存退出 0，未保存退出 1，输入/合同错误退出 2。
+
+## 显式任务输入与有限后继
+
+`load_construction_case(card_path)` 从严格 `construction-case/0.1` 卡读取模型、元模型、任务/来源和编辑空间；各路径限于卡目录内的相对路径，任务/来源/空间原字节、身份和模型基准分别校验。它不需要正确 proposal 文件。CLI 的 `--case` 使用该入口；未提供时仍运行原示例，原示例不再读取无用的预制 proposal。实例输入见[固定多任务目录](../domain-packs/structural-graph/construction/multitask/README.md)。
+
+`advance_construction(previous_inputs, previous_result, successor_card)` 只在真实前序 commit 存在且任务、基准、空间、接受快照和报告绑定相符时继续。后继卡显式引用前序任务；其模板与父输入模型相同，父声明/义务/绑定按值保留，task/plan 使用新版本。本实现只追加预先固定目标，不隐式删除/替换旧目标或迁移元模型。
+
+后继将模板 task/space 的 base 绑定为前序实际 accepted，并以模板版本加 `/bound-` 和完整基准引用摘要派生新 task/space 身份，重新固定字节/哈希并调用 prepare_task；目标、完整 plan 和编辑权限仍来自原模板。模板与派生记录区分，原文件不改。不同条件使用自己的实际快照，不强制对齐或重跑前序；前序未提交时由研究装配记录后继未启动。
+
+这仍是可信本机应用装配，不是跨进程提交凭据认证或一般工作流。每一步经既有 run_construction 的完整终验和模型接纳；没有持久化或跨阶段全局事务。未来真实候选后端的[接入合同](candidate-backend-contract.md)目前仅为 draft，尚无 API 调用能力。
 
 ## 验收与研究边界
 

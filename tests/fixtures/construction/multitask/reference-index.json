@@ -1,0 +1,32 @@
+{
+  "fork-stage1-reference.json": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage1-reference",
+    "revision": "1",
+    "content_hash": "45db63261dc49c8551a92aac65501141e9f068d9c1023ccfad4b2f6b7c8707a6"
+  },
+  "diamond-reference.json": {
+    "project_id": "construction-multitask",
+    "artifact_id": "diamond-reference",
+    "revision": "1",
+    "content_hash": "63e8149c72259973e6d257c9632b70c4881174783b31c91eeb44f9c737746a44"
+  },
+  "disconnected-reference.json": {
+    "project_id": "construction-multitask",
+    "artifact_id": "disconnected-reference",
+    "revision": "1",
+    "content_hash": "e113ca04cb6a1b716deeb9124b86cd4a3de10d089b66d83f3f6d8b1f081ebc2b"
+  },
+  "fork-stage2-reference.json": {
+    "project_id": "construction-multitask",
+    "artifact_id": "fork-stage2-reference",
+    "revision": "1-template",
+    "content_hash": "4f2ce27e59791935c9fc2225eb66f96e2da4332aebfc94a6fa4906a9fa84611b"
+  },
+  "unsupported-cycle-reference.json": {
+    "project_id": "construction-multitask",
+    "artifact_id": "unsupported-cycle-reference",
+    "revision": "1",
+    "content_hash": "e5c2819336316a8a8c8554d38184395bdb2e1c904decaf45883606086da8847b"
+  }
+}

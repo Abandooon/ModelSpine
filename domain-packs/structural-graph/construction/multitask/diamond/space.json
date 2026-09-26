@@ -1,0 +1,35 @@
+{
+  "schema_version": "dag-edit-space/0.1",
+  "id": "diamond-space",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "diamond-task",
+    "revision": "1",
+    "content_hash": "1b59a33bb4136d9590e62d2351ffae5c690e819aed4c0020fdac00d164eeac1a"
+  },
+  "base": {
+    "project_id": "construction-multitask",
+    "model_id": "diamond",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "63012db1d1760a5d602425955a337669aded8f3c7d9f9d80c983b7e5c86ca94d"
+  },
+  "graph": "graph",
+  "edges": [
+    "edge-bd"
+  ],
+  "sources": [
+    "node-b",
+    "node-d"
+  ],
+  "destinations": [
+    "node-b",
+    "node-d"
+  ],
+  "max_options": 3
+}

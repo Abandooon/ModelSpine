@@ -1,6 +1,6 @@
 # 平台应用
 
-[bounded_generation.py](bounded_generation.py) 从固定 DAG 编辑空间构造候选：`python -B -I apps/bounded_generation.py`。装配 generation 的有界步骤、领域控制、kernel 预览和原有任务验收。控制器与计划可同时显式注入；构造器、终验和保存规则固定，不接收参考答案。退出 0 为内存提交，1 为未保存，2 为输入/合同错误。范围见[有界构造合同](../docs/bounded-construction.md)。
+[bounded_generation.py](bounded_generation.py) 从固定 DAG 编辑空间构造候选：`python -B -I apps/bounded_generation.py`；`--case <card.json>` 加载显式任务卡，无需正确提案输入。`advance_construction` 从真实前序接受快照装配预先固定的后继任务，保留父目标并派生新版本引用。装配 generation 的有界步骤、领域控制、kernel 预览和原有任务验收。控制器与计划可同时显式注入；构造器、终验和保存规则固定，不接收参考答案。退出 0 为内存提交，1 为未保存，2 为输入/合同错误。范围见[有界构造合同](../docs/bounded-construction.md)。
 
 用于平台工作台与 CLI 的真实应用入口。用户生成的软件项目放在独立仓库/工作区，以项目清单关联；实验实例由 studies 管理。
 

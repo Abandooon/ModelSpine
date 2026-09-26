@@ -1,0 +1,33 @@
+{
+  "schema_version": "dag-edit-space/0.1",
+  "id": "unsupported-cycle-space",
+  "version": "1",
+  "task_ref": {
+    "project_id": "construction-multitask",
+    "artifact_id": "unsupported-cycle-task",
+    "revision": "1",
+    "content_hash": "f0048d142d9c43f2860555bb1ba7455f456653dba976c13978bac5f52c854284"
+  },
+  "base": {
+    "project_id": "construction-multitask",
+    "model_id": "unsupported-cycle",
+    "revision": 0,
+    "metamodel": {
+      "id": "structural-graph",
+      "version": "0.1"
+    },
+    "metamodel_hash": "0a3dad4f16c6b9e8f067fcbba0eefbf68eb2c55115fed0793b89304de66d6ab8",
+    "content_hash": "db01b90bb31e3914f88618806dd0290eb2bd024665cf1b74914e7753c9c7595a"
+  },
+  "graph": "graph",
+  "edges": [
+    "edge-ca"
+  ],
+  "sources": [
+    "node-a"
+  ],
+  "destinations": [
+    "node-d"
+  ],
+  "max_options": 1
+}
