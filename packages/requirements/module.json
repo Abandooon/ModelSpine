@@ -1,28 +1,45 @@
 {
   "id": "requirements",
   "title": "需求澄清与模型细化",
-  "status": "planned",
-  "version": "0.1.0-reviewed",
+  "status": "implemented-slice",
+  "version": "0.1.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
     "model-kernel"
   ],
-  "runtime_dependencies": null,
-  "provides": [
-    "RequirementEvidence",
-    "Clarification",
-    "ModelProposal"
+  "runtime_dependencies": [
+    "protocols"
   ],
-  "scope": "从自然语言/已有模型形成候选，区分映射错误、表示不足、规则错误与未知。",
-  "implementation_entrypoints": [],
-  "validation_evidence": [],
+  "provides": [
+    "EvidenceNeed",
+    "Interpretation",
+    "Probe",
+    "ClarificationCase",
+    "Observation",
+    "Question",
+    "AnswerRecord",
+    "AnsweredQuestion",
+    "Session",
+    "prepare",
+    "answer",
+    "propose"
+  ],
+  "scope": "对版本化结构化来源和显式有限解释进行行为提问、回答绑定与提案装配；未知与预算停止保留未决。",
+  "implementation_entrypoints": [
+    "src/modelspine_requirements/__init__.py"
+  ],
+  "validation_evidence": [
+    "../../docs/clarification.md",
+    "../../docs/validation.md"
+  ],
   "review_targets": [
     "architecture"
   ],
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
-  "contract_maturity": "reviewed",
+  "contract_maturity": "exercised-subset",
+  "implemented_scope": "Explicit finite interpretation lists with raw-byte-pinned sources, injected preview/observation, minimax boolean questions, immutable answer history and successor-task-bound proposals; standard library and protocols only; no exhaustive interpretation search, automatic gap classification, semantic fidelity proof, model writes or LLM judge",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft"
 }

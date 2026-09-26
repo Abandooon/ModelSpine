@@ -1,3 +1,5 @@
 # These fixtures use ArtifactRef hashes of exact bytes, including line endings.
 domain-packs/*/tasks/* -text
 tests/fixtures/task-acceptance/* -text
+domain-packs/*/clarification/* -text
+tests/fixtures/clarification/* -text

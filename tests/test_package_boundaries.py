@@ -12,6 +12,7 @@ PACKAGES = {
     "model-kernel": "modelspine_kernel",
     "assurance": "modelspine_assurance",
     "generation": "modelspine_generation",
+    "requirements": "modelspine_requirements",
 }
 
 
@@ -47,8 +48,17 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_task_application_does_not_load_reference_evaluator(self):
         paths = [str(PLATFORM / "apps")]
-        script = (f"import sys; sys.path[:0]={paths!r}; import task_acceptance; "
+        script = (f"import sys; sys.path[:0]={paths!r}; import task_acceptance; import clarification; "
                   "assert not any('oracle' in name or name.startswith('support') for name in sys.modules)")
+        result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_clarification_adapter_has_no_kernel_or_application_dependency(self):
+        paths = [str(PLATFORM / "packages" / name / "src") for name in ("protocols", "requirements")]
+        paths.append(str(PLATFORM / "adapters"))
+        script = (f"import sys; sys.path[:0]={paths!r}; import clarification_checks; "
+                  "assert 'modelspine_kernel' not in sys.modules; "
+                  "assert 'clarification' not in sys.modules")
         result = subprocess.run([sys.executable, "-B", "-I", "-c", script], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 

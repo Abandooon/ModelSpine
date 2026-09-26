@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 PLATFORM = Path(__file__).resolve().parents[1]
-PACKAGES = ("protocols", "model-kernel", "assurance", "generation")
+PACKAGES = ("protocols", "model-kernel", "assurance", "generation", "requirements")
 
 
 def activate(packages):

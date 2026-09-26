@@ -1,0 +1,6 @@
+Engineering author fixture. Explicit finite alternatives; scripted answers are not customer evidence.
+Choose between two explicitly supplied accepting-state additions while preserving all parent goals.
+intermediate-accept marks s1 accepting, leaving the initial state unchanged.
+initial-accept marks s0 accepting, leaving the intermediate state unchanged.
+Should the fixed input a be accepted?
+Should the empty input be accepted?

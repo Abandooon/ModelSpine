@@ -2,7 +2,7 @@
 
 从仓库根运行 `python -B run_tests.py`；只使用 Python 3.10+ 标准库。离线贯穿示例为 `python -B apps/offline.py`，非法阈值反例为 `python -B apps/offline.py --threshold -1`，后者应明确失败并退出 2。
 
-可用 `python -B run_tests.py --package protocols` 单独验收一个包，包名还可选 model-kernel、assurance、generation；`python -B run_tests.py --integration` 验收跨包路径。默认入口在五个隔离子进程中运行四包单元验收和集成验收，单包测试不经 offline CLI 加载其他能力包。
+可用 `python -B run_tests.py --package protocols` 单独验收一个包，包名还可选 model-kernel、assurance、generation、requirements；`python -B run_tests.py --integration` 验收跨包路径。默认入口在六个隔离子进程中运行五包单元验收和集成验收，单包测试不经 offline CLI 加载其他能力包。
 
 ## 有意义的验收
 
@@ -41,7 +41,17 @@
 
 完整原日志、公开输入/源码哈希、共同错误复现脚本与对应 Git 提交由研究工作区本轮记录保存；公开仓库可由测试入口复验，不包含旧源码副本。按原字节固定的任务/评价夹具通过 `.gitattributes` 关闭换行转换，避免克隆时改变其 ArtifactRef。
 
-参考验收来自同团队公开工程规格，且沿用明确的任务要求；不是隐藏测试集或独立专家真值。公共任务边界不证明自然语言意图完整、映射忠实或比较优势。generation 算法未改，五个方向模块继续 planned。
+参考验收来自同团队公开工程规格，且沿用明确的任务要求；不是隐藏测试集或独立专家真值。公共任务边界不证明自然语言意图完整、映射忠实或比较优势。该轮 generation 算法未改，五个方向模块当时继续 planned。
+
+## 2026-09-26 有限澄清消费者
+
+`python -B -I run_tests.py` 完整运行 **178 项全部通过**：protocols 19、model-kernel 11、assurance 16、generation 9、requirements 28、集成 95。保留此前 126 项并新增 52 项。两域 `apps/clarification.py --profile ...` 均退出 0、完成行为变更并提交 revision 1；未知 profile 退出 2。真实来源、案例、问题、原始回答、后继任务和报告按版本/哈希关联，见[运行说明](clarification.md)。
+
+新增验收覆盖连续两轮 4→2→1 过滤、确定性分组选择、来源/案例/回答字节及身份、任务/快照/探针/候选集绑定、答案 ID 重用、严格 bool/int、拒答/冲突/缺证/未知与各项预算。无区分探针保持未决；无变化解释经后继目标评估但不产生提交。父声明、义务、绑定按值保留，后继版本不得复用父任务或父计划版本。
+
+刻意注入的语义错误观察器保留正确绑定但翻转预测，澄清仍可收敛；实际候选在最终固定目标检查中被拒，未改变已接受快照。父目标与回答冲突也保留原目标并拒绝提交。测试侧预先编写的参考规格接受选定候选，并拒绝另一个虽满足父目标却违反回答目标的候选；参考结果不进入方法输入。观察与终验复用有限语义辅助，不能据此声称免疫共同错误。
+
+requirements 实际只依赖 protocols/标准库；适配器及应用隔离检查通过。没有新增外部依赖、自然语言抽取、Jev/LLM 调用、时间预算或自动 representation_gap 证明。脚本回答与同团队参考规格是工程材料，不是实际用户实验或独立专家真值；P1/claims 保持研究假设。完整日志与当前代码身份登记于研究工作区本轮交接，代码由 Git 保存。
 
 ## 支持范围
 

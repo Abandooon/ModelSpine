@@ -1,0 +1,6 @@
+Engineering author fixture. Explicit finite alternatives; scripted answers are not customer evidence.
+Choose between two explicitly supplied edge redirections while preserving all parent goals.
+entry-bypass redirects edge-ab from a->b to a->c and updates endpoint dependencies.
+tail-bypass redirects edge-bc from b->c to a->c and updates endpoint dependencies.
+Should node-a still reach node-b?
+Should node-b still reach node-c?

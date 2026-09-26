@@ -18,3 +18,5 @@
 非法模型不能借负向期望得到 satisfied；参数类型或集合错误为 error。旧 `finite_trace_acceptance` 仍读取模型内 trace，超字母表仍按旧语义 violated，两者不混同。新旧消费者共享有限结构解析与执行辅助，没有向公共核心添加图/自动机分支；报告始终绑定实际原候选和原计划哈希。任务规则只判断已声明的有限目标，不证明意图完整或研究优势。
 
 [平台入口](../README.md)
+
+[clarification_checks.py](clarification_checks.py) 提供 `observe(snapshot, probe)` 与 `goal(probe, answer)`。前者复用有限模型解析，返回绑定候选/探针的 observed、unknown 或 error；非法模型不能成为 False。后者仅从事前固定的正向行为模板和布尔回答构造验收目标，不读取候选。适配器仅导入 protocols、requirements 与有限辅助；由 apps 注入通用澄清核心，不自动换检查器。支持边界与固定任务规则相同，不推导元模型表达不足。
