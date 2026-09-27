@@ -8,11 +8,11 @@
 
 配置及支持范围见[结构图](../domain-packs/structural-graph/README.md)与[有限自动机](../domain-packs/finite-automaton/README.md)。检查器扫描根的直接成员；v0.1 无法自动追踪将来新成员，因此根必须列出实际读取成员依赖并设 `dependencies_complete=false`。根声明完整时报告 error；证据初始适用性为 unknown，已有依赖发生变化可为 stale，不能宣称全图证据 current。
 
-当前根的间接后代明确返回 violated:not_flat_membership，不静默忽略嵌套关系；其他独立根的成员不纳入当前范围。检查器直接收到包含循环或缺失 parent 的坏结构时返回 error，不沿坏引用无限遍历。
+Graph/Machine 目标根必须 parent=null，否则明确返回 error:root_has_parent。当前根的间接后代明确返回 violated:not_flat_membership，不静默忽略嵌套关系；其他独立根的成员不纳入当前范围。检查器直接收到包含循环或缺失 parent 的坏结构时返回 error，不沿坏引用无限遍历。有限结构检查器版本为 0.1.1，以区分修复前的根支持边界。
 
 目标不存在为 error；目标存在但义务 kind 不支持为 unknown。支持的义务配置错误为 error；可判定的候选语义反例为 violated。检查失败不更换执行器或改变义务。
 
-[task_checks.py](task_checks.py) 提供 `check_tasks(snapshot, plan, scope=None)`，工具身份为 `modelspine-task-checker/0.1.0`。保留三条旧有限规则，并增加两个从固定计划读取目标的规则：
+[task_checks.py](task_checks.py) 提供 `check_tasks(snapshot, plan, scope=None)`，工具身份为 `modelspine-task-checker/0.1.1`。保留三条旧有限规则，并增加两个从固定计划读取目标的规则：
 
 - `graph_reachability` 使用 `field=root`，参数为 `source`、`destination` 字符串和 `expected_reachable` 布尔值。先验证当前支持的有效有向无环图，再按固定节点 ID 检查可达性，包含同一有效节点到自身的零长度路径。任务端点不属于本图为 error。
 - `trace_acceptance` 使用 `field=initial`，参数为 `input` 字符串和 `expected_accept` 布尔值。先验证平坦、确定、依赖声明符合边界的有限自动机，再执行参数 input；不使用或替换候选的 `machine.trace`。输入超出声明字母表为 unknown；受支持输入遇到缺失转移或非接受终态是正常拒绝，可满足 expected_accept=false。

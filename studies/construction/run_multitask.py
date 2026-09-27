@@ -80,12 +80,10 @@ def collect(checkpoint=None):
         return subprocess.check_output(["git", "-c", f"safe.directory={ROOT.as_posix()}",
                                         "-C", str(ROOT), *args], text=True).strip()
     record = {
-        "schema": "construction-multitask/0.1", "started_utc": datetime.now(timezone.utc).isoformat(),
+        "schema": "construction-multitask/0.2", "started_utc": datetime.now(timezone.utc).isoformat(),
         "planned_trials": planned, "planned": len(planned), "core_task_structures": 3,
-        "independent_statistical_samples": False, "git_head": git("rev-parse", "HEAD"),
-        "git_status_before": git("status", "--short"), "python": sys.version,
-        "host_platform": host_platform.platform(), "source_hashes_before": source_hashes(),
-        "trials": [], "active_trial": None, "run_status": "in_progress", "source_stable_during_run": None,
+        "independent_statistical_samples": False, "python": sys.version,
+        "trials": [], "active_trial": None, "run_status": "initializing", "source_stable_during_run": None,
     }
     parents = {}
 
@@ -93,7 +91,7 @@ def collect(checkpoint=None):
         observed = record["trials"] + ([record["active_trial"]] if record["active_trial"] else [])
         record.update(started=sum(t.get("started") is True for t in observed),
                       terminal=sum(t.get("started") is True for t in record["trials"]),
-                      not_started=sum(t.get("status") == "not_started" for t in record["trials"]),
+                      not_started=len(planned) - sum(t.get("started") is True for t in observed),
                       returned=sum(t.get("returned") is True for t in observed),
                       saved=sum(t.get("saved") is True for t in observed),
                       reference_error_trials=sum(t.get("reference_status") == "error" for t in observed),
@@ -105,6 +103,24 @@ def collect(checkpoint=None):
         if checkpoint is not None:
             checkpoint(record)
 
+    # Preserve all planned entries before Git, file identities, or inputs can fail.
+    persist()
+    startup_step = "git_head"
+    try:
+        record["git_head"] = git("rev-parse", "HEAD")
+        startup_step = "git_status"
+        record["git_status_before"] = git("status", "--short")
+        startup_step = "host_platform"
+        record["host_platform"] = host_platform.platform()
+        startup_step = "source_hashes"
+        record["source_hashes_before"] = source_hashes()
+    except Exception as exc:
+        record.update(run_status="error", run_error={"phase": "startup", "step": startup_step,
+                      "exception_type": type(exc).__name__, "code": getattr(exc, "code", None),
+                      "reason": str(exc)}, finished_utc=datetime.now(timezone.utc).isoformat())
+        persist()
+        raise
+    record["run_status"] = "in_progress"
     persist()
     for planned_trial in planned:
         case_id, condition = planned_trial["case_id"], planned_trial["condition"]
@@ -183,14 +199,14 @@ def main():
     output = parser.parse_args().output
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8", newline="\n") as stream:
-        json.dump({"schema": "construction-multitask/0.1", "run_status": "initializing", "trials": []}, stream)
+        json.dump({"schema": "construction-multitask/0.2", "run_status": "initializing", "trials": []}, stream)
         stream.write("\n")
     try:
         record = collect(checkpoint=lambda value: single._write_checkpoint(output, value))
     except Exception as exc:
         record = json.loads(output.read_text(encoding="utf-8"))
-        record.update(run_status="error", run_error={"exception_type": type(exc).__name__, "reason": str(exc)},
-                      finished_utc=datetime.now(timezone.utc).isoformat())
+        record.setdefault("run_error", {"exception_type": type(exc).__name__, "reason": str(exc)})
+        record.update(run_status="error", finished_utc=datetime.now(timezone.utc).isoformat())
         single._write_checkpoint(output, record)
         raise
     print(json.dumps({key: record[key] for key in ("planned", "started", "terminal", "not_started", "returned", "saved",

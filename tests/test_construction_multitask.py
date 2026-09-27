@@ -92,7 +92,12 @@ class MultitaskIntegrationTests(unittest.TestCase):
         return inputs, card, previous, result
 
     def test_all_fifteen_fixed_entries_run_with_expected_stops_and_costs(self):
-        record = multi.collect()
+        def checkpoint(record):
+            self.assertEqual(record["planned"], record["started"] + record["not_started"])
+            self.assertEqual(record["status_counts"]["not_started"],
+                             sum(t.get("status") == "not_started" for t in record["trials"]))
+        record = multi.collect(checkpoint=checkpoint)
+        self.assertEqual(record["schema"], "construction-multitask/0.2")
         self.assertEqual((record["planned"], record["started"], record["terminal"], record["not_started"]), (15, 15, 15, 0))
         self.assertEqual((record["returned"], record["saved"], record["reference_error_trials"]), (12, 9, 0))
         expected = {t["id"]: t for t in truths()}
@@ -183,6 +188,7 @@ class MultitaskIntegrationTests(unittest.TestCase):
             record = multi.collect()
             advance.assert_not_called()
         self.assertEqual((record["planned"], record["started"], record["terminal"], record["not_started"]), (15, 12, 12, 3))
+        self.assertEqual(record["status_counts"]["not_started"], 3)
         for trial in record["trials"]:
             if trial["case_id"] == "fork-stage2":
                 self.assertEqual(trial["status"], "not_started")
@@ -280,6 +286,74 @@ class MultitaskIntegrationTests(unittest.TestCase):
         self.assertEqual(record["active_trial"]["case_id"], "diamond")
         self.assertTrue(record["active_trial"]["saved"])
         self.assertEqual(record["active_trial"]["reference_status"], "pending")
+
+    def assert_unstarted_plan(self, record):
+        self.assertEqual(record["schema"], "construction-multitask/0.2")
+        self.assertEqual((record["planned"], record["started"], record["not_started"],
+                          record["terminal"], record["returned"], record["saved"]), (15, 0, 15, 0, 0, 0))
+        self.assertEqual(len({item["id"] for item in record["planned_trials"]}), 15)
+        self.assertEqual(record["planned_trials"][0]["id"], "fork-stage1/terminal-only")
+        self.assertEqual(record["planned_trials"][-1]["id"], "unsupported-cycle/ordinary-rule")
+        self.assertEqual(record["trials"], [])
+        self.assertIsNone(record["active_trial"])
+        self.assertEqual(record["status_counts"]["not_started"], 0)
+
+    def test_direct_collect_records_plan_before_each_startup_failure(self):
+        cases = ((multi.subprocess, "check_output", "git_head", None),
+                 (multi.subprocess, "check_output", "git_status", "known-head\n"),
+                 (multi.host_platform, "platform", "host_platform", None),
+                 (multi, "source_hashes", "source_hashes", None))
+        for owner, name, step, first_value in cases:
+            snapshots = []
+            failure = OSError(f"startup failure at {step}")
+            effect = failure if first_value is None else [first_value, failure]
+            with self.subTest(step=step), patch.object(owner, name, side_effect=effect), \
+                    patch.object(single, "observe_trial") as observe:
+                with self.assertRaises(OSError) as caught:
+                    multi.collect(checkpoint=lambda r: snapshots.append(json.loads(json.dumps(r))))
+                self.assertIs(caught.exception, failure)
+                observe.assert_not_called()
+            self.assertEqual(len(snapshots), 2)
+            for record in snapshots:
+                self.assert_unstarted_plan(record)
+            self.assertEqual(snapshots[0]["run_status"], "initializing")
+            self.assertNotIn("git_head", snapshots[0])
+            self.assertNotIn("source_hashes_before", snapshots[0])
+            error = snapshots[-1]
+            self.assertEqual(error["run_status"], "error")
+            self.assertEqual(error["run_error"]["phase"], "startup")
+            self.assertEqual(error["run_error"]["step"], step)
+            self.assertEqual(error["run_error"]["reason"], str(failure))
+            self.assertIsNone(error["source_stable_during_run"])
+
+    def test_cli_git_failure_keeps_full_unstarted_plan_on_disk(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "startup.json"
+            with patch.object(sys, "argv", ["multitask", "--output", str(output)]), \
+                    patch.object(multi.subprocess, "check_output", side_effect=OSError("git unavailable")), \
+                    patch.object(single, "observe_trial") as observe:
+                with self.assertRaisesRegex(OSError, "git unavailable"):
+                    multi.main()
+                observe.assert_not_called()
+            record = json.loads(output.read_text(encoding="utf-8"))
+        self.assert_unstarted_plan(record)
+        self.assertEqual(record["run_status"], "error")
+        self.assertEqual(record["run_error"]["phase"], "startup")
+        self.assertEqual(record["run_error"]["step"], "git_head")
+        self.assertNotIn("git_head", record)
+
+    def test_initial_checkpoint_failure_prevents_startup_reads(self):
+        def failed_checkpoint(record):
+            self.assert_unstarted_plan(record)
+            raise OSError("checkpoint unavailable")
+        with patch.object(multi, "source_hashes") as hashes, \
+                patch.object(multi.subprocess, "check_output") as git, \
+                patch.object(single.bounded_generation, "load_construction_case") as inputs, \
+                patch.object(single, "observe_trial") as observe:
+            with self.assertRaisesRegex(OSError, "checkpoint unavailable"):
+                multi.collect(checkpoint=failed_checkpoint)
+        for operation in (hashes, git, inputs, observe):
+            operation.assert_not_called()
 
 
 if __name__ == "__main__":

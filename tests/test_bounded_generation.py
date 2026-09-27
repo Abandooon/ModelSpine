@@ -1,6 +1,7 @@
 """Application integrity and the acceptance boundary after bounded construction."""
 from dataclasses import replace
 from hashlib import sha256
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -8,8 +9,9 @@ import bounded_generation
 from bounded_generation import load_example, run_construction
 from dag_construction import DagEditSpace
 from task_checks import check_tasks
+from modelspine_assurance.tasks import prepare_task
 from modelspine_generation.bounded import ConstructionDecision
-from modelspine_protocols import ContractError, digest, dumps, loads, properties
+from modelspine_protocols import ContractError, digest, dumps, loads, properties, ref
 
 
 def repin(raw, reference, **changes):
@@ -49,6 +51,29 @@ class BoundedGenerationTests(unittest.TestCase):
         for altered, expected in bad_inputs:
             with self.subTest(raw=altered[-40:]), self.assertRaises(ContractError):
                 run_construction(prepared, meta, snapshot, altered, expected)
+
+    def test_parented_graph_root_is_rejected_before_search_or_task_save(self):
+        prepared, meta, snapshot, raw, reference = load_example()
+        outside = replace(snapshot.elements[1], id="outside", name="outside", parent=None)
+        snapshot = replace(snapshot, elements=(outside, *(
+            replace(element, parent=outside.id) if element.id == "graph" else element
+            for element in snapshot.elements)))
+        contract = replace(prepared.contract, base=ref(snapshot), version="parented-root")
+        task_raw = dumps(contract).encode("utf-8")
+        task_ref = replace(prepared.task_ref, revision=contract.version,
+                           content_hash=sha256(task_raw).hexdigest())
+        source = (Path(__file__).resolve().parents[1] / "domain-packs/structural-graph/tasks/source.txt").read_bytes()
+        prepared = prepare_task(task_raw, task_ref, {
+            evidence.source: source for statement in contract.statements for evidence in statement.source_refs})
+        raw, reference = repin(raw, reference, task_ref=task_ref, base=ref(snapshot))
+        before = digest(snapshot)
+        with patch.object(bounded_generation, "search") as search, \
+                patch.object(bounded_generation, "run_task") as save:
+            with self.assertRaisesRegex(ContractError, "root_has_parent"):
+                run_construction(prepared, meta, snapshot, raw, reference)
+        search.assert_not_called()
+        save.assert_not_called()
+        self.assertEqual(digest(snapshot), before)
 
     def test_non_utf8_space_is_an_explicit_error(self):
         prepared, meta, snapshot, _, reference = load_example()

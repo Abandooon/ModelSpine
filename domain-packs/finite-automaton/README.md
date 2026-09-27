@@ -1,6 +1,6 @@
 # 确定性有限自动机工程配置
 
-这是有限行为语义样例，不指定业务应用。Machine 声明 `initial`、`alphabet`、`trace`；State 声明布尔 `accepting`；Transition 声明 `source/target/symbol`。只支持 parent 直接指向根的成员；当前根存在间接后代时明确 violated:not_flat_membership，不静默跳过嵌套转移或递归解释层次。其他独立根的成员不属于当前检查范围；端点必须属于本机的直接 State 成员。
+这是有限行为语义样例，不指定业务应用。Machine 声明 `initial`、`alphabet`、`trace`；State 声明布尔 `accepting`；Transition 声明 `source/target/symbol`。Machine 目标根必须 `parent=null`，否则明确 error:root_has_parent。只支持 parent 直接指向根的成员；当前根存在间接后代时明确 violated:not_flat_membership，不静默跳过嵌套转移或递归解释层次。其他独立根的成员不属于当前检查范围；端点必须属于本机的直接 State 成员。
 
 支持的字母表为非空、不重复的 Unicode 码点字符串，每条转移消费一个码点；符号不是多字符 token，也不按字形合并组合码点。`deterministic_automaton` 检查端点、字母表和 `(source,symbol)` 唯一性；`finite_trace_acceptance` 在此基础上从 initial 实际遍历 trace，并判断最终状态是否接受。空输入串按初始状态的接受标记判断；未定义的转移或非接受终态均为 violated，不补造转移。
 

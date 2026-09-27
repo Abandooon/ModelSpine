@@ -186,6 +186,26 @@ class FoundationBoundaryTests(unittest.TestCase):
                 self.assertEqual(report.binding.scope, (kernel.snapshot().elements[0].id,))
                 kernel.apply(proposal, kernel.decide(proposal, report, "editor"), "editor")
 
+    def test_parented_target_roots_are_errors_and_cannot_authorize_save(self):
+        for profile in PROFILES:
+            with self.subTest(profile=profile):
+                meta, snapshot, plan = load_case(CASES / profile)
+                checker = check_structure if profile == "structural-graph" else check_automaton
+                root = snapshot.elements[0]
+                outside = replace(snapshot.elements[1], id="outside", name="outside", parent=None)
+                snapshot = replace(snapshot, elements=(outside, *(
+                    replace(element, parent=outside.id) if element.id == root.id else element
+                    for element in snapshot.elements)))
+                kernel = ModelKernel(snapshot, meta, plan, checker, frozenset({"editor"}))
+                proposal = self.proposal(kernel, Rename("rename", root.id, "renamed"))
+                report = checker(kernel.preview(proposal).candidate, plan)
+                self.assertTrue(all(outcome.status == "error" for outcome in report.outcomes))
+                self.assertTrue(all(outcome.findings == (f"{root.id}:root_has_parent",)
+                                    for outcome in report.outcomes))
+                with self.assertRaises(ContractError):
+                    kernel.decide(proposal, report, "editor")
+                self.assert_uncommitted(kernel, snapshot)
+
     def test_direct_checker_reports_parent_cycles_without_looping(self):
         for profile in PROFILES:
             with self.subTest(profile=profile):

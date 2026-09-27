@@ -345,6 +345,90 @@ class ConstructionRecordingTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout.getvalue())["run_status"], "reference_error")
 
 
+class ConstructionStartupRecordingTests(unittest.TestCase):
+    def assert_unstarted_plan(self, record):
+        self.assertEqual(record["schema"], "construction-pilot/0.3")
+        self.assertEqual((record["planned"], record["started"], record["not_started"],
+                          record["terminal"], record["returned"], record["saved"]), (24, 0, 24, 0, 0, 0))
+        self.assertEqual(len(set(record["planned_trials"])), 24)
+        self.assertEqual(record["planned_trials"][0], "budget-1/terminal-only")
+        self.assertEqual(record["planned_trials"][-1], "fault-exception/ordinary-rule")
+        self.assertEqual(record["trials"], [])
+        self.assertIsNone(record["active_trial"])
+
+    def test_direct_collect_records_plan_before_each_startup_failure(self):
+        cases = ((construction_run, "reference_spec", "reference_input", None),
+                 (construction_run, "load_example", "task_inputs", None),
+                 (construction_run, "source_hashes", "source_hashes", None),
+                 (construction_run.subprocess, "check_output", "git_head", None),
+                 (construction_run.subprocess, "check_output", "git_status", "known-head\n"),
+                 (construction_run.host_platform, "platform", "host_platform", None))
+        for owner, name, step, first_value in cases:
+            snapshots = []
+            failure = OSError(f"startup failure at {step}")
+            effect = failure if first_value is None else [first_value, failure]
+            with self.subTest(step=step), patch.object(owner, name, side_effect=effect), \
+                    patch.object(construction_run, "observe_trial") as observe:
+                with self.assertRaises(OSError) as caught:
+                    construction_run.collect(checkpoint=lambda r: snapshots.append(json.loads(json.dumps(r))))
+                self.assertIs(caught.exception, failure)
+                observe.assert_not_called()
+            self.assertEqual(len(snapshots), 2)
+            for record in snapshots:
+                self.assert_unstarted_plan(record)
+            self.assertEqual(snapshots[0]["run_status"], "initializing")
+            self.assertNotIn("git_head", snapshots[0])
+            self.assertNotIn("source_hashes_before", snapshots[0])
+            error = snapshots[-1]
+            self.assertEqual(error["run_status"], "error")
+            self.assertEqual(error["run_error"]["phase"], "startup")
+            self.assertEqual(error["run_error"]["step"], step)
+            self.assertEqual(error["run_error"]["reason"], str(failure))
+            self.assertIsNone(error["source_stable_during_run"])
+
+    def test_cli_git_failure_keeps_full_unstarted_plan_on_disk(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "startup.json"
+            with patch.object(sys, "argv", ["study", "--output", str(output)]), \
+                    patch.object(construction_run.subprocess, "check_output", side_effect=OSError("git unavailable")), \
+                    patch.object(construction_run, "observe_trial") as observe:
+                with self.assertRaisesRegex(OSError, "git unavailable"):
+                    construction_run.main()
+                observe.assert_not_called()
+            record = json.loads(output.read_text(encoding="utf-8"))
+        self.assert_unstarted_plan(record)
+        self.assertEqual(record["run_status"], "error")
+        self.assertEqual(record["run_error"]["phase"], "startup")
+        self.assertEqual(record["run_error"]["step"], "git_head")
+        self.assertNotIn("git_head", record)
+
+    def test_initial_checkpoint_failure_prevents_startup_reads(self):
+        def failed_checkpoint(record):
+            self.assert_unstarted_plan(record)
+            raise OSError("checkpoint unavailable")
+        with patch.object(construction_run, "reference_spec") as reference, \
+                patch.object(construction_run, "load_example") as inputs, \
+                patch.object(construction_run, "source_hashes") as hashes, \
+                patch.object(construction_run.subprocess, "check_output") as git, \
+                patch.object(construction_run, "observe_trial") as observe:
+            with self.assertRaisesRegex(OSError, "checkpoint unavailable"):
+                construction_run.collect(checkpoint=failed_checkpoint)
+        for operation in (reference, inputs, hashes, git, observe):
+            operation.assert_not_called()
+
+    def test_normal_fixed_batch_retains_twenty_four_outcomes(self):
+        def checkpoint(record):
+            self.assertEqual(record["planned"], record["started"] + record["not_started"])
+            self.assertLessEqual(record["terminal"], record["started"])
+        record = construction_run.collect(checkpoint=checkpoint)
+        self.assertEqual((record["planned"], record["started"], record["terminal"], record["not_started"]),
+                         (24, 24, 24, 0))
+        self.assertEqual((record["returned"], record["saved"], record["reference_error_trials"]), (23, 9, 0))
+        self.assertEqual(record["status_counts"], {"candidate_found": 9, "exhausted": 6,
+                         "budget_exhausted": 6, "unknown": 1, "error": 2})
+        self.assertEqual(record["run_status"], "complete")
+
+
 class DiagnosticWitnessTests(unittest.TestCase):
     def setUp(self):
         self.prepared, self.meta, self.base, _, _ = load_example()

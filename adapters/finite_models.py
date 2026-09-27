@@ -4,12 +4,14 @@ from modelspine_protocols import (
     checked, digest, properties, require, validate_plan,
 )
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 
 def _members(snapshot, root, root_kind):
     if root.kind != root_kind:
         return (), ("error", (f"{root.id}:wrong_root_kind",))
+    if root.parent is not None:
+        return (), ("error", (f"{root.id}:root_has_parent",))
     # Membership is selected by parent. v0.1 cannot track the absence of future
     # members, so a complete dependency claim would allow unsafe evidence reuse.
     if root.dependencies_complete:

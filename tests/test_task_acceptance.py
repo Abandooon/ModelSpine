@@ -89,6 +89,26 @@ class TaskAcceptanceTests(unittest.TestCase):
         self.assertIsNone(result.commit)
         self.assertEqual(result.accepted, snapshot)
 
+    def test_prepared_tasks_with_parented_roots_report_error_without_saving(self):
+        for profile in ("structural-graph", "finite-automaton"):
+            with self.subTest(profile=profile):
+                prepared, meta, snapshot, proposal = load_example(profile)
+                root = snapshot.elements[0]
+                outside = replace(snapshot.elements[1], id="outside", name="outside", parent=None)
+                snapshot = replace(snapshot, elements=(outside, *(
+                    replace(element, parent=outside.id) if element.id == root.id else element
+                    for element in snapshot.elements)))
+                prepared = revised_task(prepared, base=ref(snapshot), version="parented-root")
+                self.assertEqual(prepared.unresolved, ())
+                result = run_task(prepared, meta, snapshot, replace(proposal, base=ref(snapshot)),
+                                  check_tasks, "task-author")
+                self.assertEqual(result.assessment.goal_status, "error")
+                self.assertTrue(all(outcome.status == "error" for outcome in result.assessment.report.outcomes))
+                self.assertTrue(all(outcome.findings == (f"{root.id}:root_has_parent",)
+                                    for outcome in result.assessment.report.outcomes))
+                self.assertIsNone(result.commit)
+                self.assertEqual(result.accepted, snapshot)
+
     def test_editing_trace_and_behavior_cannot_replace_task_input(self):
         prepared, meta, snapshot, proposal = load_example("finite-automaton")
         result = run_task(prepared, meta, snapshot, broken_behavior(proposal), check_tasks, "task-author")

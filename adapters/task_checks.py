@@ -6,7 +6,7 @@ from modelspine_protocols import (
 from finite_models import _automaton, _graph, _machine, _run_input, _structure
 
 TOOL = "modelspine-task-checker"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 _FIELDS = {
     "directed_acyclic_graph": "root",

@@ -4,6 +4,8 @@
 
 当前使用[多任务与两阶段协议](multitask-protocol.md)，入口为 `python -B studies/construction/run_multitask.py --output studies/construction/runs/<new-unique-name>.json`。固定三类拓扑任务、一个依赖后继和一个初始成环边界，共15个计划条目；阶段1只执行一次，不把阶段或条件当作独立项目。每条件从自己的真实accepted进入阶段2，保留全部父目标，只追加预先固定的d→c可达目标。参考在执行前核对任务身份，后继参考保留模板来源并使用独立派生版本。
 
+审核修复后的记录格式为单任务 `construction-pilot/0.3`、多任务 `construction-multitask/0.2`。两个入口先持久化完整计划及零启动计数，再读取 Git、源码身份和固定输入；准备失败保留 `run_error.phase=startup`、具体步骤/异常和全部未启动分母，并继续抛出异常。`not_started=planned-started` 包含尚待启动和因前序阻塞的条目，不把它们计作终结；未取得的元数据不填默认值。此修复未新增正式运行，下文历史结果继续使用各自原 schema 和源码身份。
+
 完整回归 **265/265** 通过后，统一采集[本轮正式运行](runs/2026-09-26T173726308106Z.json)：15计划/启动/终态，12 app返回，9保存且独立验收均满足；3空间耗尽，3不支持成环初始状态错误（实际code=invalid），无参考错误。三条件各完成真实revision1→2；运行93项来源哈希前后一致。fork两个阶段搜索检查各为仅终验4次、两前控各2次；diamond 2/1/1，disconnected 3/1/1。成功接纳另各3次检查。DAG和普通Kahn仍为零差异；单图有限空间复用不证明元模型组织优势。人工首次/增量时间和计算费用仍未计量。原始输出见同前缀`.pilot.stdout.txt`/`.pilot.stderr.txt`，命令身份见同前缀`.execution.json`。
 
 新验收见 [test_construction_multitask.py](../../tests/test_construction_multitask.py)，固定答案见 [semantics.json](../../tests/fixtures/construction/multitask/semantics.json)。原普通Kahn规则跨任务参数化复用，没有逐任务控制分支。新增记录使用旧 observe_trial 的可选真实结果回调与原子检查点，不另建提交流程。下文均为此前单任务运行的历史说明，原始runs未修改。

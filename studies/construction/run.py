@@ -181,8 +181,6 @@ def source_hashes():
 
 
 def collect(checkpoint=None):
-    pinned = reference_spec()  # Pin evaluator bytes before any candidate call.
-    inputs = load_example()
     planned = [(f"{name}/{condition}", condition, changes, None)
                for name, changes in SCENARIOS for condition in CONDITIONS]
     planned += [(f"fault-{fault}/ordinary-rule", "ordinary-rule", {"max_options": 3}, fault)
@@ -190,19 +188,17 @@ def collect(checkpoint=None):
     def git(*arguments):
         return subprocess.check_output(["git", "-c", f"safe.directory={ROOT.as_posix()}",
                                         "-C", str(ROOT), *arguments], text=True).strip()
-    before = source_hashes()
-    record = {"schema": "construction-pilot/0.2", "started_utc": datetime.now(timezone.utc).isoformat(),
+    record = {"schema": "construction-pilot/0.3", "started_utc": datetime.now(timezone.utc).isoformat(),
               "task_count": 1, "independent_statistical_samples": False,
               "planned_trials": [p[0] for p in planned], "planned": len(planned),
-              "git_head": git("rev-parse", "HEAD"), "git_status_before": git("status", "--short"),
-              "python": sys.version, "host_platform": host_platform.platform(),
-              "source_hashes_before": before, "trials": [], "active_trial": None,
-              "run_status": "in_progress", "source_stable_during_run": None}
+              "python": sys.version, "trials": [], "active_trial": None,
+              "run_status": "initializing", "source_stable_during_run": None}
 
     def persist():
         trials = record["trials"]
         observed = trials + ([record["active_trial"]] if record["active_trial"] is not None else [])
-        record.update(started=len(observed), returned=sum(t.get("returned") is True for t in observed),
+        record.update(started=len(observed), not_started=len(planned) - len(observed),
+                      returned=sum(t.get("returned") is True for t in observed),
                       terminal=len(trials), saved=sum(t.get("saved") is True for t in observed),
                       status_counts={s: sum(t.get("status") == s for t in observed)
                                      for s in ("candidate_found", "exhausted", "budget_exhausted", "unknown", "error")},
@@ -214,6 +210,28 @@ def collect(checkpoint=None):
         record["active_trial"] = trial
         persist()
 
+    # The fixed denominator must survive failures even before a trial can start.
+    persist()
+    startup_step = "reference_input"
+    try:
+        pinned = reference_spec()  # Pin evaluator bytes before any candidate call.
+        startup_step = "task_inputs"
+        inputs = load_example()
+        startup_step = "source_hashes"
+        record["source_hashes_before"] = source_hashes()
+        startup_step = "git_head"
+        record["git_head"] = git("rev-parse", "HEAD")
+        startup_step = "git_status"
+        record["git_status_before"] = git("status", "--short")
+        startup_step = "host_platform"
+        record["host_platform"] = host_platform.platform()
+    except Exception as exc:
+        record.update(run_status="error", run_error={"phase": "startup", "step": startup_step,
+                      "exception_type": type(exc).__name__, "code": getattr(exc, "code", None),
+                      "reason": str(exc)}, finished_utc=datetime.now(timezone.utc).isoformat())
+        persist()
+        raise
+    record["run_status"] = "in_progress"
     persist()
     for trial_id, condition, changes, fault in planned:
         record["active_trial"] = {"id": trial_id, "condition": condition, "fault": fault,
@@ -227,7 +245,7 @@ def collect(checkpoint=None):
     record.update(run_status="reference_error" if record["reference_error_trials"] else "complete",
                   finished_utc=datetime.now(timezone.utc).isoformat())
     record["source_hashes_after"] = source_hashes()
-    record["source_stable_during_run"] = before == record["source_hashes_after"]
+    record["source_stable_during_run"] = record["source_hashes_before"] == record["source_hashes_after"]
     persist()
     return record
 
@@ -254,7 +272,7 @@ def main():
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
-        json.dump({"schema": "construction-pilot/0.2", "run_status": "initializing", "trials": []}, output)
+        json.dump({"schema": "construction-pilot/0.3", "run_status": "initializing", "trials": []}, output)
         output.write("\n")
     try:
         record = collect(checkpoint=lambda record: _write_checkpoint(args.output, record))
@@ -262,11 +280,11 @@ def main():
         # Start from the last valid checkpoint, even if serializing a later
         # in-memory result failed. Preserve its trials and any returned app facts.
         record = json.loads(args.output.read_text(encoding="utf-8"))
-        record.update(run_status="error", run_error={"exception_type": type(exc).__name__, "reason": str(exc)},
-                      finished_utc=datetime.now(timezone.utc).isoformat())
+        record.setdefault("run_error", {"exception_type": type(exc).__name__, "reason": str(exc)})
+        record.update(run_status="error", finished_utc=datetime.now(timezone.utc).isoformat())
         _write_checkpoint(args.output, record)
         raise
-    print(json.dumps({k: record[k] for k in ("planned", "started", "returned", "terminal", "saved",
+    print(json.dumps({k: record[k] for k in ("planned", "started", "not_started", "returned", "terminal", "saved",
                                             "status_counts", "reference_error_trials", "run_status",
                                             "source_stable_during_run")}, indent=2))
     return 0 if record["source_stable_during_run"] and record["run_status"] == "complete" else 2
