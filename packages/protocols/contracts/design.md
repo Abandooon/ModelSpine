@@ -1,5 +1,7 @@
 # 共享协议目标合同
 
+2026-09-28：详细语言出口：[language/0.2-draft](language-0.2.md)、[逐轴及组合载荷](language-cases.md)、[消费者载荷](consumers-0.2.md)。共享语法/类型定义唯一在此；领域词汇仍归来源候选。实际新增严格配置[finite-domain/0.1](finite-domain-0.1.md)及domain_language.py用于当前构造/检查，未改变旧v0.1。完整语言草案与有限实现不得混同。
+
 状态：draft，2026-09-21。用于全部已知能力的设计；现有 [v0.1](v0.1/README.md) 和源码才是已实现子集。本文的新对象/字段未实现，不要求旧解码器接受。全局责任见[框架设计](../../../docs/architecture.md)。
 
 ## 所有权与公开边界

@@ -1,5 +1,7 @@
 # 代码理解与演化目标合同
 
+2026-09-28：[维护具体载荷与反例](../../protocols/contracts/consumers-0.2.md)补全规则变化、人工hash冲突、未知追踪及恢复边界。该包唯一拥有代码事实/追踪覆盖/同步提案；kernel决定已保存设计与证据适用性，implementation执行文件/数据迁移。trace覆盖未知不能用空差异报无影响；本包本轮无运行实现。
+
 状态：draft，2026-09-21；运行模块仍 planned。[v0.1](v0.1/README.md) 是有限设计，研究方案责任见[框架中的 P4 方向](../../../docs/architecture.md#方向方法与可替换位置)。
 
 拥有 ImplementationFact、恢复假设、TraceLink、SemanticDelta、覆盖记录和同步提案。输入为不可变代码/构建/运行制品引用、语言与分析范围、可选当前模型和追踪。消费者为编排、requirements、interaction、implementation；依赖 protocols/model-kernel 的公开边界。

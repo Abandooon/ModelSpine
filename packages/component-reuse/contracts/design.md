@@ -1,5 +1,7 @@
 # 外部能力接入目标合同
 
+2026-09-28：单次来源试验使用[SourceTrial](../../protocols/contracts/consumers-0.2.md)及[finite-domain/0.1](../../protocols/contracts/finite-domain-0.1.md)，逐构造区分来源解析、验证、视图、生成的exact/lossy/unsupported。C固定来源/工具版本和一次Web投影，记录依赖与失败；关系能读不意味着基数能执行。公共载荷由protocols唯一合并，本包只产生能力观察/采用建议，不改语言语义。
+
 状态：draft，2026-09-21；运行模块仍 planned。[v0.1](v0.1/README.md) 的具体业务例仅为历史样例。本能力服务多个方向，不预设独立论文或组件市场。
 
 输入：外部模型/代码/库/API 的 ArtifactRef、版本/来源/许可描述、目标义务与环境限制。拥有 CapabilityProfile、CompatibilityReport、AdaptationProposal；依赖 protocols/assurance；消费者为编排/implementation，事实可供 requirements/code-intelligence 使用。

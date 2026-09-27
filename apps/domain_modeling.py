@@ -14,6 +14,9 @@ from modelspine_requirements.domain_modeling import (
     MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, MAX_SOURCE_BYTES, ModelingRequest,
     inspect_candidate, modeling_prompt, prepare_request, validate_request,
 )
+from modelspine_requirements.typed_domain import inspect_typed_candidate, typed_modeling_prompt
+from modelspine_protocols.domain_language import ProjectModel
+from domain_checks import check_project
 
 
 def _read(path, limit):
@@ -60,7 +63,16 @@ def main(argv=None):
     inspect = commands.add_parser("inspect", help="check a supplied candidate; semantics remain unchecked")
     inspect.add_argument("--request", required=True, type=Path)
     inspect.add_argument("--response", required=True, type=Path)
-    for command in (prepare, prompt, inspect):
+    typed_prompt = commands.add_parser("typed-prompt", help="source-bound finite language construction instructions")
+    typed_prompt.add_argument("--request", type=Path, required=True)
+    typed_inspect = commands.add_parser("typed-inspect", help="check finite language candidate and source binding")
+    typed_inspect.add_argument("--request", type=Path, required=True)
+    typed_inspect.add_argument("--response", type=Path, required=True)
+    instance = commands.add_parser("check-project", help="execute finite instance checks; no model writes")
+    instance.add_argument("--request", type=Path, required=True)
+    instance.add_argument("--response", type=Path, required=True)
+    instance.add_argument("--project-model", type=Path, required=True)
+    for command in (prepare, prompt, inspect, typed_prompt, typed_inspect, instance):
         command.add_argument("--output", type=Path, help="new UTF-8 file; omitted means stdout")
     args = parser.parse_args(argv)
     try:
@@ -71,6 +83,22 @@ def main(argv=None):
             output = dumps(request)
         elif args.command == "prompt":
             output = modeling_prompt(load_request(args.request))
+        elif args.command == "typed-prompt":
+            output = typed_modeling_prompt(load_request(args.request))
+        elif args.command in ("typed-inspect", "check-project"):
+            request = load_request(args.request)
+            inspection = inspect_typed_candidate(request, _read(args.response, MAX_RESPONSE_BYTES))
+            data = {"mode": args.command, "generation_provenance": "not_verified",
+                    "model_committed": False, "inspection": to_data(inspection)}
+            if args.command == "check-project":
+                raw = _read(args.project_model, MAX_RESPONSE_BYTES)
+                try:
+                    project = loads(ProjectModel, raw.decode("utf-8"))
+                except (UnicodeError, RecursionError) as exc:
+                    raise ContractError("invalid", "invalid project encoding/nesting") from exc
+                data["report"] = to_data(check_project(inspection.candidate.definition, project,
+                                                       project_id=request.source.project_id))
+            output = json.dumps(data, ensure_ascii=False, indent=2)
         else:
             inspection = inspect_candidate(load_request(args.request), _read(args.response, MAX_RESPONSE_BYTES))
             output = json.dumps({"mode": "external-candidate-inspection",

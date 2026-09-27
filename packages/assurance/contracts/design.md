@@ -1,5 +1,7 @@
 # 保障能力目标合同
 
+2026-09-28：具体[ValidatorSpec/实例消费与报告失败](../../protocols/contracts/consumers-0.2.md)、[语言求值](../../protocols/contracts/language-0.2.md)为本设计的详细合同。assurance拥有检查计划及支持说明，实际finite-domain/0.1解释器由apps/domain_checks显式装配；此包未新增执行代码。缺实例为not_run、错版本为conflict、必要残余为unknown；不把报告自报scope作为宿主预期scope。
+
 状态：draft，2026-09-21。当前 [v0.1](v0.1/README.md) 内置 check 只检查有限设计字段；另有固定任务准备/评估接口，领域规则由显式检查器注入。目标设计不能被解读为已实现一般形式化或独立保障。研究方法责任见[框架中的 P2 方向](../../../docs/architecture.md#方向方法与可替换位置)。
 
 ## 输入输出与责任

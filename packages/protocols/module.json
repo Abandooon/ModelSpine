@@ -2,7 +2,7 @@
   "id": "protocols",
   "title": "共享协议与稳定引用",
   "status": "implemented-slice",
-  "version": "0.1.3-experimental",
+  "version": "0.2.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [],
   "runtime_dependencies": [],
@@ -22,14 +22,20 @@
     "TaskContract",
     "TaskAssessment",
     "select_scope",
-    "validate_report"
+    "validate_report",
+    "domain_language.DomainDefinition",
+    "domain_language.ProjectModel",
+    "domain_language.validate_definition",
+    "domain_language.expression_type"
   ],
   "scope": "定义交换格式和版本策略；不承担所有领域语义。",
   "implementation_entrypoints": [
-    "src/modelspine_protocols/__init__.py"
+    "src/modelspine_protocols/__init__.py",
+    "src/modelspine_protocols/domain_language.py"
   ],
   "validation_evidence": [
-    "../../docs/validation.md"
+    "../../docs/validation.md",
+    "../../docs/domain-modeling.md"
   ],
   "review_targets": [
     "architecture"
@@ -37,7 +43,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation",
+  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor.",
   "reference_sources": [
     {
       "asset_id": "prime-code-audit-2026-09-21",
@@ -50,5 +56,10 @@
     }
   ],
   "design_contract_entrypoint": "contracts/design.md",
-  "design_contract_maturity": "draft"
+  "design_contract_maturity": "draft",
+  "additional_contract_entrypoints": [
+    "contracts/finite-domain-0.1.md",
+    "contracts/language-0.2.md",
+    "contracts/consumers-0.2.md"
+  ]
 }

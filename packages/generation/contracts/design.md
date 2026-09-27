@@ -1,6 +1,8 @@
 # 生成与修复目标合同
 
-状态：draft，2026-09-21；[v0.1](v0.1/README.md) 仅单字段候选控制与纯报告比较。候选生成、文件物化和最终交付为不同责任。
+2026-09-28：具体[ApplicationSpec/GenerationUnit/Manifest](../../protocols/contracts/consumers-0.2.md)给出模板/LLM单元的输入、文件范围、接口、预算与失败。generation唯一拥有单元计划和候选，不决定目标平台需求，不改共享语言、原文或验收分母；留出答案不进入spec/提示/修复。本轮只细化设计，未增加应用编码执行器。
+
+状态：draft；当前有限实现见 [v0.1](v0.1/README.md)，包括单字段候选控制、固定选项上的 bounded 控制/构造/评估搜索、完整终验与逐步记录，以及纯报告比较；DAG 规则由显式适配器提供。无 LLM、行为构造器或完整修复循环。候选生成、文件物化和最终交付为不同责任。
 
 输入：版本化元模型/模型、已知任务目标、assurance 义务/支持说明、生成目标和预算。拥有 GenerationPlan、CandidateArtifact、RepairProposal、运行轨迹；输出给 implementation 或编排，由 kernel 接受模型提案。依赖 protocols/assurance，不直接改已接受模型或应用文件。
 

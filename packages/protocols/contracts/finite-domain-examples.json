@@ -1,0 +1,565 @@
+{
+  "contract": "finite-domain-examples/0.1",
+  "provenance": "hand_authored_engineering_only",
+  "definition": {
+    "schema_version": "finite-domain/0.1",
+    "id": "engineering-sample",
+    "version": "1",
+    "entities": [
+      {
+        "id": "unit",
+        "name": "Unit",
+        "fields": [
+          {
+            "id": "enabled",
+            "name": "Enabled",
+            "value_type": "boolean",
+            "required": true,
+            "nullable": false
+          }
+        ]
+      },
+      {
+        "id": "part",
+        "name": "Part",
+        "fields": []
+      }
+    ],
+    "relations": [
+      {
+        "id": "uses",
+        "name": "Uses",
+        "source": "unit",
+        "target": "part",
+        "targets_per_source": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "sources_per_target": {
+          "minimum": 0,
+          "maximum": "unbounded"
+        }
+      }
+    ],
+    "constraints": [
+      {
+        "id": "active-cap",
+        "context": "unit",
+        "applies": {
+          "op": "field",
+          "args": [],
+          "symbol": "enabled",
+          "value": null
+        },
+        "assertion": {
+          "op": "le",
+          "args": [
+            {
+              "op": "count",
+              "args": [],
+              "symbol": "uses:out",
+              "value": null
+            },
+            {
+              "op": "literal",
+              "args": [],
+              "symbol": null,
+              "value": 1
+            }
+          ],
+          "symbol": null,
+          "value": null
+        },
+        "unless": {
+          "op": "literal",
+          "args": [],
+          "symbol": null,
+          "value": false
+        }
+      }
+    ],
+    "residuals": []
+  },
+  "cases": [
+    {
+      "id": "positive",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "positive",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "known",
+                "value": true
+              }
+            ]
+          },
+          {
+            "id": "p0",
+            "entity": "part",
+            "slots": []
+          }
+        ],
+        "links": [
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p0"
+          }
+        ],
+        "population_complete": true
+      },
+      "expected_rule": "satisfied"
+    },
+    {
+      "id": "negative",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "negative",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "known",
+                "value": true
+              }
+            ]
+          },
+          {
+            "id": "p0",
+            "entity": "part",
+            "slots": []
+          },
+          {
+            "id": "p1",
+            "entity": "part",
+            "slots": []
+          }
+        ],
+        "links": [
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p0"
+          },
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p1"
+          }
+        ],
+        "population_complete": true
+      },
+      "expected_rule": "violated"
+    },
+    {
+      "id": "unknown",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "unknown",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "unknown",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "p0",
+            "entity": "part",
+            "slots": []
+          }
+        ],
+        "links": [
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p0"
+          }
+        ],
+        "population_complete": true
+      },
+      "expected_rule": "unknown"
+    },
+    {
+      "id": "not-applicable",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "not-applicable",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "known",
+                "value": false
+              }
+            ]
+          },
+          {
+            "id": "p0",
+            "entity": "part",
+            "slots": []
+          }
+        ],
+        "links": [
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p0"
+          }
+        ],
+        "population_complete": true
+      },
+      "expected_rule": "not_applicable"
+    },
+    {
+      "id": "open-population",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "open-population",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "known",
+                "value": true
+              }
+            ]
+          },
+          {
+            "id": "p0",
+            "entity": "part",
+            "slots": []
+          }
+        ],
+        "links": [
+          {
+            "relation": "uses",
+            "source": "u",
+            "target": "p0"
+          }
+        ],
+        "population_complete": false
+      },
+      "expected_rule": "unknown"
+    },
+    {
+      "id": "zero-links",
+      "project": {
+        "schema_version": "finite-project/0.1",
+        "id": "zero-links",
+        "version": "1",
+        "definition": {
+          "project_id": "engineering",
+          "artifact_id": "engineering-sample",
+          "revision": "1",
+          "content_hash": "88f4510641d59a5b59d915f825c37f6eb8a46f9e5e2f6d3e5cfa34d1b387ace3"
+        },
+        "objects": [
+          {
+            "id": "u",
+            "entity": "unit",
+            "slots": [
+              {
+                "field": "enabled",
+                "state": "known",
+                "value": true
+              }
+            ]
+          }
+        ],
+        "links": [],
+        "population_complete": true
+      },
+      "expected_relation": "violated"
+    }
+  ],
+  "residual_definition": {
+    "schema_version": "finite-domain/0.1",
+    "id": "engineering-sample",
+    "version": "2",
+    "entities": [
+      {
+        "id": "unit",
+        "name": "Unit",
+        "fields": [
+          {
+            "id": "enabled",
+            "name": "Enabled",
+            "value_type": "boolean",
+            "required": true,
+            "nullable": false
+          }
+        ]
+      },
+      {
+        "id": "part",
+        "name": "Part",
+        "fields": []
+      }
+    ],
+    "relations": [
+      {
+        "id": "uses",
+        "name": "Uses",
+        "source": "unit",
+        "target": "part",
+        "targets_per_source": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "sources_per_target": {
+          "minimum": 0,
+          "maximum": "unbounded"
+        }
+      }
+    ],
+    "constraints": [
+      {
+        "id": "active-cap",
+        "context": "unit",
+        "applies": {
+          "op": "field",
+          "args": [],
+          "symbol": "enabled",
+          "value": null
+        },
+        "assertion": {
+          "op": "le",
+          "args": [
+            {
+              "op": "count",
+              "args": [],
+              "symbol": "uses:out",
+              "value": null
+            },
+            {
+              "op": "literal",
+              "args": [],
+              "symbol": null,
+              "value": 1
+            }
+          ],
+          "symbol": null,
+          "value": null
+        },
+        "unless": {
+          "op": "literal",
+          "args": [],
+          "symbol": null,
+          "value": false
+        }
+      }
+    ],
+    "residuals": [
+      {
+        "id": "time-window",
+        "family": "time-filter",
+        "text": "Count only events in the prior 24 hours; this profile cannot execute that filter.",
+        "required": true
+      }
+    ]
+  },
+  "residual_project": {
+    "schema_version": "finite-project/0.1",
+    "id": "residual",
+    "version": "1",
+    "definition": {
+      "project_id": "engineering",
+      "artifact_id": "engineering-sample",
+      "revision": "2",
+      "content_hash": "cd8fbc09587a784174814bf5eba7f79f775a00cb0cf16793b856ec0fef687952"
+    },
+    "objects": [
+      {
+        "id": "u",
+        "entity": "unit",
+        "slots": [
+          {
+            "field": "enabled",
+            "state": "known",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "p0",
+        "entity": "part",
+        "slots": []
+      }
+    ],
+    "links": [
+      {
+        "relation": "uses",
+        "source": "u",
+        "target": "p0"
+      }
+    ],
+    "population_complete": true
+  },
+  "scalar_projection_positive": {
+    "schema_version": "finite-domain/0.1",
+    "id": "scalar-sample",
+    "version": "1",
+    "entities": [
+      {
+        "id": "unit",
+        "name": "Unit",
+        "fields": [
+          {
+            "id": "enabled",
+            "name": "Enabled",
+            "value_type": "boolean",
+            "required": true,
+            "nullable": false
+          }
+        ]
+      }
+    ],
+    "relations": [],
+    "constraints": [],
+    "residuals": []
+  },
+  "scalar_projection_rejected_definition": {
+    "schema_version": "finite-domain/0.1",
+    "id": "engineering-sample",
+    "version": "1",
+    "entities": [
+      {
+        "id": "unit",
+        "name": "Unit",
+        "fields": [
+          {
+            "id": "enabled",
+            "name": "Enabled",
+            "value_type": "boolean",
+            "required": true,
+            "nullable": false
+          }
+        ]
+      },
+      {
+        "id": "part",
+        "name": "Part",
+        "fields": []
+      }
+    ],
+    "relations": [
+      {
+        "id": "uses",
+        "name": "Uses",
+        "source": "unit",
+        "target": "part",
+        "targets_per_source": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "sources_per_target": {
+          "minimum": 0,
+          "maximum": "unbounded"
+        }
+      }
+    ],
+    "constraints": [
+      {
+        "id": "active-cap",
+        "context": "unit",
+        "applies": {
+          "op": "field",
+          "args": [],
+          "symbol": "enabled",
+          "value": null
+        },
+        "assertion": {
+          "op": "le",
+          "args": [
+            {
+              "op": "count",
+              "args": [],
+              "symbol": "uses:out",
+              "value": null
+            },
+            {
+              "op": "literal",
+              "args": [],
+              "symbol": null,
+              "value": 1
+            }
+          ],
+          "symbol": null,
+          "value": null
+        },
+        "unless": {
+          "op": "literal",
+          "args": [],
+          "symbol": null,
+          "value": false
+        }
+      }
+    ],
+    "residuals": []
+  },
+  "invalid_definition_patch": {
+    "path": "relations/0/target",
+    "value": "missing-type",
+    "expected": "invalid"
+  },
+  "wrong_version_project_patch": {
+    "path": "definition/revision",
+    "value": "unavailable-v2",
+    "expected": "conflict"
+  }
+}

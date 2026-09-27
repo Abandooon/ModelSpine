@@ -2,7 +2,7 @@
   "id": "model-kernel",
   "title": "模型状态与版本内核",
   "status": "implemented-slice",
-  "version": "0.1.3-experimental",
+  "version": "0.1.4-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols"
@@ -18,14 +18,17 @@
     "apply",
     "ImpactSet",
     "EvidenceRecord",
-    "Applicability"
+    "Applicability",
+    "domain_projection.to_scalar_metamodel"
   ],
   "scope": "管理版本、稳定身份、合法编辑与证据失效；保存意图、事实、假设的区别。",
   "implementation_entrypoints": [
-    "src/modelspine_kernel/__init__.py"
+    "src/modelspine_kernel/__init__.py",
+    "src/modelspine_kernel/domain_projection.py"
   ],
   "validation_evidence": [
-    "../../docs/validation.md"
+    "../../docs/validation.md",
+    "../../docs/domain-modeling.md"
   ],
   "review_targets": [
     "architecture"
@@ -33,7 +36,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Single-owner in-memory thread-atomic snapshots, six typed operations, issued decisions, impact/evidence applicability, checker binding and obligation coverage validation via shared protocols helper; task-agnostic",
+  "implemented_scope": "Single-owner in-memory thread-atomic snapshots, six typed operations, issued decisions, impact/evidence applicability, checker binding and obligation coverage validation via shared protocols helper; task-agnostic Adds explicit lossless projection of the required/nonnullable scalar-only finite definition subset; relations, rules, residuals and optional/nullable fields are rejected without partial projection or commit.",
   "reference_sources": [
     {
       "asset_id": "prime-code-audit-2026-09-21",
@@ -46,5 +49,8 @@
     }
   ],
   "design_contract_entrypoint": "contracts/design.md",
-  "design_contract_maturity": "draft"
+  "design_contract_maturity": "draft",
+  "additional_contract_entrypoints": [
+    "contracts/design.md"
+  ]
 }

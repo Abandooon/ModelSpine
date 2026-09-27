@@ -6,9 +6,9 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 ## 当前开发重点
 
-当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示和外部候选结构/引用检查；目前仍没有真实语言传输、自动领域候选生成或自动语义忠实性验证。
+当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示、外部候选结构/引用检查，以及来源绑定的 typed 候选检查和有限 check-project；目前仍没有真实语言传输、自动领域候选生成、审阅 UI 或自动语义忠实性验证。
 
-已有 requirements 切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考，不能直接承载不同领域元模型候选。protocols 的 `Metamodel`/`KindSpec`/`FieldSpec` 目前定义有限标量结构；关系端点、图规则和自动机行为由适配器另行解释。把领域概念写成元素名或字符串属性，不会自动获得关系基数、约束或行为的领域语义。
+既有 requirements 有限解释切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考；新增 typed 候选另用领域定义合同承载。protocols 的旧 `Metamodel`/`KindSpec`/`FieldSpec` 定义有限标量结构；新增 `domain_language` 的 finite-domain/0.1 支持实体、三标量、二元关系、双向基数和有限纯表达式，由 apps/domain_checks.py 执行实例检查。详细语言及消费者合同仍为 draft，复杂执行器未实现；旧图配置与自动机行为仍由各自适配器解释。
 
 自然语言建模的候选与解释仍归 requirements，来源完整性与已支持部分的检查可消费 protocols 和 assurance；apps 装配可审查流程。新的候选产物先按实际消费者设计，不强塞入现有同元模型 `ChangeProposal`，也不提前实现通用元模型迁移。模型提交继续由 kernel 负责，候选草案、人工确认、形式检查和已接受模型分别记录。
 
@@ -18,9 +18,9 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 | 模块 | 拥有的状态或产物 | 公开边界及当前范围 |
 |---|---|---|
-| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON 和有限标量元模型；本轮新增任务信封与公共报告校验，不持有项目状态 |
-| [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；无持久化或跨进程事务 |
-| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清，另提供原文请求/提示与外部领域候选检查；无自动抽取或直接模型写权，通用诊断仍为设计 |
+| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验；新增 finite-domain/0.1 值对象、静态类型和定义检查，不持有项目状态 |
+| [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；新增必填且不可空的纯标量定义只读无损投影，拒绝关系/规则/残余及可选/可空字段；无持久化或跨进程事务 |
+| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清，原文请求/提示与外部领域候选检查，以及来源绑定的 typed 候选提示/检查；无自动抽取或直接模型写权，通用诊断仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
 | [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录和纯报告比较；DAG 语义留在适配器，无 LLM 或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |
@@ -74,7 +74,7 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 | 方向 | 研究问题与计划替换位置 | 独立验收与边界 |
 |---|---|---|
-| P1 自然语言建模与澄清 | requirements 从原文形成概念/关系/约束候选，保留来源与未决项，通过澄清细化领域元模型候选；固定元模型内的模型变更才使用现有 ChangeProposal | 候选表达的充分性、意图忠实、任务可支持程度与澄清成本；目前只有显式有限解释澄清可运行，未决意图不强制二分类 |
+| P1 自然语言建模与澄清 | requirements 从原文形成概念/关系/约束候选，保留来源与未决项，通过澄清细化领域元模型候选；固定元模型内的模型变更才使用现有 ChangeProposal | 候选表达的充分性、意图忠实、任务可支持程度与澄清成本；目前可运行显式有限解释澄清、原文请求/typed 候选检查及有限实例检查，尚无真实语言调用或独立语义通过；未决意图不强制二分类 |
 | P2 合同保障 | assurance 的形式化/检查方法、generation 的控制阶段；由调用方注入具体检查实现 | 独立真值检查规格、绑定、候选符合性及相关错误；工具不同不自动意味着独立 |
 | P3 任务交互 | interaction 的任务投影、解释与呈现；应用业务 UI 保持 CommandBinding 语义，代码前审阅保持需求/候选的版本和确认语义 | 真人的理解、操作和修改正确性；业务界面和开发审查台分别研究 |
 | P4 代码恢复与演化 | code-intelligence 的恢复、追踪和语义差异；同步仍输出受控提案 | 带来源事实、覆盖缺口、影响漏检/过度失效；JSON diff 不等于一般语义恢复 |

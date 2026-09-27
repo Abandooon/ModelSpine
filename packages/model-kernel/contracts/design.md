@@ -1,5 +1,7 @@
 # 模型内核目标合同
 
+2026-09-28：共享完整语言与[映射/拒绝](../../protocols/contracts/language-cases.md)细化。domain_projection.to_scalar_metamodel新增只读定义投影：仅required/nonnullable三标量、无关系/规则/残余；不自动提交或迁移。完整语言中的继承、状态或跨包不能被旧parent/dependencies字段替代。实例校核由显式apps/domain_checks适配器执行；设计状态写权保持此包独占。
+
 状态：draft，2026-09-21；[v0.1](v0.1/README.md) 仅实现单实例线程内存事务和有限操作。本设计不归 P1 独占，供应所有模型消费者。
 
 ## 输入、输出与状态

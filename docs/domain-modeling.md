@@ -1,6 +1,16 @@
 # 原文领域建模入口
 
-当前完成原文输入与候选合同消费者：可准备请求、导出语言模型提示、核对外部候选。真实语言模型传输、从原文自动抽取、回答驱动修订和领域规则执行仍未实现。既有有限澄清与图构造入口保留各自范围，不作为本入口的前置条件。
+当前完成原文输入与候选合同消费者：可准备请求、导出语言模型提示、核对外部候选；新增有限类型化定义及实例规则检查。真实语言模型传输、从原文自动抽取和回答驱动修订仍未实现。既有有限澄清与图构造入口保留各自范围，不作为本入口的前置条件。
+
+2026-09-28新增[finite-domain/0.1合同](../packages/protocols/contracts/finite-domain-0.1.md)、[完整语言设计](../packages/protocols/contracts/language-0.2.md)及[消费者设计](../packages/protocols/contracts/consumers-0.2.md)。公开[工程正/反/未知/残余样例](../packages/protocols/contracts/finite-domain-examples.json)可供一次来源投影试验；样例为人工构造，不是自然语言或独立语义验收。
+
+```text
+python -B -I apps/domain_modeling.py typed-prompt --request request.json --output typed-prompt.txt
+python -B -I apps/domain_modeling.py typed-inspect --request request.json --response typed-response.json
+python -B -I apps/domain_modeling.py check-project --request request.json --response typed-response.json --project-model project.json
+```
+
+新增命令保持来源/请求绑定和不覆盖输出。check-project在三标量/二元关系/有限表达式配置内真正执行检查，报告逐项satisfied/violated/unknown/error/not_applicable；退出0仅表示报告已完成，不代表所有义务通过。原R1 prompt/inspect仍只执行原合同。typed-response必须提供全部元素引文，不能直接把独立样例或参考答案当作模型输出。真实API配置仍缺，平台实验调用为0；不选择默认供应商/模型、不模拟自然语言成功。
 
 从仓库根运行，source.txt 是你提供的 UTF-8 需求原文：
 

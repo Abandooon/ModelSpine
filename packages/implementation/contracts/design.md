@@ -1,5 +1,7 @@
 # 实现与交付目标合同
 
+2026-09-28：详细[Web/桌面映射、ApplicationBuild及维护载荷](../../protocols/contracts/consumers-0.2.md)定义相同权限/状态/版本义务在HTTP与IPC的消费；该包拥有目标映射、命令执行、文件/构建/应用数据迁移责任。独立ProjectModel可省略条件及ApplicationSpec配置责任同页定义。只有结构支持、未真实构建/运行的结果保持not_run；本轮未实现后端。
+
 状态：draft，2026-09-21；运行模块仍 planned。此前 [v0.1](v0.1/README.md) 的业务数值/角色只是工程样例，不是通用合同默认值。
 
 输入：版本化模型、候选制品、业务操作定义、目标技术栈、外部能力/采用计划、文件所有权及交付策略。拥有 CommandBinding、文件计划、MigrationPlan、ApplicationBuild。依赖 protocols/generation；为 interaction 供应公开命令合同，不要求后者导入构建器。
