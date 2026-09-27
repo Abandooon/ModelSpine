@@ -6,6 +6,8 @@ ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台
 
 版本化任务合同与固定目标检查已提供公共验收边界：共享信封归 protocols，来源与声明评估归 assurance，有限规则由适配器解释，apps 装配已有内核保存。当前[有限澄清闭环](docs/clarification.md)进一步将来源、解释、行为问题和回答连接到显式后继任务与模型提案。独立参考验收留在测试侧，和开发检查分别记录；此前固定任务切片的范围见[任务合同交接](docs/next-iteration.md)。
 
+当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。这条链仍待实现，下一步先做一个可审查的最小消费者，明确产物语义与正反验收。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。 当前按领域元模型候选规划，具体候选层级以任务约定为准。
+
 ## 运行
 
 使用 Python 3.10+，当前只依赖标准库，无安装步骤。从本仓库根执行：
@@ -40,7 +42,7 @@ python -B apps/clarification.py --profile finite-automaton
 
 ## 框架与研究入口
 
-有界构造入口：`python -B -I apps/bounded_generation.py`，或追加 `--case domain-packs/structural-graph/construction/multitask/fork-stage1/card.json` 加载显式输入。从固定端点空间构造真实边编辑，构造前排除成环选项，全部任务义务终验满足后才提交；输出保留每步结果与停止原因。有限后继由真实前序接受快照继续并保留父目标。详见[有界构造控制](docs/bounded-construction.md)及[三条件多任务先导](studies/construction/README.md)。[候选后端合同](docs/candidate-backend-contract.md)中的宿主请求绑定、严格选择和批次执行已提供；真实后端传输与API验收仍未接入。
+有界构造入口：`python -B -I apps/bounded_generation.py`，或追加 `--case domain-packs/structural-graph/construction/multitask/fork-stage1/card.json` 加载显式输入。从固定端点空间构造真实边编辑，构造前排除成环选项，全部任务义务终验满足后才提交；输出保留每步结果与停止原因。有限后继由真实前序接受快照继续并保留父目标。详见[有界构造控制](docs/bounded-construction.md)及[三条件多任务先导](studies/construction/README.md)。[候选后端合同](docs/candidate-backend-contract.md)中的宿主请求绑定、严格选择和批次执行已提供；真实后端传输与 API 验收仍未接入。该合同保留为有限构造支线，后续接入按具体任务决定，不因已有宿主或配置可用而自动启动，也不代替当前自然语言建模主线。
 
 - [九模块职责、解耦规则与方向实验入口](docs/architecture.md)
 - [共享接口与当前支持范围](packages/protocols/contracts/v0.1/README.md)
