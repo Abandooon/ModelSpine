@@ -7,5 +7,6 @@ domain-packs/*/construction/* -text
 tests/fixtures/construction/* -text
 domain-packs/*/construction/multitask/** -text
 tests/fixtures/construction/multitask/** -text
+tests/fixtures/domain-modeling/** -text
 # Captured runs retain their original bytes, including Windows line endings.
 studies/construction/runs/* -text

@@ -4,7 +4,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 ## 当前开发重点
 
-当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。先明确一个最小消费者的产物语义、输入范围和正反验收，再实现这条链；目前没有自然语言抽取、领域元模型候选生成或自动语义忠实性验证。 当前按领域元模型候选规划，具体候选层级以任务约定为准。
+当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示和外部候选结构/引用检查；目前仍没有真实语言传输、自动领域候选生成或自动语义忠实性验证。 当前按领域元模型候选规划，具体候选层级以任务约定为准。
 
 已有 requirements 切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考，不能直接承载不同领域元模型候选。protocols 的 `Metamodel`/`KindSpec`/`FieldSpec` 目前定义有限标量结构；关系端点、图规则和自动机行为由适配器另行解释。把领域概念写成元素名或字符串属性，不会自动获得关系基数、约束或行为的领域语义。
 
@@ -18,7 +18,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 |---|---|---|
 | [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON 和有限标量元模型；本轮新增任务信封与公共报告校验，不持有项目状态 |
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；无持久化或跨进程事务 |
-| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释集的行为澄清与提案；无直接模型写权，通用诊断/扩展建议仍为设计 |
+| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清，另提供原文请求/提示与外部领域候选检查；无自动抽取或直接模型写权，通用诊断仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
 | [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录和纯报告比较；DAG 语义留在适配器，无 LLM 或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |

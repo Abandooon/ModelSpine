@@ -2,7 +2,7 @@
   "id": "requirements",
   "title": "需求澄清与模型细化",
   "status": "implemented-slice",
-  "version": "0.1.0-experimental",
+  "version": "0.2.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -23,15 +23,23 @@
     "Session",
     "prepare",
     "answer",
-    "propose"
+    "propose",
+    "domain_modeling.ModelingRequest",
+    "domain_modeling.DomainCandidate",
+    "domain_modeling.CandidateInspection",
+    "domain_modeling.prepare_request",
+    "domain_modeling.modeling_prompt",
+    "domain_modeling.inspect_candidate"
   ],
-  "scope": "对版本化结构化来源和显式有限解释进行行为提问、回答绑定与提案装配；未知与预算停止保留未决。",
+  "scope": "保留显式有限解释上的行为澄清；新增原文请求、未确认领域候选合同、引用/结构检查和提示准备，无语言传输或自动抽取。",
   "implementation_entrypoints": [
-    "src/modelspine_requirements/__init__.py"
+    "src/modelspine_requirements/__init__.py",
+    "src/modelspine_requirements/domain_modeling.py"
   ],
   "validation_evidence": [
     "../../docs/clarification.md",
-    "../../docs/validation.md"
+    "../../docs/validation.md",
+    "../../docs/domain-modeling.md"
   ],
   "review_targets": [
     "architecture"
@@ -39,7 +47,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Explicit finite interpretation lists with raw-byte-pinned sources, injected preview/observation, minimax boolean questions, immutable answer history and successor-task-bound proposals; standard library and protocols only; no exhaustive interpretation search, automatic gap classification, semantic fidelity proof, model writes or LLM judge",
+  "implemented_scope": "Explicit finite interpretation lists with raw-byte-pinned sources, injected preview/observation, minimax boolean questions, immutable answer history and successor-task-bound proposals; standard library and protocols only; no exhaustive interpretation search, automatic gap classification, semantic fidelity proof, model writes or LLM judge; raw UTF-8 source requests and unconfirmed domain definition candidates with attributed concepts/attributes/relations/rules/issues, strict structural inspection and prompt preparation, no language transport/extraction or rule execution",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft"
 }

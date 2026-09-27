@@ -1,5 +1,7 @@
 # 需求合同 v0.1：有限澄清切片
 
+原文新建入口另见[领域候选合同](../domain-modeling.md)，其产物不同于本页固定元模型上的 ClarificationCase/ChangeProposal。本页已有字段与解释语义不因新入口改变。
+
 状态：exercised-subset。本页描述[当前源码](../../src/modelspine_requirements/__init__.py)实际支持的合同；更广的声明分析与诊断仍见[目标设计](../design.md)。[早期样例](examples.json)保留原有设计地位，不是当前 `ClarificationCase` JSON。应用装配和有限样例见[澄清闭环](../../../../docs/clarification.md)。
 
 ## 输入、状态与职责

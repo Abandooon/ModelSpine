@@ -1,0 +1,158 @@
+{
+  "schema_version": "domain-modeling-semantic-reference/0.1",
+  "status": "development-reference",
+  "basis": "Independently authored from the five synthetic source texts before any production candidate output; not an experimental result or a production candidate schema.",
+  "input_policy": "Only the selected source text is method input. This file, its labels, requirements and witnesses must not enter prompts, extraction or search.",
+  "matching_policy": "Review semantic equivalence and source support, not generated IDs, field order or exact wording. Explicit source content remains a proposed interpretation until separately confirmed.",
+  "cases": [
+    {
+      "id": "equipment-base",
+      "source": "sources/equipment-base.txt",
+      "category": "clear",
+      "requirements": [
+        {"id": "concepts", "lines": [1], "meaning": "区分成员、器材、借用记录三个领域概念类型，不能把它们当成三个已有项目实例。"},
+        {"id": "attributes", "lines": [2], "meaning": "姓名与培训是否完成属于成员；编号与状态属于器材；借出日期与归还是否完成属于借用记录。属性归属不可交换。"},
+        {"id": "member-link", "lines": [3], "meaning": "每条借用记录关联成员的数量必须为1；原文未给出每名成员关联的历史借用记录总基数。"},
+        {"id": "equipment-link", "lines": [3], "meaning": "每条借用记录关联器材的数量必须为1；原文未给出每件器材关联的历史借用记录总基数。"},
+        {"id": "active-limit", "lines": [4], "meaning": "对每名成员，只统计同时归还未完成的借用记录，该数量不超过2；这是带状态条件的规则，不是该成员历史全部借用记录的总上限。"},
+        {"id": "creation-condition", "lines": [5], "meaning": "创建借用记录的必要条件是成员培训已完成且器材状态为可借，连接词为AND。原文没有说这两个条件成立便足以允许创建。"}
+      ],
+      "must_not_assert": [
+        "不得把成员与器材建成各自只能参加一次借用的一对一关系。",
+        "不得把活动借用上限2写成成员关联所有历史借用记录的无条件最大基数。",
+        "不得以培训完成或器材可借任意一项成立代替AND条件。",
+        "不得臆造借用期限、押金、审批人、唯一编号约束或未在原文声明的状态全集并当成来源事实。",
+        "不得宣称当前标量运行时已执行了关系基数、条件计数或动作许可校核。"
+      ],
+      "unresolved": [
+        {"lines": [2], "meaning": "编号的值类型、唯一性和借出日期的格式/时区未规定；可提出明确标为假设的实现选择，不能写成用户已确定。"},
+        {"lines": [3], "meaning": "成员及器材一侧的历史总基数未规定，应保留未指定。"},
+        {"lines": [5], "meaning": "必要条件成立后是否另有许可条件未说明，不能推出动作一定获准。"}
+      ],
+      "witnesses": [
+        {"id": "no-training", "lines": [5], "scenario": "成员培训未完成，但器材状态为可借。", "expected": "违反本句创建的必要条件。"},
+        {"id": "history-not-active", "lines": [4], "scenario": "同一成员有3条借用记录，其中2条已归还、1条未归还。", "expected": "未违反本句活动数量上限；不能据此判断其他规则均通过。"},
+        {"id": "two-active", "lines": [4], "scenario": "同一成员恰有2条未归还借用记录。", "expected": "未违反本句上限。"},
+        {"id": "three-active", "lines": [4], "scenario": "同一成员恰有3条未归还借用记录。", "expected": "违反本句上限。"}
+      ]
+    },
+    {
+      "id": "equipment-condition-change",
+      "source": "sources/equipment-condition-change.txt",
+      "category": "clear-paired-condition-change",
+      "requirements": [
+        {"id": "concepts-and-attributes", "lines": [1, 2], "meaning": "成员、器材、借用记录及各自属性与equipment-base相同，语义不因条件变化而改名或转移归属。"},
+        {"id": "links", "lines": [3], "meaning": "每条借用记录恰关联1名成员、1件器材；两类对象一侧的历史总基数仍未指定。"},
+        {"id": "active-limit", "lines": [4], "meaning": "每名成员同时未归还记录数仍不超过2；这是条件规则，不能写成历史总基数。"},
+        {"id": "creation-condition", "lines": [5], "meaning": "必要条件变为培训已完成或器材可借，至少满足一项，连接词为包容性OR；仍不是允许动作的充分条件。"}
+      ],
+      "must_not_assert": [
+        "不得因概念名称相同而沿用equipment-base的AND条件。",
+        "不得把至少一项误读为恰好一项的排他OR。",
+        "不得把OR改动扩散到借用记录的必需端点或活动数量上限。",
+        "不得把本句必要条件成立写成动作最终获准或当前运行时已经验证。"
+      ],
+      "unresolved": [
+        {"lines": [2, 3], "meaning": "属性格式、编号唯一性、反向历史总基数均未规定。"},
+        {"lines": [5], "meaning": "该必要条件以外的许可条件未知。"}
+      ],
+      "witnesses": [
+        {"id": "no-training", "lines": [5], "scenario": "成员培训未完成，但器材状态为可借。", "expected": "满足本句必要条件；仍不能据此宣布动作获准。与base在此句的判定不同。"},
+        {"id": "both-conditions", "lines": [5], "scenario": "成员培训已完成，器材状态也为可借。", "expected": "满足本句必要条件；不能因为两项都满足而拒绝。"},
+        {"id": "neither-condition", "lines": [5], "scenario": "成员培训未完成，器材状态也不是可借。", "expected": "违反本句必要条件。"}
+      ]
+    },
+    {
+      "id": "equipment-cardinality-change",
+      "source": "sources/equipment-cardinality-change.txt",
+      "category": "clear-paired-conditional-cardinality-change",
+      "requirements": [
+        {"id": "concepts-and-attributes", "lines": [1, 2], "meaning": "成员、器材、借用记录及各自属性与equipment-base相同。"},
+        {"id": "links", "lines": [3], "meaning": "每条借用记录仍恰关联1名成员、1件器材；反向历史总基数未指定。"},
+        {"id": "active-limit", "lines": [4], "meaning": "每名成员同时未归还记录数上限由2改为1，只改变带状态条件的计数规则，不改变历史总基数或借用记录的必需端点。"},
+        {"id": "creation-condition", "lines": [5], "meaning": "创建的必要条件仍为培训已完成AND器材可借，不随数量上限变化。"}
+      ],
+      "must_not_assert": [
+        "不得只保留相同概念/属性名称而漏掉上限2到1的变化。",
+        "不得把未归还数量上限1等同于成员一生最多关联1条借用记录。",
+        "不得把成员上限转移成每件器材上限。",
+        "不得把必要条件改成充分条件或声称未实现的条件规则已执行。"
+      ],
+      "unresolved": [
+        {"lines": [2, 3], "meaning": "属性格式、编号唯一性、反向历史总基数仍未规定。"},
+        {"lines": [5], "meaning": "该必要条件以外的许可条件未知。"}
+      ],
+      "witnesses": [
+        {"id": "two-active", "lines": [4], "scenario": "同一成员恰有2条未归还借用记录。", "expected": "违反本句上限；与base在同一情景的判定不同。"},
+        {"id": "history-not-active", "lines": [4], "scenario": "同一成员有3条借用记录，其中2条已归还、1条未归还。", "expected": "未违反本句活动数量上限，不能按历史总数3判失败。"}
+      ]
+    },
+    {
+      "id": "observation-conflict",
+      "source": "sources/observation-conflict.txt",
+      "category": "ambiguity-and-conflict",
+      "requirements": [
+        {"id": "concepts", "lines": [1], "meaning": "区分观测站、观察员、观测任务三个概念；原文没有指定观测站与任务的关联基数。"},
+        {"id": "conflicting-responsibility", "lines": [2, 3, 4], "meaning": "同一负责关系有甲的恰1人和乙的同时恰2名不同人员两条不相容要求；保留各自出处并标记冲突，不能任选其一作为确定基数。"},
+        {"id": "weather-condition", "lines": [5], "meaning": "任务开始与天气合适有关，但合适的判定标准未定义；保留规则及歧义/缺失条件。"}
+      ],
+      "must_not_assert": [
+        "不得默认后出现的乙覆盖甲、甲优先或任意一方已过期。",
+        "不得将一名负责人和两名负责人改写成不同角色以消除冲突。",
+        "不得把恰1与恰2取并集成1..2并宣称忠实于两条要求。",
+        "不得臆造天气温度、降水、风速阈值，或默认晴天即合适。",
+        "不得把冲突未解决的候选标为已确认、语义通过或已接受。"
+      ],
+      "unresolved": [
+        {"lines": [2, 3, 4], "meaning": "需要用户决定负责人数的适用规则，当前没有选择依据。"},
+        {"lines": [5], "meaning": "需要明确天气合适的判断标准；没有答案时保持未决。"}
+      ],
+      "witnesses": [
+        {"id": "one-observer", "lines": [2, 3], "scenario": "某任务同时仅由1名观察员负责。", "expected": "符合甲、违反乙，不能满足当前全部来源。"},
+        {"id": "two-observers", "lines": [2, 3], "scenario": "某任务同时由2名不同观察员负责。", "expected": "违反甲、符合乙，不能满足当前全部来源。"},
+        {"id": "weather-no-threshold", "lines": [5], "scenario": "已知当天晴朗，但用户没有补充天气标准。", "expected": "不能据此判定合适或允许开始任务。"}
+      ]
+    },
+    {
+      "id": "audio-unsupported",
+      "source": "sources/audio-unsupported.txt",
+      "category": "unsupported-semantic-rule",
+      "requirements": [
+        {"id": "concepts", "lines": [1], "meaning": "区分录音片段与处理任务两个概念类型。"},
+        {"id": "input-and-output", "lines": [2], "meaning": "处理任务有不同角色的输入和输出关系，每项各恰1段录音；输出是新的片段，不能与输入角色混并。原文未给出每段录音参与多少处理任务的反向总基数。"},
+        {"id": "meaning-and-naturalness", "lines": [3], "meaning": "保留全部原意和听感自然两项要求，带原文出处；当前有限标量/关系合同没有可执行的音频语义或听感解释，必须明确未支持语义校核，不能因无法执行删除此规则。"},
+        {"id": "no-transcript-proxy", "lines": [4], "meaning": "转写相同不是满足第三句的充分依据，不能用文本相等或字符串合法作为语义通过的替代。"}
+      ],
+      "must_not_assert": [
+        "不得将全部原意缩减成转写文字相同或若干关键词命中。",
+        "不得臆造音频质量评分、相似度阈值或将任意模型分数作为独立真值。",
+        "不得只保留可解析的概念和关系而遗漏原文第三、四句。",
+        "不得将原文规则保存为字符串等同于已有可执行检查器，或把不支持写成满足。"
+      ],
+      "unresolved": [
+        {"lines": [3, 4], "meaning": "原意保持与听感自然的验收依据尚未操作化；将来需独立判据，但本轮不擅自制定替代指标。"},
+        {"lines": [2], "meaning": "每段录音参与处理任务的反向总基数未规定。"}
+      ],
+      "witnesses": [
+        {"id": "same-transcript", "lines": [3, 4], "scenario": "输入输出转写完全相同，但语音含义与听感未被独立评估。", "expected": "不能判第三句满足；保留未支持/未评估状态。"},
+        {"id": "two-outputs", "lines": [2], "scenario": "一项处理任务关联2段输出录音。", "expected": "违反该句的输出数量要求；这一明确结构问题与开放音频语义规则分开。"}
+      ]
+    }
+  ],
+  "paired_changes": [
+    {
+      "base": "equipment-base",
+      "variant": "equipment-condition-change",
+      "changed_lines": [5],
+      "must_change": "创建必要条件的连接词从AND变为包容性OR；no-training情景对此条件的判定改变。",
+      "must_preserve": "全部概念名称、属性归属、记录两端的恰1关系、未指定的反向历史总基数、活动数量上限2、必要而非充分的逻辑方向。"
+    },
+    {
+      "base": "equipment-base",
+      "variant": "equipment-cardinality-change",
+      "changed_lines": [4],
+      "must_change": "带未归还状态条件的成员计数上限从2变为1；two-active情景对此规则的判定改变。",
+      "must_preserve": "全部概念名称、属性归属、两端恰1关系、未指定的历史总基数、AND创建必要条件；history-not-active情景仍不违反活动上限。"
+    }
+  ]
+}
