@@ -111,7 +111,7 @@ requirements 新增独立的原文建模合同：请求只需原始文本、来�
 
 旧 ModelKernel 的内存表示仅含有限标量字段和显式依赖；新增 [finite-domain/0.1](../packages/protocols/contracts/finite-domain-0.1.md) 的 DomainDefinition 另支持实体、二元关系与有限表达式，并由独立实例检查器消费。事务只覆盖同一 ModelKernel 实例的内存状态，不覆盖磁盘、跨进程、构建或应用数据。assurance 内置领域义务仍为 integer_range/equals，另提供通用固定任务准备/评估；显式适配器另解释结构图和有限自动机配置的有限规则，见[支持矩阵](foundation-boundaries.md)。CLI 不执行真实业务批准，也不调用 LLM、外部求解器或付费 API。
 
-既有订单模型是工程夹具；具体金额、币种与角色不成为通用默认。一般行为合同形式化、代码恢复、界面、文件所有权和应用交付仍需对应实现及独立验收。研究比较的条件、真值、失败分母和成本要求见[协议摘要](../studies/lifecycle/protocol.md)。
+既有订单模型是工程夹具；具体金额、币种与角色不成为通用默认。一般行为合同形式化、代码恢复、完整任务/业务界面、文件所有权和应用交付仍需对应实现及独立验收；当前有限前置审阅界面见[本地候选审阅 UI](model-review-ui.md)。研究比较的条件、真值、失败分母和成本要求见[协议摘要](../studies/lifecycle/protocol.md)。
 
 ## 2026-09-28 有限领域语言、消费者合同与审核返修
 
@@ -134,3 +134,13 @@ requirements 新增独立的原文建模合同：请求只需原始文本、来�
 9月28日作者首测失败保留：超长整数JSON绕过合同异常包装，已在新review入口保留原件并报告rejected；隔离CLI未能导入bootstrap，已在新应用入口修复。总领独立指出整体确认与合法`$candidate`元素歧义，改用`WHOLE_CANDIDATE=review:candidate`并增加区分回归，未修改有限语言。总领报告的14探针及9组独立边界与作者测试分别记录，不相加为样本。上回合中断没有形成完成的全套结果，本次重新运行，不覆盖旧324/340/345等历史数字。
 
 本次真实运行工程demo，再经act提交decline、整体confirm及完整候选propose_edit，并以三个新进程show恢复：共4动作，原候选hash不变，review版本4；结构合法提案仍adoption=pending、next_candidate_ref=null，忠实性not_checked、实例not_run。输入为人工工程材料，平台实验API调用0；没有真实自动候选、回答驱动自动修订、提案采纳或UI贯通。完整命令、输出、失败及工件身份在本批A交接证据中，不据此宣布F1/F2完成。
+
+## 2026-09-30 有限前置审阅 UI 集成验证
+
+[本地候选审阅 UI](model-review-ui.md)在一个显式目录、本机HTTP服务上消费已有model-review/0.1。interaction只做文本/表格及页面资源呈现；requirements负责纯审阅转换和重放，保存由apps/model_review.py负责。页面提供原文、字段/关系/规则、未决项与诊断，以及答复、拒答、明确目标确认和完整候选提案。检查、确认、pending和候选身份分别显示，不因记录成功表示采纳或自动修订。
+
+以0ba5493770282111120369e7c5a434aca02e7489为父版本，合入D已审核11文件、总领interaction manifest及4份共享导航。在platform根用Python3.12.14各运行一次：`python -B -I run_tests.py`共383项（26/13/16/30/52/246），**377通过、6 skipped、0失败**，39.591秒；`python -B -I packages/interaction/tests/test_review_ui.py`另有**3/3通过**，1.117秒。6项skip均因固定外部BESSER未安装，不计作已执行通过。前者包含新增6项HTTP集成和既有7项导入边界；bootstrap.PACKAGES保持原五包，interaction由app显式装配，其3项独立呈现测试未被前者discover，不能混为同一分母。
+
+D已记录的真实Edge浏览器行为及总领独立审核与本轮集成验证分别保留；本轮未重复浏览器套件。完整命令、stdout/stderr、退出码、文件身份及待提交树保存在研究工作区的本批集成交接证据中，不嵌入公开仓库。原324/340/345/377等历史结果不改写。
+
+这些人工工程输入仅支持有限接口与呈现行为；完整TaskView/Studio、实例审阅、提案采纳、自动修订、真实语言调用和应用交付尚未实现，不据此宣布F1/F2完成。平台实验API调用0，未测真实模型费用或真人可用性。

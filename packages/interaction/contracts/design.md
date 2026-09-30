@@ -1,8 +1,8 @@
 # 任务交互目标合同
 
-2026-09-28：具体[ReviewInput/Action/Result与应用视图载荷](../../protocols/contracts/consumers-0.2.md)统一定义候选/问题版本、未决展示、旧视图冲突及回答写入责任；[完整语言](../../protocols/contracts/language-0.2.md)拥有规则语义，UI不复制解释器。没有应用CommandBinding仍可审阅错误候选；本包仍未实现运行UI。
+2026-09-28：具体[ReviewInput/Action/Result与应用视图载荷](../../protocols/contracts/consumers-0.2.md)统一定义候选/问题版本、未决展示、旧视图冲突及回答写入责任；[完整语言](../../protocols/contracts/language-0.2.md)拥有规则语义，UI不复制解释器。没有应用CommandBinding仍可审阅错误候选。2026-09-30新增[有限审阅呈现](review.md)与[本地浏览器入口](../../../docs/model-review-ui.md)，只消费 A 的 model-review/0.1；没有实例查看、提案采纳、自动修订/新候选或应用运行。
 
-状态：draft，2026-09-27 修订；运行模块仍 planned。已有 [v0.1](v0.1/README.md) 样例不能限定应用种类；本页补充代码生成前的需求与候选审阅，不升级既有合同成熟度，也不表示已有 UI 实现。研究设计责任见[框架中的 P3 方向](../../../docs/architecture.md#方向方法与可替换位置)。
+状态：draft，2026-09-27 修订；模块状态由 module.json 统一登记，当前有限运行范围单列于上述审阅合同。已有 [v0.1](v0.1/README.md) 样例不能限定应用种类；本页是代码生成前需求与候选审阅的完整目标设计，不升级既有合同成熟度，也不因局部 UI 实现而将下文设计全部记为已实现。研究设计责任见[框架中的 P3 方向](../../../docs/architecture.md#方向方法与可替换位置)。
 
 拥有 TaskView、InteractionPlan、VisualAssetRef 与用户操作提案，不拥有已接受模型或应用状态提交权。输入按交互用途确定：用户任务/角色、版本化需求与候选、模型与合同、来源/问题/差异/检查结果，以及适用时的 CommandBinding 和视觉资产。需求与候选由平台编排通过公开合同提供，模型引用消费 protocols/model-kernel 合同；implementation 的 CommandBinding 只供应应用业务操作绑定，不是所有视图的前置。
 

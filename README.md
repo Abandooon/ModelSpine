@@ -2,13 +2,13 @@
 
 ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台为 **ModelSpine Studio**。相对代码中心、规格中心和模型辅助方法的比较优势仍是待检验假设。
 
-当前九模块已有合同设计；`protocols`、`model-kernel`、`assurance`、`generation` 提供有限离线模型变更实现，`requirements` 增加显式有限解释上的结构化澄清及来源绑定的 typed 领域候选检查。本批有限交付已验收：有限领域语言及实例检查、必填且不可空的纯标量定义无损投影；投影遇关系、规则、残余或可选/可空字段整项拒绝。其他四模块为 planned。尚无完整无代码平台、应用运行时或研究比较结果。模块实际状态以各 `module.json` 和源码为准；详细语言及消费者合同仍为 draft，不代表复杂执行器已实现。
+当前九模块已有合同设计；`protocols`、`model-kernel`、`assurance`、`generation` 提供有限离线模型变更实现，`requirements` 增加显式有限解释上的结构化澄清及来源绑定的 typed 领域候选检查。本批有限交付已验收：有限领域语言及实例检查、必填且不可空的纯标量定义无损投影；投影遇关系、规则、残余或可选/可空字段整项拒绝。`interaction` 已提供有限审阅呈现；其他三模块为 planned。尚无完整无代码平台、应用运行时或研究比较结果。模块实际状态以各 `module.json` 和源码为准；详细语言及消费者合同仍为 draft，不代表复杂执行器已实现。
 
 版本化任务合同与固定目标检查已提供公共验收边界：共享信封归 protocols，来源与声明评估归 assurance，有限规则由适配器解释，apps 装配已有内核保存。当前[有限澄清闭环](docs/clarification.md)进一步将来源、解释、行为问题和回答连接到显式后继任务与模型提案。独立参考验收留在测试侧，和开发检查分别记录；此前固定任务切片的范围见[任务合同交接](docs/next-iteration.md)。
 
-当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。当前已实现[原文请求、提示准备与外部候选检查](docs/domain-modeling.md)，不需要正确模型作为输入；新增 `typed-prompt`、`typed-inspect` 和有限 `check-project` 入口。真实语言调用、自动抽取、回答驱动细化及审阅 UI 尚未实现；下一入口需明确供应商/API、模型、认证环境变量名和预算，再接真实语言适配器及独立语义核对。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。
+当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。当前已实现[原文请求、提示准备与外部候选检查](docs/domain-modeling.md)，不需要正确模型作为输入；新增 `typed-prompt`、`typed-inspect` 和有限 `check-project` 入口。真实语言调用、自动抽取和回答驱动细化尚未实现；下一入口需明确供应商/API、模型、认证环境变量名和预算，再接真实语言适配器及独立语义核对。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。
 
-新增[有限审阅接口 model-review/0.1](docs/model-review.md)：外部候选原件、独立审阅版本及answer/decline/confirm/propose_edit可在显式本地目录保存与恢复，检查拒绝的原件也可审阅。回答和编辑保留pending，不自动修订/采纳候选，不提供实例检查或UI。既有clarification的进程内会话与此本地保存入口分别维护。
+新增[有限审阅接口 model-review/0.1](docs/model-review.md)：外部候选原件、独立审阅版本及answer/decline/confirm/propose_edit可在显式本地目录保存与恢复，检查拒绝的原件也可审阅。回答和编辑保留pending，不自动修订/采纳候选，不提供实例检查。新增[本地候选审阅 UI](docs/model-review-ui.md)消费此接口，展示来源、结构、规则与未决项并提交四种动作；完整TaskView、Studio及应用交付尚未实现。既有clarification的进程内会话与此本地保存入口分别维护。
 
 基础产品目标是需求完善、领域建模/验证、代码前模型审阅、代码生成、运行交付和同项目修改的完整流程。自然语言建模是上游；更强语义保障与演化研究在该流程上增强，不以研究成功作为基础UI、生成和维护的前置。当前尚未贯通，来源组件须经实际适配与验收才能登记为可用。
 
@@ -23,6 +23,8 @@ python -B apps/boundary_examples.py --profile finite-automaton
 python -B apps/offline.py
 python -B apps/offline.py --threshold -1
 ```
+
+打开已保存审阅项目：`python -B -I apps/model_review_ui.py --project-dir "E:/absolute/existing-review-project"`，浏览器访问终端给出的本机地址。首次创建参数、保存失败和旧页冲突处理见[启动说明](docs/model-review-ui.md)；不自动生成候选。
 
 两条 boundary_examples 命令通过显式适配检查器完成两类配置的加载、预览、检查、决定和模型提交；只解释各自有限语言，范围见[公共基础边界](docs/foundation-boundaries.md)。既有 offline CLI 执行字段构造与同一提交链，固定加载[订单工程夹具](domain-packs/order-approval/README.md)，不提供任意领域配置加载。最后一条为非法输入反例，预期退出码 2。所有入口均不指定未来应用试点。
 

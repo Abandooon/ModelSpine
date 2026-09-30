@@ -1,32 +1,46 @@
 {
   "id": "interaction",
   "title": "任务界面与用户审查",
-  "status": "planned",
-  "version": "0.1.0-reviewed",
+  "status": "implemented-slice",
+  "version": "0.2.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
     "model-kernel",
     "implementation"
   ],
-  "runtime_dependencies": null,
+  "runtime_dependencies": [],
   "provides": [
-    "TaskView",
-    "InteractionPlan",
-    "VisualAssetRef"
+    "review_ui.format_expression",
+    "review_ui.project_review",
+    "review_ui.review_page",
+    "review_ui.review_asset"
   ],
-  "scope": "同源任务视图和操作绑定，面向用户解释后果；开放图像语义需要经验评估。",
-  "implementation_entrypoints": [],
-  "validation_evidence": [],
+  "scope": "有限前置候选审阅的纯文本/表格投影与页面资源；本机应用装配requirements纯审阅转换及apps/model_review.py保存接口。没有实例审阅、提案采纳、自动修订、业务CommandBinding执行或完整Studio。",
+  "implementation_entrypoints": [
+    "src/modelspine_interaction/review_ui.py"
+  ],
+  "validation_evidence": [
+    "../../docs/model-review-ui.md"
+  ],
   "review_targets": [
     "architecture"
   ],
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
-  "contract_maturity": "reviewed",
+  "contract_maturity": "exercised-subset",
   "dependency_semantics": {
-    "implementation": "public CommandBinding contract; no builder-internal runtime import"
+    "implementation": "Design-only public CommandBinding consumption; finite candidate review does not import or execute an implementation backend."
   },
   "design_contract_entrypoint": "contracts/design.md",
-  "design_contract_maturity": "draft"
+  "design_contract_maturity": "draft",
+  "additional_contract_entrypoints": [
+    "contracts/review.md"
+  ],
+  "design_provides": [
+    "TaskView",
+    "InteractionPlan",
+    "VisualAssetRef"
+  ],
+  "implemented_scope": "Standard-library-only finite review presentation and static shell/assets; exact integer/rule text is projected on the server without evaluation, original details remain available. Local HTTP/action assembly belongs to apps/model_review_ui.py; no model state ownership, authentication service, instance review or application delivery."
 }
