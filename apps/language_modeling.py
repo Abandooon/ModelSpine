@@ -13,13 +13,13 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from domain_modeling import load_request
 from model_review import create_review, read_review
-from modelspine_protocols import ContractError, digest, dumps, to_data
+from modelspine_protocols import ArtifactRef, ContractError, digest, dumps, to_data
 from modelspine_requirements.typed_domain import typed_modeling_prompt
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from language_response import (VERSION, LanguageError, encoded, extract_response, load_config,
                                post_response, redact, strict_json)
 
-METHOD = "typed-language-run/0.1"
+METHOD = "typed-language-run/0.1.1"
 REPO = Path(__file__).resolve().parents[1]
 METHOD_PATHS = (
     "apps/language_modeling.py", "adapters/language_response.py", "apps/domain_modeling.py",
@@ -143,6 +143,24 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
         plan = strict_json(plan_raw)
         if plan["config"] != config.public() or plan["method_sha256"] != method_hashes():
             raise LanguageError("configuration_or_method_conflict")
+        inputs = []
+        # The frozen pair is one plan: future and past slots are checked too.
+        for input_slot, item in enumerate(plan["items"], 1):
+            folder = root / f"input-{input_slot}"
+            for name, expected in item["files"].items():
+                if Path(name).name != name or hash_bytes(load(folder / name)) != expected:
+                    raise LanguageError("input_hash_conflict")
+            request = load_request(folder / "request.json")
+            prompt = typed_modeling_prompt(request).encode("utf-8")
+            payload = load(folder / "payload.json")
+            expected_payload = encoded({"model": config.model, "input": prompt.decode("utf-8"), "store": False,
+                                        "stream": False, "max_output_tokens": config.max_output_tokens})
+            if (digest(request) != item["request_hash"] or prompt != load(folder / "prompt.txt")
+                    or request.text.encode("utf-8") != load(folder / "source.txt") or payload != expected_payload):
+                raise LanguageError("request_binding_conflict")
+            if any(redact(raw, config.key)[1] for raw in (plan_raw, payload)):
+                raise LanguageError("credential_in_input")
+            inputs.append((request, payload))
         attempts = root / "attempts"
         safe_path(attempts)
         previous = sorted(attempts.iterdir())
@@ -161,26 +179,28 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
                         raise LanguageError("receipt_artifact_conflict")
                 if not receipt["continue_allowed"]:
                     raise LanguageError("previous_attempt_stopped")
+                review = folder / "review-project"
+                if receipt["review_project"] != str(review):
+                    raise LanguageError("review_binding_conflict")
+                try:
+                    view = read_review(review)
+                except (ValueError, OSError, RecursionError):
+                    # Public recovery checks pending/busy, saved hashes and replay.
+                    # Do not expose stored user text through exception messages.
+                    raise LanguageError("review_recovery_failed") from None
+                request = inputs[index - 1][0]
+                expected_request = to_data(ArtifactRef(request.source.project_id, f"language-{index}/request",
+                                                       "1", digest(request)))
+                if (view["request_ref"] != expected_request or view["candidate_ref"] != receipt["candidate_ref"]
+                        or view["candidate_ref"]["content_hash"] != hash_bytes(load(folder / "candidate.raw"))):
+                    raise LanguageError("review_binding_conflict")
+                # Legal actions change review_ref; immutable request/candidate must not change.
             except FileNotFoundError:
                 raise LanguageError("incomplete_attempt_no_automatic_replay") from None
         if len(previous) >= min(plan["executable_slots"], config.max_requests):
             raise LanguageError("planned_budget_exhausted")
         slot = len(previous) + 1
-        item = plan["items"][slot - 1]
-        folder = root / f"input-{slot}"
-        for name, expected in item["files"].items():
-            if Path(name).name != name or hash_bytes(load(folder / name)) != expected:
-                raise LanguageError("input_hash_conflict")
-        request = load_request(folder / "request.json")
-        prompt = typed_modeling_prompt(request).encode("utf-8")
-        payload = load(folder / "payload.json")
-        expected_payload = encoded({"model": config.model, "input": prompt.decode("utf-8"), "store": False,
-                                    "stream": False, "max_output_tokens": config.max_output_tokens})
-        if (digest(request) != item["request_hash"] or prompt != load(folder / "prompt.txt")
-                or request.text.encode("utf-8") != load(folder / "source.txt") or payload != expected_payload):
-            raise LanguageError("request_binding_conflict")
-        if any(redact(raw, config.key)[1] for raw in (plan_raw, payload)):
-            raise LanguageError("credential_in_input")
+        request, payload = inputs[slot - 1]
         attempt = attempts / f"{slot:03}"
         attempt.mkdir()  # Persistent reservation is consumed even on crash/timeout/write failure.
         reservation = {"plan_sha256": expected_plan_sha256, "slot": slot, "reserved_utc": now(),

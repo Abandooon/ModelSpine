@@ -4,6 +4,7 @@ import base64
 import http.client
 import json
 from pathlib import Path
+import re
 import socket
 import ssl
 import time
@@ -11,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "language-response/0.1"
+VERSION = "language-response/0.1.1"
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 TIMEOUT_SECONDS = 120
 NAMES = ("MODELSPINE_PROVIDER_URL", "MODELSPINE_BASE_URL", "MODELSPINE_API_KEY",
@@ -110,36 +111,37 @@ def redact(raw, key):
     clean = raw
     for value in sorted(variants, key=len, reverse=True):
         clean = clean.replace(value, b"[REDACTED_CREDENTIAL]")
-    # Also catches mixed JSON Unicode escapes and escaped keys.
-    try:
-        value = strict_json(clean)
-        hit = False
-        def visit(item, depth=0):
-            nonlocal hit
-            if isinstance(item, str):
-                if key in item:
-                    hit = True
-                    return item.replace(key, "[REDACTED_CREDENTIAL]")
-                # A candidate is itself JSON text inside the envelope; catch escaped echoes there.
-                if depth < 4 and item.lstrip().startswith(("{", "[")):
-                    try:
-                        nested = strict_json(item.encode("utf-8"))
-                        cleaned = visit(nested, depth + 1)
-                        if cleaned != nested:
-                            return encoded(cleaned).decode("utf-8")
-                    except (LanguageError, UnicodeError):
-                        pass
-                return item
-            if isinstance(item, list):
-                return [visit(x, depth) for x in item]
-            if isinstance(item, dict):
-                return {visit(k, depth): visit(v, depth) for k, v in item.items()}
-            return item
-        value = visit(value)
-        if hit:
-            clean = encoded(value)
-    except LanguageError:
-        pass
+    # JSON string escapes are recognizable without a complete JSON document.
+    # Config limits keys to ASCII; hex digit case may vary, literal case may not.
+    tokens = []
+    for char in key:
+        forms = {re.escape(char.encode()), re.escape(json.dumps(char)[1:-1].encode()),
+                 rb"\\u(?i:%04x)" % ord(char)}
+        if char == "/":
+            forms.add(re.escape(b"\\/"))
+        tokens.append(b"(?:" + b"|".join(sorted(forms)) + b")")
+    credential = re.compile(b"".join(tokens))
+    # Match complete strings or a valid received prefix at EOF, keeping any
+    # unfinished escape separate. No closing quote is added to saved bytes.
+    strings = re.compile(rb'"((?:[^"\\]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*)("|\\(?:u[0-9a-fA-F]{0,3})?\Z|\Z)')
+    def json_echoes(data, depth=0):
+        data = credential.sub(b"[REDACTED_CREDENTIAL]", data)
+        if depth == 4:
+            return data
+        def visit(match):
+            # Decode only complete characters for credential detection, even if
+            # the string/envelope is unfinished. Reattach its actual terminator.
+            try:
+                text = json.loads(b'"' + match[1] + b'"').encode("utf-8")
+                safe = json_echoes(text, depth + 1)
+                if safe != text:
+                    quoted = json.dumps(safe.decode("utf-8"), ensure_ascii=False).encode("utf-8")
+                    return quoted[:-1] + match[2]
+            except (ValueError, UnicodeError):
+                pass
+            return match[0]
+        return strings.sub(visit, data)
+    clean = json_echoes(clean)
     return clean, clean != raw
 
 
@@ -173,8 +175,12 @@ def post_response(config, payload):
         with response:
             status = response.code
             while len(raw) <= MAX_ENVELOPE_BYTES:
-                chunk = response.read(min(65536, MAX_ENVELOPE_BYTES + 1 - len(raw)))
+                # read1 returns available body bytes instead of filling amt: a later
+                # socket timeout cannot swallow a prefix already delivered here.
+                chunk = response.read1(min(65536, MAX_ENVELOPE_BYTES + 1 - len(raw)))
                 if not chunk:
+                    if response.length is not None and response.length > 0:
+                        return Exchange(status, raw, "truncated_http_body")
                     break
                 raw += chunk
                 if time.monotonic() >= deadline:

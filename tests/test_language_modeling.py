@@ -1,8 +1,10 @@
 """Synthetic transport engineering only. No live API and no independent semantic answers."""
 from dataclasses import replace
 import http.client
+import io
 import json
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tempfile
@@ -15,7 +17,9 @@ import urllib.request
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps"))
 import language_modeling as app
 import language_response as wire
-from modelspine_protocols import ArtifactRef, dumps, digest
+from modelspine_protocols import ArtifactRef, ContractError, decode, dumps, digest
+from modelspine_protocols.review import ReviewAction
+import model_review
 from modelspine_requirements.domain_modeling import prepare_request
 
 KEY = "offline-engineering-secret-NOT-A-REAL-KEY"
@@ -38,6 +42,16 @@ def envelope(raw, **changes):
                         "content": [{"type": "output_text", "text": raw.decode("utf-8")}]}]}
     data.update(changes)
     return wire.encoded(data)
+
+
+def http_response(body, framing):
+    """Actual stdlib parsing/reads, backed by a finite byte stream (no network)."""
+    class MemorySocket:
+        def makefile(self, mode):
+            return io.BytesIO(b"HTTP/1.1 200 OK\r\n" + framing + b"\r\n" + body)
+    response = http.client.HTTPResponse(MemorySocket())
+    response.begin()
+    return response
 
 
 class LanguageRunTests(unittest.TestCase):
@@ -225,8 +239,238 @@ class LanguageRunTests(unittest.TestCase):
         with self.assertRaisesRegex(wire.LanguageError, "run_busy"):
             app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
 
+    def assert_preflight_stops(self, code):
+        before = list((self.run / "attempts").iterdir())
+        with patch.object(app, "post_response", side_effect=AssertionError("network reached before preflight rejection")) as post:
+            with self.assertRaisesRegex((wire.LanguageError, ContractError), code):
+                app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+            post.assert_not_called()
+        self.assertEqual(list((self.run / "attempts").iterdir()), before)
+
+    def test_aud01_truncated_mixed_escape_echo_is_redacted_on_disk(self):
+        mixed = ''.join(c if i % 2 else '\\u%04x' % ord(c) for i, c in enumerate(KEY))
+        raw = ('{"error":{"message":"' + mixed + '"}').encode()
+        receipt = self.execute(raw, status=401)
+        saved = (self.run / "attempts/001/response.body").read_bytes()
+        self.assertEqual(receipt["response_bytes"], "redacted")
+        self.assertEqual(receipt["received_sha256"], app.hash_bytes(raw))
+        self.assertEqual(receipt["stored_sha256"], app.hash_bytes(saved))
+        self.assertNotEqual(receipt["received_sha256"], receipt["stored_sha256"])
+        self.assertIn("credential_echo_redacted", receipt["stop_reasons"])
+        self.assertFalse(receipt["continue_allowed"])
+        # Decode the received JSON string tokens even though the envelope is incomplete.
+        import re
+        for path in self.run.rglob("*"):
+            if path.is_file():
+                data = path.read_bytes()
+                self.assertNotIn(KEY.encode(), data)
+                for token in re.findall(rb'"(?:[^"\\]|\\.)*"', data):
+                    self.assertNotIn(KEY, json.loads(token))
+        self.assert_preflight_stops("previous_attempt_stopped")
+
+    def test_aud02_complete_json_with_short_http_body_stops_next_slot(self):
+        body = envelope(candidate(self.requests[0]))
+        response = http_response(body, f"Content-Length: {len(body) + 100}\r\n".encode())
+        with patch.object(wire.urllib.request, "build_opener") as build:
+            build.return_value.open.return_value = response
+            receipt = app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+            self.assertEqual(build.return_value.open.call_count, 1)
+        self.assertEqual(receipt["transport_status"], "truncated_http_body")
+        self.assertEqual((self.run / "attempts/001/response.body").read_bytes(), body)
+        self.assertFalse(receipt["continue_allowed"])
+        self.assertIsNone(receipt["candidate"])
+        self.assertTrue(response.isclosed())
+        self.assert_preflight_stops("previous_attempt_stopped")
+
+    def test_aud01_truncated_outer_nested_mixed_echo_redacted_on_disk(self):
+        mixed = ''.join(c if i % 2 == 0 else '\\u%04x' % ord(c) for i, c in enumerate(KEY))
+        inner = '{"error":"' + mixed + '"}'
+        full = json.dumps({"output_text": inner}).encode()
+        raw = full[:-3]
+        receipt = self.execute(raw, status=400)
+        saved = (self.run / "attempts/001/response.body").read_bytes()
+        self.assertEqual(receipt["response_bytes"], "redacted")
+        self.assertEqual(receipt["received_sha256"], app.hash_bytes(raw))
+        self.assertEqual(receipt["stored_sha256"], app.hash_bytes(saved))
+        # Reattach ONLY the known test suffix to detect recoverable fake secrets.
+        # Production storage/extraction never completes the received response.
+        self.assertNotIn(KEY, json.loads(json.loads(saved + full[-3:])["output_text"])["error"])
+        self.assertIn("credential_echo_redacted", receipt["stop_reasons"])
+        self.assert_preflight_stops("previous_attempt_stopped")
+
+    def test_aud04_input_two_corrupt_before_slot_one(self):
+        (self.run / "input-2/source.txt").write_bytes(b"changed")
+        self.assert_preflight_stops("input_hash_conflict")
+
+    def test_aud04_input_one_corrupt_before_slot_two(self):
+        self.execute()
+        (self.run / "input-1/source.txt").write_bytes(b"changed")
+        self.assert_preflight_stops("input_hash_conflict")
+
+    def first_review_with_question(self):
+        data = json.loads(candidate(self.requests[0]))
+        data["issues"] = [{"id": "q", "kind": "missing_information", "text": "待回答",
+                           "related_ids": ["item"], "question": "物件是什么？",
+                           "evidence": data["traces"][0]["evidence"]}]
+        receipt = self.execute(envelope(wire.encoded(data)))
+        self.assertTrue(receipt["continue_allowed"])
+        project = Path(receipt["review_project"])
+        view = app.read_review(project)
+        action = ReviewAction("model-review/0.1", "answer-1", view["project_id"],
+                              decode(ArtifactRef, view["request_ref"]), decode(ArtifactRef, view["candidate_ref"]),
+                              decode(ArtifactRef, view["review_ref"]), decode(ArtifactRef, view["questions"][0]["ref"]),
+                              "engineering-actor", "answer", "尚不确定", (), None)
+        return project, view, action
+
+    def test_aud04_formal_action_replace_failure_pending_stops_network(self):
+        project, _, action = self.first_review_with_question()
+        with patch.object(model_review.os, "replace", side_effect=OSError("synthetic replace failure")):
+            with self.assertRaises(OSError):
+                model_review.submit_action(project, action)
+        self.assertTrue((project / model_review.PENDING).is_file())
+        with self.assertRaises(ContractError) as caught:
+            app.read_review(project)
+        self.assertEqual(caught.exception.code, "incomplete_write")
+        self.assert_preflight_stops("review_recovery_failed")
+
+    def test_aud04_legitimate_answer_new_review_version_allows_slot_two(self):
+        project, view, action = self.first_review_with_question()
+        model_review.submit_action(project, action)
+        updated = app.read_review(project)
+        self.assertNotEqual(updated["review_ref"], view["review_ref"])
+        self.assertEqual(updated["candidate_ref"], view["candidate_ref"])
+        with patch.object(app, "post_response", return_value=wire.Exchange(200, envelope(candidate(self.requests[1])), "received")) as post:
+            receipt = app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+            self.assertEqual(post.call_count, 1)
+        self.assertTrue(receipt["continue_allowed"])
+
+    def test_aud04_valid_store_with_wrong_request_rejected(self):
+        receipt = self.execute()
+        other = self.root / "other-review"
+        other.mkdir()
+        app.create_review(other, self.requests[1], candidate(self.requests[1]), session_id="language-1")
+        (Path(receipt["review_project"]) / model_review.STATE).write_bytes((other / model_review.STATE).read_bytes())
+        self.assert_preflight_stops("review_binding_conflict")
+
+    def test_aud04_valid_store_with_wrong_candidate_rejected(self):
+        receipt = self.execute()
+        other = self.root / "other-review"
+        other.mkdir()
+        app.create_review(other, self.requests[0], candidate(self.requests[0]) + b"\n", session_id="language-1")
+        (Path(receipt["review_project"]) / model_review.STATE).write_bytes((other / model_review.STATE).read_bytes())
+        self.assert_preflight_stops("review_binding_conflict")
+
+    def test_aud04_public_recovery_corrupt_and_busy_store_stop_network(self):
+        receipt = self.execute()
+        project = Path(receipt["review_project"])
+        state = project / model_review.STATE
+        original = state.read_bytes()
+        state.write_bytes(b'{')
+        self.assert_preflight_stops("review_recovery_failed")
+        state.write_bytes(original)
+        lock = project / model_review.LOCK
+        lock.write_bytes(b'')
+        self.assert_preflight_stops("review_recovery_failed")
+        self.assertTrue(lock.is_file())
+
 
 class TransportTests(unittest.TestCase):
+    def test_aud01_mixed_json_escape_case_short_escapes_and_negative_control(self):
+        key = 'fake/a"b\\c-Z'
+        spellings = [json.dumps(key)[1:-1],
+                     ''.join('\\u%04X' % ord(c) if i % 2 else json.dumps(c)[1:-1]
+                             for i, c in enumerate(key)),
+                     json.dumps(key)[1:-1].replace('/', '\\/')]
+        for spelling in spellings:
+            for suffix in ('"}', '"', ''):
+                with self.subTest(spelling=spelling, suffix=suffix):
+                    raw = ('{"detail":"' + spelling + suffix).encode()
+                    safe, changed = wire.redact(raw, key)
+                    self.assertTrue(changed)
+                    self.assertIn(b'[REDACTED_CREDENTIAL]', safe)
+                    self.assertNotIn(key.encode(), safe)
+        raw = b'{"detail":"fake/a different value"'
+        self.assertEqual(wire.redact(raw, key), (raw, False))
+
+    def test_aud01_bounded_nested_strings_complete_and_truncated_controls(self):
+        mixed = ''.join(c if i % 2 == 0 else '\\u%04x' % ord(c) for i, c in enumerate(KEY))
+        for depth in range(1, 5):
+            nested = '{"error":"' + mixed + '"}'
+            normal = '{"error":"ordinary \\u0061 text"}'
+            for _ in range(depth):
+                nested = json.dumps({"text": nested})
+                normal = json.dumps({"text": normal})
+            for cut in range(0, 6):
+                with self.subTest(depth=depth, cut=cut):
+                    full = nested.encode()
+                    raw = full[:-cut] if cut else full
+                    safe, hit = wire.redact(raw, KEY)
+                    self.assertTrue(hit)
+                    decoded = (safe + full[-cut:] if cut else safe).decode()
+                    for _ in range(depth):
+                        decoded = json.loads(decoded)["text"]
+                    self.assertNotIn(KEY, json.loads(decoded)["error"])
+                    control = normal.encode()[:-cut] if cut else normal.encode()
+                    self.assertEqual(wire.redact(control, KEY), (control, False))
+
+    def test_aud02_real_http_response_complete_length_and_eof_delimited(self):
+        body = b'{"engineering":true}'
+        for framing in (f"Content-Length: {len(body)}\r\n".encode(), b""):
+            with self.subTest(framing=framing), patch.object(wire.urllib.request, "build_opener") as build:
+                response = http_response(body, framing)
+                build.return_value.open.return_value = response
+                cfg = wire.Config("https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", 3, 4096)
+                result = wire.post_response(cfg, b'{}')
+                self.assertEqual((result.transport_status, result.raw), ("received", body))
+                self.assertTrue(response.isclosed())
+
+    def test_aud02_real_chunked_body_complete_and_early_eof(self):
+        cfg = wire.Config("https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", 3, 4096)
+        for body, expected in ((b'3\r\nabc\r\n0\r\n\r\n', "received"),
+                               (b'5\r\nabc', "truncated_http_body")):
+            with self.subTest(body=body), patch.object(wire.urllib.request, "build_opener") as build:
+                response = http_response(body, b'Transfer-Encoding: chunked\r\n')
+                build.return_value.open.return_value = response
+                result = wire.post_response(cfg, b'{}')
+                self.assertEqual((result.transport_status, result.raw), (expected, b'abc'))
+                self.assertTrue(response.isclosed())
+
+    def test_incremental_transport_still_bounds_size_time_and_http_error_body(self):
+        cfg = wire.Config("https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", 3, 4096)
+        for limit, timeout, expected, length in ((16, 120, "response_size_limit", 17),
+                                                 (100, 0, "timeout", 21)):
+            with self.subTest(expected=expected), patch.object(wire.urllib.request, "build_opener") as build:
+                response = http_response(b'x' * 21, b'Content-Length: 21\r\n')
+                build.return_value.open.return_value = response
+                with patch.object(wire, "MAX_ENVELOPE_BYTES", limit), patch.object(wire, "TIMEOUT_SECONDS", timeout):
+                    result = wire.post_response(cfg, b'{}')
+                self.assertEqual((result.transport_status, len(result.raw)), (expected, length))
+                self.assertTrue(response.isclosed())
+        with patch.object(wire.urllib.request, "build_opener") as build:
+            response = http_response(b'error', b'Content-Length: 5\r\n')
+            build.return_value.open.side_effect = urllib.error.HTTPError(cfg.base_url, 503, 'synthetic', {}, response)
+            result = wire.post_response(cfg, b'{}')
+            self.assertEqual((result.http_status, result.transport_status, result.raw), (503, 'received', b'error'))
+            self.assertTrue(response.isclosed())
+
+    def test_aud03_real_http_socket_timeout_preserves_21_bytes(self):
+        reader, writer = socket.socketpair()
+        self.addCleanup(reader.close)
+        self.addCleanup(writer.close)
+        reader.settimeout(0.05)
+        body = b'123456789012345678901'
+        writer.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 121\r\n\r\n" + body)
+        response = http.client.HTTPResponse(reader)
+        response.begin()
+        with patch.object(wire.urllib.request, "build_opener") as build:
+            build.return_value.open.return_value = response
+            cfg = wire.Config("https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", 3, 4096)
+            result = wire.post_response(cfg, b'{}')
+            self.assertEqual(build.return_value.open.call_count, 1)
+        self.assertEqual(result.transport_status, "timeout")
+        self.assertEqual(result.raw, body)
+        self.assertTrue(response.isclosed())
+
     def test_configuration_missing_empty_model_limits_and_no_secret_exception(self):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / ".env"
@@ -259,10 +503,10 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(opener.open.call_count, 1)
         with patch.object(wire.urllib.request, "build_opener") as build:
             response = build.return_value.open.return_value.__enter__.return_value
-            # read is called on the object returned by open, not its __enter__ result.
+            # read1 is called on the object returned by open, not its __enter__ result.
             response = build.return_value.open.return_value
             response.code = 200
-            response.read.side_effect = [b"prefix-", http.client.IncompleteRead(b"partial", 100)]
+            response.read1.side_effect = [b"prefix-", http.client.IncompleteRead(b"partial", 100)]
             result = wire.post_response(cfg, b'{}')
             self.assertEqual(result.transport_status, "truncated_http_body")
             self.assertEqual(result.raw, b"prefix-partial")
