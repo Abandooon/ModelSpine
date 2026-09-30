@@ -12,15 +12,17 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 自然语言建模的候选与解释仍归 requirements，来源完整性与已支持部分的检查可消费 protocols 和 assurance；apps 装配可审查流程。新的候选产物先按实际消费者设计，不强塞入现有同元模型 `ChangeProposal`，也不提前实现通用元模型迁移。模型提交继续由 kernel 负责，候选草案、人工确认、形式检查和已接受模型分别记录。
 
+[有限审阅接口](model-review.md)已提供独立候选/审阅身份及四种追加动作：protocols.review定义封闭动作，requirements.review解释与重放，apps/model_review.py在显式本地目录互斥保存、恢复并拒绝旧版本/损坏。原件检查拒绝仍可审阅，propose_edit只保存待采纳完整候选；没有实例输入、自动修订或审阅UI。该本地保存不改变旧clarification会话只在进程内的边界，也不构成已接受模型提交。
+
 有界 DAG 构造、三条件记录和候选批次重放保留为保障机制与比较方法的工程支撑。[候选后端合同](candidate-backend-contract.md)是这条支线的接入设计，当前主线不要求先完成其外部 API。具体支线按任务启动，目录或可运行入口的存在不决定下一优先级。
 
 ## 九模块的职责
 
 | 模块 | 拥有的状态或产物 | 公开边界及当前范围 |
 |---|---|---|
-| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验；新增 finite-domain/0.1 值对象、静态类型和定义检查，不持有项目状态 |
+| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验、finite-domain/0.1值对象及静态检查；新增model-review/0.1动作信封，不持有项目状态 |
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；新增必填且不可空的纯标量定义只读无损投影，拒绝关系/规则/残余及可选/可空字段；无持久化或跨进程事务 |
-| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清，原文请求/提示与外部领域候选检查，以及来源绑定的 typed 候选提示/检查；无自动抽取或直接模型写权，通用诊断仍为设计 |
+| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清、原文/typed候选提示与检查；新增有限审阅会话及用户动作，文件保存归apps；无自动抽取、自动修订或直接模型写权，通用诊断仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
 | [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录和纯报告比较；DAG 语义留在适配器，无 LLM 或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |

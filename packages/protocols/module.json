@@ -2,7 +2,7 @@
   "id": "protocols",
   "title": "共享协议与稳定引用",
   "status": "implemented-slice",
-  "version": "0.2.0-experimental",
+  "version": "0.3.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [],
   "runtime_dependencies": [],
@@ -26,16 +26,20 @@
     "domain_language.DomainDefinition",
     "domain_language.ProjectModel",
     "domain_language.validate_definition",
-    "domain_language.expression_type"
+    "domain_language.expression_type",
+    "review.ReviewAction",
+    "review.validate_action"
   ],
   "scope": "定义交换格式和版本策略；不承担所有领域语义。",
   "implementation_entrypoints": [
     "src/modelspine_protocols/__init__.py",
-    "src/modelspine_protocols/domain_language.py"
+    "src/modelspine_protocols/domain_language.py",
+    "src/modelspine_protocols/review.py"
   ],
   "validation_evidence": [
     "../../docs/validation.md",
-    "../../docs/domain-modeling.md"
+    "../../docs/domain-modeling.md",
+    "../../docs/model-review.md"
   ],
   "review_targets": [
     "architecture"
@@ -43,7 +47,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor.",
+  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor. Adds finite model-review/0.1 action envelopes with explicit request/candidate/review/question binding; no persistence or authentication.",
   "reference_sources": [
     {
       "asset_id": "prime-code-audit-2026-09-21",

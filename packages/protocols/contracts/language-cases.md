@@ -71,8 +71,33 @@ BaseCrew.members:Person集合0..5，SpecialCrew继承收窄2..3；effective boun
 
 ## R1和旧标量的映射/拒绝
 
-R1 Concept{id:c,name:N}→Entity{id:c,name:N,abstract:false,bases:[],renames:[],fields:[],identity:[]}，但这只是概念声明，不伪造实例。R1 Attribute{id:a,concept_id:c,value_type:integer}→类型Int64；其required/nullable/多重性/身份未提供，保留未决字段，**不得填required=true/nullable=false**。因此含属性的R1不能自动直接进入finite-domain，须新来源/回答补足。R1未知value_type保持Unknown+issue。R1 Relation双向已知基数→二元association两角色，target角色取targets_per_source，source角色取sources_per_target；任一null基数拒绝可执行投影并保留问题。R1 Rule.text/not_formalized→原文义务Residual(required按来源模态)，不推导恒true Constraint。例：规则“24小时内最多2个”不能映射为全历史关系max2；反向从时间规则导出R1只能带原文规则+显式有损报告，不可报exact。
+R1 Concept{id:c,name:N}→Entity{id:c,name:N,abstract:false,bases:[],renames:[],refinements:[],fields:[],identity:[]}，但这只是概念声明，不伪造实例。R1 Attribute{id:a,concept_id:c,value_type:integer}→类型Int64；其required/nullable/多重性/身份未提供，保留未决字段，**不得填required=true/nullable=false**。因此含属性的R1不能自动直接进入finite-domain，须新来源/回答补足。R1未知value_type保持Unknown+issue。R1 Relation双向已知基数→二元association两角色，target角色取targets_per_source，source角色取sources_per_target；任一null基数拒绝可执行投影并保留问题。R1 Rule.text/not_formalized→原文义务Residual(required按来源模态)，不推导恒true Constraint。例：规则“24小时内最多2个”不能映射为全历史关系max2；反向从时间规则导出R1只能带原文规则+显式有损报告，不可报exact。
 
 旧Metamodel KindSpec(name=Device,FieldSpec(name=enabled,type=boolean))→实体ID Device、字段ID按`Device.enabled`分配、required=true、nullable=false、单值Bool；这两个限定来自旧内核的实际语义，有理由而非猜测。旧字段name是结构键，名称变化须映射ID并保留追踪。反例：旧Element.parent/dependencies仅保留开发包含/依赖元数据，没有来源证明时不能转领域owns/precedes关系。旧标量字符串中编码日期、JSON、图边不自动获得日期/关系语义。
 
 finite→旧内核实际API `modelspine_kernel.domain_projection.to_scalar_metamodel`仅支持：至少一个实体、全部字段required/nonnullable、无关系/约束/残余。以entity/field稳定ID作为kind/field键；display name留在原定义，由引用保留，不是领域键。`enabled:boolean`正例可映射；`enabled nullable=true`、任何binary relation、cap表达式或Residual均返回unsupported，**不返回部分Metamodel**。该API只导出定义，不迁移实例、不接受候选、不提交模型；旧快照还有category/source/dependencies等独立前提。
+
+
+## 2026-09-28 草案闭合性返修载荷（设计推演，非执行器）
+
+继承×基数以如下完整Entity记录表达；Field只在BaseCrew声明一次，Person为同包已声明的Entity。此处两记录作为entity Declaration.body，Person为`{id:"Person",name:"Person",abstract:false,bases:[],renames:[],refinements:[],fields:[],identity:[]}`。
+
+```json
+[
+ {"id":"BaseCrew","name":"BaseCrew","abstract":false,"bases":[],"renames":[],"refinements":[],"fields":[{"id":"members","name":"members","type":{"tag":"Named","ref":{"element":"Person"}},"required":true,"nullable":false,"multiplicity":{"min":0,"max":5,"ordered":false,"unique":true},"default":null,"derived":null}],"identity":[]},
+ {"id":"SpecialCrew","name":"SpecialCrew","abstract":false,"bases":[{"element":"BaseCrew"}],"renames":[],"refinements":[{"field_ref":{"element":"members"},"type":{"tag":"Named","ref":{"element":"Person"}},"required":true,"nullable":false,"multiplicity":{"min":2,"max":3,"ordered":false,"unique":true}}],"fields":[],"identity":[]}
+]
+```
+
+正：声明ID仅BaseCrew/members/SpecialCrew（加既有Person），细化不新增声明；有效字段身份仍Local(members)，界2..3，完整人口2个成员满足父/子义务。反：把members完整复制到SpecialCrew.fields→duplicate_id；新字段members2不构成覆盖；field_ref=SpecialCrew或未继承字段→invalid；max=6、required=false、nullable=true、unique=false均弱化而拒绝；同一field_ref两条细化→invalid；父上界1而子下界2→不一致。未知：父来自缺失包→closure unknown，不能确认2..3合法。删除继承约束/默认、更换可写类型没有本草案合法细化载荷，明确拒绝；不影响允许另建独立字段或显式需求演化。此推演不改变finite-domain/0.1运行范围。
+
+同包operation/policy绑定片段如下；它仅检验引用闭合，恒true策略是人工身份工程例，不替代上文role/state业务策略。Actor/Job为同包Entity（完整记录与上方空Person同形，只替换id/name），以下两项为同一Package的完整Declaration，imports=[]，无需任何自身hash：
+
+```json
+[
+ {"kind":"operation","body":{"id":"run","kind":"command","input":{"tag":"Record","fields":[]},"output":{"tag":"Bool"},"errors":[],"pre":{"tag":"Lit","type":{"tag":"Bool"},"value":true},"post":{"tag":"Lit","type":{"tag":"Bool"},"value":true},"effects":[],"transaction":{"scope":[{"element":"Job"}],"isolation":"version_compare"},"retry":{"mode":"none","max_attempts":1},"permission_ref":{"element":"run-policy"}}},
+ {"kind":"policy","body":{"id":"run-policy","subjects":{"element":"Actor"},"resources":{"element":"Job"},"actions":[{"element":"run"}],"rules":[{"effect":"allow","condition":{"tag":"Lit","type":{"tag":"Bool"},"value":true}}],"combining":"deny_overrides","default":"deny"}}
+]
+```
+
+正：run.permission_ref→Local(run-policy)，policy.actions→Local(run)，transaction.scope→Local(Job)，subjects/resources同样Local；包内容可一次规范序列化并计算hash，无自hash固定点。反：Local多加hash键、缺element、permission_ref指Job、scope指run-policy均invalid；将任何上述本包引用写为Ref(package=本包,version=本版本,hash=H(本包),element=...)违反禁止自hash规则；拆成互相imports的两包仍被跨包DAG规则拒绝。未知：合法外部Ref对应包缺原件→closure unknown；不取最新版本。protocols仍为唯一引用/权限语义所有者，本轮没有实现Policy或Operation运行器。

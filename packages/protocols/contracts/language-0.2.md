@@ -4,7 +4,7 @@
 
 ## 身份、记法和唯一语义所有者
 
-下列记录是封闭积类型：列出的字段全部必填，无隐式默认值；`T?`是显式JSON null或T，`[T]`是数组，`A|B`由tag区分，ID为非空UTF-8字符串。同一Package内所有声明ID唯一。`Ref={package,version,hash,element}`，hash为被引用包规范JSON字节的SHA256；本包引用为`Local={element}`，由包身份限定。引用可显示名称，但不按名称解析。外包采用精确版本闭包，不访问网络、不解析latest；同包同版本不同hash为conflict。本草案仅支持哈希依赖为DAG的包闭包，跨包引用环（包括无继承环的普通引用）明确拒绝为unsupported/cyclic_package_hash_dependency。继承/派生/包含等自己的环规则另行检查。ArtifactRef沿用protocols已实现定义；不得将内容哈希省略成路径。
+下列记录是封闭积类型：列出的字段全部必填，无隐式默认值；`T?`是显式JSON null或T，`[T]`是数组，`A|B`由tag区分，ID为非空UTF-8字符串。同一Package内所有声明ID唯一。`Ref={package,version,hash,element}`，hash为被引用包规范JSON字节的SHA256；本包引用为`Local={element}`，由包身份限定。统一元素引用为`ElementRef=Ref|Local`：这是按封闭键集合区分的引用和式（仅此和式不加tag）；Local恰有element，Ref恰有package/version/hash/element，混合/缺键非法。本文所有field_ref/type_ref/operation_ref/role_ref等元素引用及数组元素均为ElementRef，另标ArtifactRef/EvidenceRef的制品引用不受此别名替换。引用可显示名称，但不按名称解析。外包采用精确版本闭包，不访问网络、不解析latest；同包同版本不同hash为conflict。本草案仅支持哈希依赖为DAG的包闭包，跨包引用环（包括无继承环的普通引用）明确拒绝为unsupported/cyclic_package_hash_dependency。继承/派生/包含等自己的环规则另行检查。ArtifactRef沿用protocols已实现定义；不得将内容哈希省略成路径。
 
 `Package={id,version,language,imports:[ArtifactRef],profiles:[ArtifactRef],declarations:[Declaration],traces:[Trace]}`。`language`钉住本规范版本及分发文件hash；规范发布时固定，草案改字节须换hash。`Trace={element:Local,requirements:[ArtifactRef],evidence:[EvidenceRef],category:intent|fact|hypothesis,confirmation:unconfirmed|confirmed|rejected}`。事实来源和用户确认正交。语言定义不承诺用户需求穷尽。
 
@@ -56,9 +56,11 @@ Date为有效公历YYYY-MM-DD；Instant输入必须有UTC偏移并规范为UTC�
 
 ## 结构、关系与组合
 
-`Entity={id,name,abstract,bases:[Ref|Local],renames:[{field_ref:Ref|Local,name}],fields:[Field],identity:[field_ref]}`；`ValueObject`同记录但无独立对象身份、bases/renames/identity均为空。`Field={id,name,type,required,nullable,multiplicity:{min,max,ordered,unique},default:Expr?,derived:Expr?}`。required要求slot存在；nullable允许Null；multiplicity控制slot中的成员数，不能用0..1代替可空。default/derived不得同时存在；默认值有来源和显式materialize记录，不能写成原文承诺。派生值只读、纯、类型兼容，依赖图无环。identity字段必须required/nonnullable、不可变且可判等，按实体有效类型作用域唯一。
+`Entity={id,name,abstract,bases:[ElementRef],renames:[{field_ref:ElementRef,name}],refinements:[FieldRefinement],fields:[Field],identity:[ElementRef]}`；`ValueObject`同记录但无独立对象身份、bases/renames/refinements/identity均为空。`Field={id,name,type,required,nullable,multiplicity:{min,max,ordered,unique},default:Expr?,derived:Expr?}`。required要求slot存在；nullable允许Null；multiplicity控制slot中的成员数，不能用0..1代替可空。default/derived不得同时存在；默认值有来源和显式materialize记录，不能写成原文承诺。派生值只读、纯、类型兼容，依赖图无环。identity字段必须required/nonnullable、不可变且可判等，按实体有效类型作用域唯一。
 
-继承为多重特化DAG。类型闭包按祖先集合合并；同源祖先同ID只继承一次。不同字段ID重名必须显式rename映射，不能按遍历顺序选一项。覆盖须保留字段ID、类型协变、不得增加nullable或弱化required，集合区间只能收窄；对可写字段类型必须不变，操作参数逆变/返回协变。继承约束全部合取，不能覆盖删除。冲突区间、无可实现枚举/类型交集为定义不一致，不用“没有实例”掩盖。
+继承为多重特化DAG。类型闭包按祖先集合合并；同源祖先同ID只继承一次。不同字段ID重名必须显式rename映射，不能按遍历顺序选一项。细化只通过`FieldRefinement={field_ref:ElementRef,type:Type,required:Bool,nullable:Bool,multiplicity:{min,max,ordered,unique}}`表达；它引用已有字段而不是新声明，不含id/name/default/derived，不进入声明ID集合。Entity.fields仅声明新字段，不能重复父字段ID或用新ID冒称覆盖。细化须保留field_ref限定身份、类型协变、不得增加nullable或弱化required，集合区间只能收窄；对可写字段类型必须不变，操作参数逆变/返回协变。继承约束全部合取，不能覆盖删除。冲突区间、无可实现枚举/类型交集为定义不一致，不用“没有实例”掩盖。
+
+refinements属于派生Entity，每个field_ref最多一条且必须解析为继承闭包内的字段；指向自有/非字段元素非法。对所有继承路径的同一身份先合并有效限制，再检查本地细化相对每条路径都不弱化；互斥界/类型无共同实现即invalid。ordered不得改变，unique=true不得改false；default/derived从原声明继承，不允许用细化替换或删除，若继承默认/派生不满足新类型或界则本草案拒绝该细化，不能静默改值。可写字段（derived=null）类型保持不变，只读派生字段可协变；required/nullable与界的规则对二者相同。名字变化单独由renames表达，实例slot/Get始终引用最初声明的field_ref。protocols唯一拥有这些定义语义，其他消费者不能另行flatten后改变身份。
 
 renames属于派生Entity，不属于父Field或消费UI。每条field_ref必须是该实体继承闭包内一个字段的完整限定身份；相同field_ref最多一条，name非空。只改变该实体有效字段的本地可见名称，不创建新字段ID、不更改父定义、类型、约束或实例slot引用。先按身份合并祖先字段，应用本实体renames，再核对有效字段名（含自有字段）唯一。菱形继承中同一字段经两路径得到不同有效名称时，本实体必须显式指定该field_ref的新名称；不得依遍历顺序选名。无法解析父包→unknown；映射到非继承字段、重复映射、仍有同名→invalid。
 
@@ -66,13 +68,13 @@ renames属于派生Entity，不属于父Field或消费UI。每条field_ref必须
 
 ```json
 [
- {"id":"Left","name":"Left","abstract":false,"bases":[],"renames":[],"fields":[{"id":"left_code","name":"code","type":{"tag":"Bool"},"required":true,"nullable":false,"multiplicity":{"min":1,"max":1,"ordered":false,"unique":true},"default":null,"derived":null}],"identity":[]},
- {"id":"Right","name":"Right","abstract":false,"bases":[],"renames":[],"fields":[{"id":"right_code","name":"code","type":{"tag":"Bool"},"required":true,"nullable":false,"multiplicity":{"min":1,"max":1,"ordered":false,"unique":true},"default":null,"derived":null}],"identity":[]},
- {"id":"Combined","name":"Combined","abstract":false,"bases":[{"element":"Left"},{"element":"Right"}],"renames":[{"field_ref":{"element":"left_code"},"name":"leftCode"},{"field_ref":{"element":"right_code"},"name":"rightCode"}],"fields":[],"identity":[]}
+ {"id":"Left","name":"Left","abstract":false,"bases":[],"renames":[],"refinements":[],"fields":[{"id":"left_code","name":"code","type":{"tag":"Bool"},"required":true,"nullable":false,"multiplicity":{"min":1,"max":1,"ordered":false,"unique":true},"default":null,"derived":null}],"identity":[]},
+ {"id":"Right","name":"Right","abstract":false,"bases":[],"renames":[],"refinements":[],"fields":[{"id":"right_code","name":"code","type":{"tag":"Bool"},"required":true,"nullable":false,"multiplicity":{"min":1,"max":1,"ordered":false,"unique":true},"default":null,"derived":null}],"identity":[]},
+ {"id":"Combined","name":"Combined","abstract":false,"bases":[{"element":"Left"},{"element":"Right"}],"renames":[{"field_ref":{"element":"left_code"},"name":"leftCode"},{"field_ref":{"element":"right_code"},"name":"rightCode"}],"refinements":[],"fields":[],"identity":[]}
 ]
 ```
 
-正：Combined有效字段为left_code→leftCode、right_code→rightCode，父定义中的两个code不变；规则仍按原字段ID访问。反：Combined.renames=[]会保留两个不同ID的code，拒绝；把第二条name改leftCode也拒绝；把field_ref改Combined（不是字段）拒绝。未知：Right外包缺失时无法确认完整有效字段集合，不能用只加载Left的结果宣称无冲突。这里只补设计载荷，finite-domain/0.1仍不接受bases/renames。
+正：Combined有效字段为left_code→leftCode、right_code→rightCode，父定义中的两个code不变；规则仍按原字段ID访问。反：Combined.renames=[]会保留两个不同ID的code，拒绝；把第二条name改leftCode也拒绝；把field_ref改Combined（不是字段）拒绝。未知：Right外包缺失时无法确认完整有效字段集合，不能用只加载Left的结果宣称无冲突。这里只补设计载荷，finite-domain/0.1仍不接受bases/renames/refinements。
 
 `Relation={id,roles:[{id,type:Ref|Local,bounds:{min,max}}],fields:[Field],semantics:association|composition,owner_role:role_id?,opposite_views:[{id,from_role,to_role}]}`。roles≥2且ID唯一。实例`RelationObject={id,relation_ref,participants:{role_id:object_ref},slots:[Slot]}`恰有每个角色一次；多值参与必须拆成多个显式元组。每个角色bounds表示固定其余角色元组后，该角色不同对象的数量；另需对所有合类型其余元组（包括零连接）检查下界。只对已观察到的连接计下界是不完整验证。关系字段属于整个元组，n元不得拆边丢失联合语义。重复参与元组如有多个关系对象，计数按distinct对象；重复事件须用明确事件实体表达。二元无属性关系可紧凑存储为去重边集合。
 
@@ -100,15 +102,15 @@ Known运算遵从类型语义。Null只允许IsNull或显式可空消除；普�
 
 ## 操作、状态、过程与授权
 
-`Operation={id,kind:query|command,input:Record,output:Type,errors:[{id,type}],pre:Expr,post:Expr,effects:[Effect],transaction:{scope:[Ref],isolation:serializable|version_compare},retry:{mode:none|idempotent,max_attempts},permission_ref:Ref}`。Effect为`Set{target,field,value}|Create{type,slots}|Delete{target,cascade}|Link{relation,participants}|Unlink{relation,participants}|Emit{event,payload}`。query effects须为空；效果引用必须在事务写集，读pre为旧状态、post同时绑定old/new，效果类型匹配。pre或权限非true即不执行；unknown返回indeterminate，不授权。post失败不得发布候选状态；事务边界外Emit使用明确outbox或补偿契约，不能承诺跨服务原子性。
+`Operation={id,kind:query|command,input:Record,output:Type,errors:[{id,type}],pre:Expr,post:Expr,effects:[Effect],transaction:{scope:[ElementRef],isolation:serializable|version_compare},retry:{mode:none|idempotent,max_attempts},permission_ref:ElementRef}`。Effect为`Set{target,field,value}|Create{type,slots}|Delete{target,cascade}|Link{relation,participants}|Unlink{relation,participants}|Emit{event,payload}`。query effects须为空；效果引用必须在事务写集，读pre为旧状态、post同时绑定old/new，效果类型匹配。pre或权限非true即不执行；unknown返回indeterminate，不授权。post失败不得发布候选状态；事务边界外Emit使用明确outbox或补偿契约，不能承诺跨服务原子性。
 
 `StateMachine={id,context,states:[id],initial:state_id,final:[state_id],events:[{id,payload:Record}],transitions:[{id,from,event,guard:Expr,effect:operation_ref,to,deadline:Duration?}]}`。状态引用存在，initial唯一；同一状态/事件同时可用多个迁移即conflict，未验证互斥不声称确定。事件到达时以一份状态版本检查权限、guard、deadline，单个事务更新；guard未知不选分支，过期返回timeout，旧版本conflict。有限轨迹的接受以终态定义，不能推出所有轨迹性质。
 
-`Process={id,nodes:[Start|End|Action{operation_ref}|Branch{guards}|Fork|Join],edges:[{from,to}],join_mode:all|any,cancellation:{scope,compensation_refs},clock_ref:Ref}`。Start唯一、所有可达节点可达End；Branch恰有一个true，否则conflict/unknown；Fork复制控制token，Join按相同fork实例等待all或any，any必须取消未完成分支并按补偿记录。不同分支冲突写集由Operation隔离解决，不按布局顺序执行。截止与时钟单调语义由clock_ref绑定；未完成运行结果为pending/timeout，不能判进程终验通过。
+`Process={id,nodes:[Start|End|Action{operation_ref}|Branch{guards}|Fork|Join],edges:[{from,to}],join_mode:all|any,cancellation:{scope,compensation_refs},clock_ref:ElementRef}`。Start唯一、所有可达节点可达End；Branch恰有一个true，否则conflict/unknown；Fork复制控制token，Join按相同fork实例等待all或any，any必须取消未完成分支并按补偿记录。不同分支冲突写集由Operation隔离解决，不按布局顺序执行。截止与时钟单调语义由clock_ref绑定；未完成运行结果为pending/timeout，不能判进程终验通过。
 
 Process节点的封闭形状为`Start{id}`、`End{id}`、`Action{id,operation_ref,input_bindings:[{parameter,expression}]}`、`Branch{id,guards:[{target:node_id,predicate:Expr}]}`、`Fork{id,join:node_id}`、`Join{id,fork:node_id}`。所有节点ID在过程内唯一；边仅引用本过程节点，Start入度0/出度1、End出度0、Action出度1，Branch每条出边恰有一个guard，Fork至少两条出边，Join入边匹配同fork的分支、出度1。结构化fork/join不能交叉，循环必须含显式Action且执行有步数/时限预算，运行耗尽保留timeout。token包括process_instance/fork_instance/branch_id，不能把不同业务实例的完成信号混合。节点只引用已经定义的操作，不内嵌代码。
 
-`Policy={id,subjects:type_ref,resources:type_ref,actions:[operation_ref],rules:[{effect:allow|deny,condition:Expr}],combining:deny_overrides,default:deny}`。所有匹配deny先行；unknown deny导致indeterminate；无deny且有true allow才permit；未知allow且无true allow为indeterminate，其余deny。未知不是permit。角色成员关系也是版本化输入，UI仅解释。外部调用`ExternalContract={id,capability,input,output,errors,timeout:Duration,idempotency,trust,observation_schema}`；无真实回执→unknown，超时→timeout，错误→error。ExternalObservation只读已绑定观测，无求值器暗中联网/重试；回执的请求/响应/时刻/服务版本/hash必须匹配。
+`Policy={id,subjects:ElementRef,resources:ElementRef,actions:[ElementRef],rules:[{effect:allow|deny,condition:Expr}],combining:deny_overrides,default:deny}`。subjects/resources须解析为类型，actions须为Operation，permission_ref须为Policy，transaction.scope须为可寻址实体/关系声明；同包全部用Local。Operation→Policy→Operation是合法同包元素引用闭环，不是继承环或跨包哈希依赖环。所有匹配deny先行；unknown deny导致indeterminate；无deny且有true allow才permit；未知allow且无true allow为indeterminate，其余deny。未知不是permit。角色成员关系也是版本化输入，UI仅解释。外部调用`ExternalContract={id,capability,input,output,errors,timeout:Duration,idempotency,trust,observation_schema}`；无真实回执→unknown，超时→timeout，错误→error。ExternalObservation只读已绑定观测，无求值器暗中联网/重试；回执的请求/响应/时刻/服务版本/hash必须匹配。
 
 ## 质量、任务、视图与演化
 

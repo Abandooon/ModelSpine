@@ -1,5 +1,7 @@
 # 共享协议与稳定引用
 
+新增[review.py](src/modelspine_protocols/review.py)的model-review/0.1共享动作信封、validate_action和WHOLE_CANDIDATE常量：项目/请求/候选原件/问题/预期审阅版本明确绑定，整体确认与合法同名元素不混淆。语义与[有限消费合同](../requirements/contracts/review.md)对应；本包不保存审阅、解释用户意图或认证actor，原v0.1及finite-domain入口保持原语义。
+
 已实现有限离线切片：严格不可变 v0.1 JSON、标量字段元模型、身份/版本/哈希绑定，以及同步 Checker 接口。新增 TaskContract/TaskAssessment 独立信封与公共报告校验。当前包版本见 module.json；原 JSON api_version 仍为 0.1，任务信封为 task-contract/0.1、task-assessment/0.1。
 
 状态、依赖和证据由 [module.json](module.json) 维护。公开字段与错误/副作用/版本语义见 [合同](contracts/v0.1/README.md)，正反例见 [结构化样例](contracts/v0.1/examples.json)。共享结构只有 [protocols](../protocols/contracts/v0.1/README.md) 一处定义。

@@ -23,17 +23,21 @@ ValidationResult={request_hash,definition_ref,project_model_ref,validator_ref,
 ## 代码前审阅与回答
 
 ```text
-ReviewInput={id,version,mode:review,request_ref,candidate_ref,
+ReviewInput={id,version,review_ref,mode:review,request_ref,candidate_ref,
  definition_ref?,project_examples:[{model_ref,purpose:example|counterexample}],
  traces,issues,reports:[ArtifactRef],support:[Support],unrenderable:[{path,raw,reason}]}
-ReviewAction={id,view_ref,expected_request_ref,expected_candidate_ref,actor_ref,
+ReviewAction={id,project_id,view_ref,expected_review_ref,expected_request_ref,expected_candidate_ref,actor_ref,
  action:answer|decline|confirm|propose_edit,question_ref?,targets:[element_ref],
  answer_text?,proposed_values?,reason}
-ReviewResult={action_ref,status:recorded|conflict|invalid|cancelled,
+ReviewResult={action_ref,status:recorded|already_recorded|conflict|invalid|cancelled,
  next_candidate_ref?,next_question_refs:[ArtifactRef],checks:[ArtifactRef],diagnostics}
 ```
 
-例：candidate A(c1)有issue q1“上限是否含历史记录”；ReviewAction答“仅当前”绑定A(c1)/A(q1)，requirements追加回答版本并产生A(c2)，不预置真假答案目录。界面展示A(c1)的未知也允许答复；A(c1)旧视图提交到当前A(c2)→conflict并给差异，不自动套用。decline保留issue；confirm只确认targets，不把检查改satisfied。修改layout用View新版本，不修改definition hash；非法规则原载荷在unrenderable保留。实现责任：interaction呈现/解释、requirements保存回答/候选、编排重检；无CommandBinding或已接受模型也是合法输入。
+例：candidate A(c1)有issue q1“上限是否含历史记录”；ReviewAction答“仅当前”绑定项目、请求、A(c1)/A(q1)及预期review_ref，requirements追加回答版本。只有真实修订产物存在才可报告A(c2)；本轮没有自动修订，next_candidate_ref=null、revision_status=pending，不复制旧候选冒称新候选。即使candidate没变，回答后的旧review_ref也冲突，不自动套用。decline保留issue；confirm只登记目标确认，不把检查改satisfied或清除其他未决。修改layout用View新版本，不修改definition hash；非法规则原载荷保留。实现责任：interaction呈现/解释、requirements保存回答/候选、编排重检；无CommandBinding或已接受模型也是合法输入。
+
+候选工件引用必须钉住外部响应**原始字节**，与definition_ref分开：同definition但issues/traces或序列化原件变化，candidate_ref必须变化。问题身份绑定候选原件及原始来源、issue ID，不按问题文本合并。审阅状态有独立版本/hash；动作ID同规范内容重试返回already_recorded，异内容conflict。回答/拒答/编辑是独立actor动作来源，不能伪装SourceSpan或倒写原文真实性。
+
+上述是完整消费者设计；当前实际可调用子合同为 [model-review/0.1](../../requirements/contracts/review.md)，共享动作类型在protocols.review，纯状态/解释归requirements.review，本地保存归apps/model_review.py。其confirm.targets为有限ID字符串或专用整体标识`review:candidate`（冒号在finite ID中非法）；合法元素`$candidate`只表示该元素，与整体确认不同。完整候选propose_edit保留原字节、旧绑定、修改理由及结构诊断，只作为待采纳提案，不替换当前有效候选；允许用户提出删除约束/residual、改变AND/OR等需求变化，但不能据结构合法自动确认意图。持久化/恢复与D精确函数载荷见该子合同，完整消费者设计的其余操作仍未实现。
 
 ## ApplicationSpec与生成
 

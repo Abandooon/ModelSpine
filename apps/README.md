@@ -1,5 +1,7 @@
 # 平台应用
 
+[model_review.py](model_review.py) 提供create_review/read_review/submit_action及create/show/act/demo命令：从原文请求和外部typed候选原字节建立有限审阅，在一个显式本地项目目录保存并核验版本链。候选原件与审阅版本分别绑定；answer/decline/confirm/完整候选编辑提案只追加用户动作，不自动采纳或修订。非法候选仍保留原件和诊断。它新增本地持久化，不改变下文clarification的进程内范围；没有实例检查、UI、认证服务或真实模型调用。接口、工程demo和失败责任见[给D的说明](../docs/model-review.md)。
+
 [domain_modeling.py](domain_modeling.py) 是当前自然语言建模主线的首个合同消费者：prepare 接收原文及来源身份，prompt 导出固定指令，inspect 校验外部领域候选；已验收的有限增量提供 typed-prompt / typed-inspect 的来源绑定 typed 候选提示与检查，以及 check-project 对显式实例的有限检查。无损标量投影由 model-kernel 的 `domain_projection.to_scalar_metamodel` 提供，仅接受必填且不可空的纯标量定义，遇关系、规则、残余或可选/可空字段整项拒绝。详细语言及消费者合同仍为 draft。无需已有正确模型或编辑目录，结构检查不冒充语义正确；无实际语言模型调用、自动抽取、审阅 UI 或模型提交。命令与边界见[原文建模入口](../docs/domain-modeling.md)。
 
 [bounded_generation.py](bounded_generation.py) 从固定 DAG 编辑空间构造候选：`python -B -I apps/bounded_generation.py`；`--case <card.json>` 加载显式任务卡，无需正确提案输入。`advance_construction` 从真实前序接受快照装配预先固定的后继任务，保留父目标并派生新版本引用。装配 generation 的有界步骤、领域控制、kernel 预览和原有任务验收。控制器与计划可同时显式注入；构造器、终验和保存规则固定，不接收参考答案。退出 0 为内存提交，1 为未保存，2 为输入/合同错误。范围见[有界构造合同](../docs/bounded-construction.md)。

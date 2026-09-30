@@ -1,5 +1,7 @@
 # 需求澄清与模型细化
 
+新增[有限审阅合同](contracts/review.md)：[review.py](src/modelspine_requirements/review.py)提供create_session/review_input/apply_action/review_ref，绑定外部候选原件、问题和独立审阅版本，追加回答、拒答、目标确认与完整候选提案。纯状态处理不写文件；[应用入口](../../apps/model_review.py)负责显式本地目录保存/恢复，与下文旧clarification进程内Session分开。未实现实例审阅、候选采纳、回答驱动自动修订或UI；actor只记录宿主提供的归属。来源绑定、结构合法和用户确认都不自动等于意图忠实。
+
 新增[原文输入与领域候选合同](contracts/domain-modeling.md)：从 UTF-8 原文准备 ModelingRequest 和固定提示，解析带出处的概念、属性、关系/基数、规则及未决项，明确结构有效与语义未验收。当前 [CLI](../../apps/domain_modeling.py) 可 prepare/prompt/inspect；无需人工正确元模型。该新增入口没有语言传输或自动抽取，旧有限澄清范围如下。
 
 已实现显式有限候选集上的结构化需求澄清：校验来源与基准，预览候选，通过实际行为差异选择布尔问题，记录绑定问题的回答，再为已消歧的解释生成 `ChangeProposal`。包本身只依赖 protocols 和标准库，无模型写权限。
