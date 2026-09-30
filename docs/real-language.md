@@ -1,20 +1,22 @@
-# 有界真实语言入口（typed-language-run/0.1.1）
+# 有界真实语言入口（typed-language-run/0.2）
 
 `apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。这是P1-R2有限入口，不包含自动修复、回答驱动修订、实例生成/检查、提案采纳或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
 
-协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求只带model、当前typed提示input、store=false、stream=false、max_output_tokens；不传previous_response_id、工具、温度或假定模型支持的额外推理设置。服务实际支持与模型身份须以调用结果验证，目录可见不等于生成成功。
+协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求只带model、装配后的typed提示input、store=false、stream=false、max_output_tokens；不传previous_response_id、工具、温度或假定模型支持的额外推理设置。服务实际支持与模型身份须以调用结果验证，目录可见不等于生成成功。
 
 ## 配置与准备
 
-仅标准库，无SDK/自动重试。宿主显式提供公开仓库外的绝对`.env`路径，进程只解析六个精确名称：MODELSPINE_PROVIDER_URL、MODELSPINE_BASE_URL、MODELSPINE_API_KEY、MODELSPINE_MODEL、MODELSPINE_MAX_REQUESTS、MODELSPINE_MAX_OUTPUT_TOKENS。值必须完整，模型和端点必须上述显式值；总请求预算1–3、每次输出上限1–4096（包括服务计入的推理输出）。本入口两请求计划要求总预算至少2。不得打印配置文件或把key放进命令行、提示、工件及公开仓库。TLS保持验证，urllib使用宿主已有系统/环境代理；不关闭TLS、不换域名，全部重定向拒绝。
+仅标准库，无SDK/自动重试。宿主显式提供公开仓库外的绝对`.env`路径，进程只解析六个精确名称：MODELSPINE_PROVIDER_URL、MODELSPINE_BASE_URL、MODELSPINE_API_KEY、MODELSPINE_MODEL、MODELSPINE_MAX_REQUESTS、MODELSPINE_MAX_OUTPUT_TOKENS。值必须完整，模型和端点必须上述显式值；本计划请求预算1–3、每次输出上限1–4096（包括服务计入的推理输出）。prepare接受显式1或2个请求，数量不得大于配置预算；空输入、超过2个输入、重复请求或空任务身份拒绝。不得打印配置文件或把key放进命令行、提示、工件及公开仓库。TLS保持验证，urllib使用宿主已有系统/环境代理；不关闭TLS、不换域名，全部重定向拒绝。
 
-先用[原文入口](domain-modeling.md)为两份独立原文各准备一个request.json，再执行下列命令（工作目录platform）。不要求人工正确候选。目录父路径须存在，run-dir必须为新绝对路径，重复准备拒绝覆盖。
+先用[原文入口](domain-modeling.md)为原文准备request.json，再执行下列命令（工作目录platform）；双输入计划再增加`--request request-2.json`。不要求人工正确候选。目录父路径须存在，run-dir必须为新绝对路径，重复准备拒绝覆盖。
 
 ```text
-python -B -I apps/language_modeling.py prepare --env-file "E:/private/.env" --run-dir "E:/runs/explicit-task" --task-id "explicit-task" --request request-1.json --request request-2.json
+python -B -I apps/language_modeling.py prepare --env-file "E:/private/.env" --run-dir "E:/runs/explicit-task" --task-id "explicit-task" --request request-1.json
 ```
 
-prepare不联网。它保存每份原文的完整UTF-8（包括尾LF）、规范ModelingRequest、现有typed_modeling_prompt的完整文本、无认证头的实际请求JSON。plan.json绑定请求、原文、提示、请求参数、两个顺序slot、方法源码SHA及显式预算，返回plan_sha256。两请求不共享对方原文、响应或参考答案。原始请求文件的JSON排版不作为候选来源，保存的request.json是既有dumps规范编码，原文source.txt保持原字节。
+prepare不联网。它保存每份原文的完整UTF-8（包括尾LF）、规范ModelingRequest、精确装配提示和无认证头的实际请求JSON。plan.json绑定请求、原文、提示/提示版本、请求参数、实际1或2个顺序slot、方法源码SHA及显式预算，返回plan_sha256。两请求不共享对方原文、响应或参考答案。原始请求文件的JSON排版不作为候选来源，保存的request.json是既有dumps规范编码，原文source.txt保持原字节。
+
+装配提示`typed-language-assembly/0.1`完整保留既有typed_modeling_prompt前缀，然后追加固定通用输出说明和SOURCE_LINES_JSON。行表使用与检查器相同的`request.text.splitlines()`、一基行号和精确行文本，不把CRLF、空行或Unicode行分隔的显示当作新需求；证据按选中完整行精确以LF连接，不加行号前缀，也不在该join结果之外额外加换行；选中末行为空时join产生的末尾LF必须保留。原始source.txt不归一化。行表明确是数据，不能提供业务参考模型。要求紧凑JSON、短ID、无缩进/围栏/重复解释，但不得省略必要键、原文条件、例外、未决、问题或残余，也不得缩短quote。宿主不修回模型的引文/行号或JSON；既有typed检查仍可拒绝它。此呈现调整不保证4096输出预算内得到完整或忠实候选。
 
 ## 明确执行与停止
 
@@ -24,7 +26,7 @@ prepare不联网。它保存每份原文的完整UTF-8（包括尾LF）、规范
 python -B -I apps/language_modeling.py execute-next --env-file "E:/private/.env" --run-dir "E:/runs/explicit-task" --expected-plan-sha256 "<prepare给出的hash>"
 ```
 
-执行前再次核对计划hash、方法源码、配置、两个冻结输入的全部hash及各自重新构造的实际请求，包括尚未调用和已经调用的slot。每次先在attempts/001、002排他创建reservation.json并fsync，再联网。该目录是这一任务唯一预算账本，失败和无响应均占用；重启不重置，不允许通过换目录重建同一任务来重置预算。当显式预算为3时，余下1次不由本入口自动使用；预算为2时没有额外名额。跨子批累计预算由宿主明确登记已耗/剩余，本入口不提供跨任务预算服务，不能借新目录抹去旧失败。不得自动循环、修JSON、删除围栏、补默认候选、换模型或换API。
+执行前再次核对计划hash、方法源码、配置、全部冻结输入的hash及各自重新构造的实际请求，包括尚未调用和已经调用的slot。每次先在对应attempts/001或002排他创建reservation.json并fsync，再联网。该目录是本计划唯一账本，失败和无响应均占用；重启不重置，不允许通过换目录重建同一任务来重置预算。最多执行已冻结的slot数，reserved_revision_slots只记录配置中未分配的额度，不授权自动调用。单输入/预算1在一次后即耗尽；新进程亦不可发送第二次。跨子批累计预算由宿主明确登记已耗/剩余，并以task_id引用预算记录身份；本入口不提供跨任务预算服务，不能借新目录抹去旧失败。不得自动循环、修JSON、删除围栏、补默认候选、换模型或换API。
 
 单写者以.run.lock互斥。挂起锁、未完成attempt、receipt/工件损坏都拒绝继续；宿主须先核查是否已经发出或扣费，再另行决定恢复，不能删attempt假装没有消耗。receipt和其hash排他保存；写失败不返回成功，不退回旧缓存。无法持久化联网结果时已有reservation仍保留，调用完成状态为未知。预算不防恶意宿主删除整个账本或伪造所有hash，宿主负责独占目录及原证据保护。
 
@@ -50,6 +52,8 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 
 ## 验证与当前事实
 
+0.2增加单输入预算和确定性行表的离线回归，保留既有双输入、AUD01–04和同一候选经审阅/UI读取的工程检查。新提示和方法hash只用于新计划，不回填旧0.1/0.1.1运行。0.2及末尾空行提示窄修经有限工程验收后，宿主已明确放行并执行唯一v2一次；总预算3/3已耗尽。工程通过与来源呈现不证明自动候选合法或忠实。
+
 0.1.1的离线回归使用假凭据、真实标准库HTTPResponse/本机socketpair及公开submit_action，覆盖截断转义回显落盘、短Content-Length、超时21字节前缀、完整配对输入、pending审阅、错request/candidate和合法回答后的继续。没有新增依赖、配置或恢复服务。旧调用的0.1方法hash、失败原件和预算不随修复改写，旧plan在新方法下应拒绝执行；本修复不授权重放或额外真实调用。
 
-定向离线验收：`python -B -I tests/test_language_modeling.py`。合成响应均为工程自测，不计真实样本。覆盖配置、重定向、预算重开/失败/损坏、身份冲突、HTTP/超时/截断、无usage、错模型、非法原件、密钥隔离，以及同一候选经D现有HTTP入口读取。真实供应商配置已由宿主提供；生成次数、最终调用计划、真实结果及独立语义评价须查本轮运行证据，不能由离线测试推出。2026-09-30累计2次POST尝试：原环境network_error、HTTP状态null、0字节、usage unknown；宿主明确保留旧耗1并分配剩余2的人工恢复子批，进程显式使用既有本机代理。恢复S01收到HTTP200和gpt-6-luna，但incomplete/max_output_tokens；输入976、输出4096（含推理1763），报告合计5072 tokens，金额未核定。截断候选原件经typed-inspect退出2、review保持rejected，D真实HTTP读取200且candidate_ref/base64一致、存储hash不变。S02 not_run；余1未再分派，不再恢复/重试/增上限/补JSON。原失败与新收据分开保存，未知首调用量不并入已知5072当成完整总量。语义未检查、实例未运行，完整F1/F2未完成。
+定向离线验收：`python -B -I tests/test_language_modeling.py`。合成响应均为工程自测，不计真实样本。覆盖配置、重定向、预算重开/失败/损坏、身份冲突、HTTP/超时/截断、无usage、错模型、非法原件、密钥隔离，以及同一候选经D现有HTTP入口读取。真实供应商配置已由宿主提供；生成次数、最终调用计划、真实结果及独立语义评价须查本轮运行证据，不能由离线测试推出。2026-09-30累计3次POST尝试，预算3/3已耗尽、余0。首次原环境network_error、HTTP状态null、0字节、usage unknown。第二次经显式有界宿主恢复，S01收到HTTP200/gpt-6-luna，但incomplete/max_output_tokens；输入976、输出4096（含推理1763），报告5072 tokens，截断候选被拒绝。第三次使用已审行表/紧凑提示v2，HTTP200、transport received、response completed、返回gpt-6-luna；输入1455、输出3488（含推理1379），报告4943 tokens，输出未达4096上限。其7407字节候选仍因JSON语法错误被拒绝：候选文本末尾报`Expecting ',' delimiter`，typed-inspect退出2。服务端completed不等于JSON合法，本次也没有已证实的token上限截断。独立审核只读取原件中完整可解析的traces子数组：13条full-line引文匹配、0越界，说明引用绑定改善，不证明语义、完整性或候选合法。两次失败候选均保存原件，现有D HTTP入口读取200且candidate_ref/base64一致、存储hash不变；未运行新的完整浏览器验收。已知用量小计10015 tokens加首次未知，金额未测。S02及B正式86/34/5均not_run；无剩余额度，不重试、补JSON或替换失败原件。真实收据与generation_provenance=not_verified分开，审阅仍rejected、语义not_checked、实例not_run，R2/F1/F2未完成。下一步仅可另行审阅围绕该可观察JSON语法错误的有界方案，本轮不分配新调用。

@@ -85,12 +85,86 @@ class LanguageRunTests(unittest.TestCase):
 
     def test_prepare_is_network_free_and_exact_prompt_payload(self):
         payload = wire.strict_json((self.run / "input-1/payload.json").read_bytes())
-        self.assertEqual(payload["input"], app.typed_modeling_prompt(self.requests[0]))
+        self.assertEqual(payload["input"], app.language_prompt(self.requests[0]))
+        self.assertTrue(payload["input"].startswith(app.typed_modeling_prompt(self.requests[0]) + "\n\n"))
         self.assertEqual(set(payload), {"model", "input", "store", "stream", "max_output_tokens"})
         self.assertEqual((self.run / "input-1/source.txt").read_bytes(), self.requests[0].text.encode())
         self.assertFalse(payload["store"])
         self.assertNotIn(self.requests[1].text, payload["input"])
         self.assertEqual(list((self.run / "attempts").iterdir()), [])
+
+    def test_single_input_budget_one_is_persistent_and_cannot_send_second(self):
+        config = replace(self.config, max_requests=1)
+        run = self.root / "single-run"
+        with patch.object(app, "post_response") as post:
+            prepared = app.prepare_run(run, self.paths[:1], config, task_id="engineering-only-remaining-one")
+            post.assert_not_called()
+        plan = json.loads((run / "plan.json").read_bytes())
+        self.assertEqual(prepared["planned_requests"], 1)
+        self.assertEqual((len(plan["items"]), plan["executable_slots"], plan["reserved_revision_slots"]), (1, 1, 0))
+        with patch.object(app, "post_response", return_value=wire.Exchange(200, envelope(candidate(self.requests[0])), "received")) as post:
+            receipt = app.execute_next(run, config, expected_plan_sha256=prepared["plan_sha256"])
+            self.assertTrue(receipt["continue_allowed"])
+            with self.assertRaisesRegex(wire.LanguageError, "planned_budget_exhausted"):
+                app.execute_next(run, config, expected_plan_sha256=prepared["plan_sha256"])
+            self.assertEqual(post.call_count, 1)
+        code = ("import sys;sys.path.insert(0," + repr(str(app.REPO / 'apps')) + ");import language_modeling as a;"
+                "from language_response import Config;"
+                "c=Config('https://api.openai-proxy.org','https://api.openai-proxy.org/v1','offline-unused','gpt-6-luna',1,4096);"
+                "a.execute_next(" + repr(str(run)) + ",c,expected_plan_sha256=" + repr(prepared["plan_sha256"]) + ")")
+        result = subprocess.run([sys.executable, "-B", "-I", "-c", code], capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"planned_budget_exhausted", result.stderr)
+        self.assertEqual([p.name for p in (run / "attempts").iterdir()], ["001"])
+
+    def test_prepare_rejects_empty_excess_and_over_budget_inputs_before_writing(self):
+        for number, (paths, budget, task) in enumerate((([], 1, "task"), (self.paths * 2, 3, "task"),
+                                                       (self.paths, 1, "task"), (self.paths[:1], 1, " "))):
+            run = self.root / f"invalid-{number}"
+            with self.subTest(number=number), patch.object(app, "post_response") as post:
+                with self.assertRaises(wire.LanguageError):
+                    app.prepare_run(run, paths, replace(self.config, max_requests=budget), task_id=task)
+                self.assertFalse(run.exists())
+                post.assert_not_called()
+
+    def test_line_presentation_is_exact_without_changing_typed_prompt_or_source(self):
+        raw = ' 甲\t"引文"\r\n\r\n乙\\字\u2028丙\n'.encode('utf-8')
+        request = prepare_request(raw, ArtifactRef("engineering", "line-source", "1", app.hash_bytes(raw)),
+                                  request_id="lines", scope="source presentation only")
+        prompt = app.language_prompt(request)
+        self.assertTrue(prompt.startswith(app.typed_modeling_prompt(request) + "\n\n"))
+        table = json.loads(prompt.rsplit("\nSOURCE_LINES_JSON=", 1)[1])
+        expected = [' 甲\t"引文"', '', '乙\\字', '丙']
+        self.assertEqual(table["line_count"], 4)
+        self.assertEqual(table["lines"], [{"line": n, "text": text} for n, text in enumerate(expected, 1)])
+        self.assertEqual([x["text"].encode('utf-8') for x in table["lines"]],
+                         [line.encode('utf-8') for line in request.text.splitlines()])
+        self.assertEqual(request.text.encode('utf-8'), raw)
+
+        from modelspine_requirements.typed_domain import inspect_typed_candidate
+        source = b"Alpha\n\nBeta\n"
+        request = prepare_request(source, ArtifactRef("engineering", "empty-line", "1", app.hash_bytes(source)),
+                                  request_id="empty-line", scope="engineering source evidence only")
+        table = json.loads(app.language_prompt(request).rsplit("\nSOURCE_LINES_JSON=", 1)[1])
+        quote = "\n".join(row["text"] for row in table["lines"][:2])
+        self.assertEqual(quote, "Alpha\n")
+        data = json.loads(candidate(request))
+        span = {"start_line": 1, "end_line": 2, "quote": quote}
+        data["traces"][0]["evidence"] = [span]
+        self.assertEqual(inspect_typed_candidate(request, wire.encoded(data)).language, "valid")
+        for wrong_quote in ("Alpha", "Alpha\n\n"):
+            span["quote"] = wrong_quote
+            with self.assertRaises(ContractError):
+                inspect_typed_candidate(request, wire.encoded(data))
+
+    def test_line_presentation_does_not_repair_generated_fragment_quote(self):
+        data = json.loads(candidate(self.requests[0]))
+        data["traces"][0]["evidence"][0]["quote"] = self.requests[0].text[:2]
+        raw = wire.encoded(data)
+        receipt = self.execute(envelope(raw))
+        self.assertEqual((self.run / "attempts/001/candidate.raw").read_bytes(), raw)
+        self.assertIn("candidate_rejected", receipt["stop_reasons"])
+        self.assertEqual(app.read_review(Path(receipt["review_project"]))["inspection"]["status"], "rejected")
 
     def test_valid_response_same_candidate_review_and_unverified_check(self):
         receipt = self.execute()

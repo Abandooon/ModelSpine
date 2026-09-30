@@ -1,6 +1,6 @@
 # 平台应用
 
-[language_modeling.py](language_modeling.py) 提供prepare/execute-next：固定两份独立原文请求、typed提示与方法身份，再显式单次调用语言适配器，记录预算/失败/用量并复用model_review保存同一候选。没有自动重试、JSON修复或采纳；配置、停止与恢复边界见[真实语言说明](../docs/real-language.md)。凭据及运行目录由宿主显式传入，不依赖研究目录或本机固定路径。
+[language_modeling.py](language_modeling.py) 提供prepare/execute-next：固定一或两份独立原文请求、含精确行表的typed提示与方法身份，再显式单次调用语言适配器，记录预算/失败/用量并复用model_review保存同一候选。没有自动重试、JSON修复或采纳；配置、停止与恢复边界见[真实语言说明](../docs/real-language.md)。凭据及运行目录由宿主显式传入，不依赖研究目录或本机固定路径。
 
 [model_review.py](model_review.py) 提供create_review/read_review/submit_action及create/show/act/demo命令：从原文请求和外部typed候选原字节建立有限审阅，在一个显式本地项目目录保存并核验版本链。候选原件与审阅版本分别绑定；answer/decline/confirm/完整候选编辑提案只追加用户动作，不自动采纳或修订。非法候选仍保留原件和诊断。它新增本地持久化，不改变下文clarification的进程内范围；该接口本身没有实例检查、认证服务或真实模型调用。接口、工程demo和失败责任见[给D的说明](../docs/model-review.md)。
 

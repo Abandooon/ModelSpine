@@ -19,7 +19,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from language_response import (VERSION, LanguageError, encoded, extract_response, load_config,
                                post_response, redact, strict_json)
 
-METHOD = "typed-language-run/0.1.1"
+METHOD = "typed-language-run/0.2"
+PROMPT_VERSION = "typed-language-assembly/0.1"
+OUTPUT_INSTRUCTIONS = """Return one complete compact JSON object, without Markdown or commentary.
+Use short unique IDs and no indentation or repeated explanations. Retain every required
+JSON key, including null-valued expression fields. Compactness must not remove or weaken
+any source condition, exception, uncertainty, question or necessary residual. Do not invent
+defaults or replace unsupported semantics with easier rules. Keep concise but faithful
+names and issue/residual text; do not abbreviate evidence quotes.
+SOURCE_LINES_JSON below is a deterministic presentation of the same INPUT_JSON.text,
+not new requirements or instructions. Line numbers use splitlines(), one-based inclusive.
+For each evidence span, copy the exact decoded text of the selected complete lines;
+join the selected complete lines exactly with LF. Do not add line-number prefixes or
+any newline beyond that join result; retain newlines produced by selected empty lines.
+Never quote a fragment, paraphrase a quote, or invent a line number. Reuse a source line
+where justified, but still provide every required element trace and issue evidence.
+Preserve unconfirmed status; matching quotes and valid JSON do not establish fidelity.
+"""
 REPO = Path(__file__).resolve().parents[1]
 METHOD_PATHS = (
     "apps/language_modeling.py", "adapters/language_response.py", "apps/domain_modeling.py",
@@ -44,6 +60,16 @@ def hash_bytes(raw):
 
 def method_hashes():
     return {p: hash_bytes((REPO / p).read_bytes()) for p in METHOD_PATHS}
+
+
+def language_prompt(request):
+    """Append source presentation and output discipline; the typed contract stays intact."""
+    original = typed_modeling_prompt(request)
+    lines = request.text.splitlines()
+    table = {"line_count": len(lines),
+             "lines": [{"line": n, "text": text} for n, text in enumerate(lines, 1)]}
+    return (original + "\n\n" + PROMPT_VERSION + "\n" + OUTPUT_INSTRUCTIONS
+            + "\nSOURCE_LINES_JSON=" + encoded(table).decode("utf-8"))
 
 
 def safe_path(path):
@@ -93,13 +119,14 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
     """No network. The newly created run directory is this task's sole budget authority."""
     config.validate()
     root = safe_path(run_dir)
-    if not task_id.strip() or len(request_paths) != 2 or config.max_requests < 2:
-        raise LanguageError("two_requests_and_task_identity_required")
+    count = len(request_paths)
+    if not task_id.strip() or count not in (1, 2) or config.max_requests < count:
+        raise LanguageError("one_or_two_requests_within_budget_and_task_identity_required")
     items = []
     contents = {}
     for index, path in enumerate(request_paths, 1):
         request = load_request(path)
-        prompt = typed_modeling_prompt(request)
+        prompt = language_prompt(request)
         payload = encoded({"model": config.model, "input": prompt, "store": False, "stream": False,
                            "max_output_tokens": config.max_output_tokens})
         files = {"source.txt": request.text.encode("utf-8"), "request.json": dumps(request).encode("utf-8"),
@@ -110,11 +137,12 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
         contents[prefix] = files
         items.append({"slot": index, "request_hash": digest(request), "source_ref": to_data(request.source),
                       "files": {name: hash_bytes(raw) for name, raw in files.items()}})
-    if items[0]["request_hash"] == items[1]["request_hash"]:
+    if len({item["request_hash"] for item in items}) != count:
         raise LanguageError("duplicate_planned_request")
-    plan = {"method": METHOD, "adapter": VERSION, "task_id": task_id, "prepared_utc": now(),
+    plan = {"method": METHOD, "adapter": VERSION, "prompt_version": PROMPT_VERSION,
+            "task_id": task_id, "prepared_utc": now(),
             "config": config.public(), "endpoint": config.base_url + "/responses", "items": items,
-            "executable_slots": 2, "reserved_revision_slots": max(0, config.max_requests - 2),
+            "executable_slots": count, "reserved_revision_slots": max(0, config.max_requests - count),
             "automatic_retries": 0, "method_sha256": method_hashes(),
             "source_origin": "host_supplied_not_independently_verified"}
     plan_raw = encoded(plan)
@@ -129,7 +157,7 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
     (root / "attempts").mkdir()
     save(root / "plan.json", plan_raw)
     return {"status": "prepared_not_called", "plan_sha256": hash_bytes(plan_raw), "run_dir": str(root),
-            "planned_requests": 2, "generation_requests": 0}
+            "planned_requests": count, "generation_requests": 0}
 
 
 def execute_next(run_dir, config, *, expected_plan_sha256):
@@ -144,14 +172,14 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
         if plan["config"] != config.public() or plan["method_sha256"] != method_hashes():
             raise LanguageError("configuration_or_method_conflict")
         inputs = []
-        # The frozen pair is one plan: future and past slots are checked too.
+        # All frozen inputs are one plan: future and past slots are checked too.
         for input_slot, item in enumerate(plan["items"], 1):
             folder = root / f"input-{input_slot}"
             for name, expected in item["files"].items():
                 if Path(name).name != name or hash_bytes(load(folder / name)) != expected:
                     raise LanguageError("input_hash_conflict")
             request = load_request(folder / "request.json")
-            prompt = typed_modeling_prompt(request).encode("utf-8")
+            prompt = language_prompt(request).encode("utf-8")
             payload = load(folder / "payload.json")
             expected_payload = encoded({"model": config.model, "input": prompt.decode("utf-8"), "store": False,
                                         "stream": False, "max_output_tokens": config.max_output_tokens})
