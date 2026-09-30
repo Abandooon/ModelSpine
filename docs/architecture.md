@@ -6,7 +6,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 ## 当前开发重点
 
-当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示、外部候选结构/引用检查，以及来源绑定的 typed 候选检查和有限 check-project；另有[有限前置候选审阅 UI](model-review-ui.md)。目前仍没有真实语言传输、自动领域候选生成或自动语义忠实性验证，完整Studio尚未实现。
+当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示、外部候选结构/引用检查，以及来源绑定的 typed 候选检查和有限 check-project；另有[有限前置候选审阅 UI](model-review-ui.md)。新增[有界真实语言传输](real-language.md)和原文候选装配；实际生成/失败与工程验收分别记录，自动语义忠实性验证及完整Studio尚未实现。
 
 既有 requirements 有限解释切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考；新增 typed 候选另用领域定义合同承载。protocols 的旧 `Metamodel`/`KindSpec`/`FieldSpec` 定义有限标量结构；新增 `domain_language` 的 finite-domain/0.1 支持实体、三标量、二元关系、双向基数和有限纯表达式，由 apps/domain_checks.py 执行实例检查。详细语言及消费者合同仍为 draft，复杂执行器未实现；旧图配置与自动机行为仍由各自适配器解释。
 
@@ -39,6 +39,8 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 `depends_on` 保留目标设计所消费的能力合同：requirements/code-intelligence 消费 kernel，assurance 消费 kernel 的模型边界，generation/component-reuse 消费 assurance 的公开义务与报告，implementation 消费 generation，interaction 消费 kernel 与 implementation 的 CommandBinding。设计依赖不授权直接导入另一包内部实现。
 
 模块 manifest 的文件引用相对所在模块目录；`reference_sources.asset_id` 和 `review_targets` 是来源、研究工作区联动的逻辑标识，不是 Python 包或运行依赖。公共来源、验证入口均在本仓库内。
+
+apps/language_modeling.py以固定原文/提示/请求参数装配adapters/language_response.py的单一无状态Responses传输和既有typed检查、审阅存储；配置与预算由显式宿主提供，不进入requirements/protocols的runtime依赖。真实调用收据与既有generation_provenance=not_verified分别保留，调用成功不等于语义忠实。
 
 apps 负责装配当前能力；studies 可装配替代方法、检查器、条件和记录器。运行包不能反向导入 apps/studies/tests/research。适配器实现公开合同，按调用显式选择；失败不自动换后端。尚无实际消费者的扩展保持设计，不预建插件注册中心、运行框架或空包实现。
 
@@ -76,7 +78,7 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 | 方向 | 研究问题与计划替换位置 | 独立验收与边界 |
 |---|---|---|
-| P1 自然语言建模与澄清 | requirements 从原文形成概念/关系/约束候选，保留来源与未决项，通过澄清细化领域元模型候选；固定元模型内的模型变更才使用现有 ChangeProposal | 候选表达的充分性、意图忠实、任务可支持程度与澄清成本；目前可运行显式有限解释澄清、原文请求/typed 候选检查及有限实例检查，尚无真实语言调用或独立语义通过；未决意图不强制二分类 |
+| P1 自然语言建模与澄清 | requirements 从原文形成概念/关系/约束候选，保留来源与未决项，通过澄清细化领域元模型候选；固定元模型内的模型变更才使用现有 ChangeProposal | 候选表达的充分性、意图忠实、任务可支持程度与澄清成本；目前可运行显式有限解释澄清、原文请求/typed 候选检查及有限实例检查，新增有界真实语言调用入口，尚无独立语义通过；未决意图不强制二分类 |
 | P2 合同保障 | assurance 的形式化/检查方法、generation 的控制阶段；由调用方注入具体检查实现 | 独立真值检查规格、绑定、候选符合性及相关错误；工具不同不自动意味着独立 |
 | P3 任务交互 | interaction 的任务投影、解释与呈现；应用业务 UI 保持 CommandBinding 语义，代码前审阅保持需求/候选的版本和确认语义 | 真人的理解、操作和修改正确性；业务界面和开发审查台分别研究 |
 | P4 代码恢复与演化 | code-intelligence 的恢复、追踪和语义差异；同步仍输出受控提案 | 带来源事实、覆盖缺口、影响漏检/过度失效；JSON diff 不等于一般语义恢复 |

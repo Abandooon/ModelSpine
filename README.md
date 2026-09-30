@@ -6,7 +6,7 @@ ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台
 
 版本化任务合同与固定目标检查已提供公共验收边界：共享信封归 protocols，来源与声明评估归 assurance，有限规则由适配器解释，apps 装配已有内核保存。当前[有限澄清闭环](docs/clarification.md)进一步将来源、解释、行为问题和回答连接到显式后继任务与模型提案。独立参考验收留在测试侧，和开发检查分别记录；此前固定任务切片的范围见[任务合同交接](docs/next-iteration.md)。
 
-当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。当前已实现[原文请求、提示准备与外部候选检查](docs/domain-modeling.md)，不需要正确模型作为输入；新增 `typed-prompt`、`typed-inspect` 和有限 `check-project` 入口。真实语言调用、自动抽取和回答驱动细化尚未实现；下一入口需明确供应商/API、模型、认证环境变量名和预算，再接真实语言适配器及独立语义核对。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。
+当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。当前已实现[原文请求、提示准备与外部候选检查](docs/domain-modeling.md)，不需要正确模型作为输入；新增 `typed-prompt`、`typed-inspect` 和有限 `check-project` 入口。新增[有界真实语言入口](docs/real-language.md)，按显式模型/端点/预算从原文获取候选并连接审阅保存；真实运行结果与失败见[验证记录](docs/validation.md)。回答驱动细化与独立语义验收尚未完成。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。
 
 新增[有限审阅接口 model-review/0.1](docs/model-review.md)：外部候选原件、独立审阅版本及answer/decline/confirm/propose_edit可在显式本地目录保存与恢复，检查拒绝的原件也可审阅。回答和编辑保留pending，不自动修订/采纳候选，不提供实例检查。新增[本地候选审阅 UI](docs/model-review-ui.md)消费此接口，展示来源、结构、规则与未决项并提交四种动作；完整TaskView、Studio及应用交付尚未实现。既有clarification的进程内会话与此本地保存入口分别维护。
 
