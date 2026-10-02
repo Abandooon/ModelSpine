@@ -172,6 +172,10 @@ class FiniteDomainTests(unittest.TestCase):
         self.assertEqual(result.requirement_fidelity, "not_checked")
         self.assertEqual(result.instance_conformance, "not_run")
         for mutation in (lambda c: c.update(request_hash="0" * 64),
+                         lambda c: c.pop("schema_version"),
+                         lambda c: c.update(schema_version="finite-domain/0.1"),
+                         lambda c: c.update(status="accepted"),
+                         lambda c: c.update(extra=True),
                          lambda c: c["traces"].pop(),
                          lambda c: c["traces"][0]["evidence"][0].update(quote="invented")):
             candidate = deepcopy(self.candidate)
@@ -183,6 +187,9 @@ class FiniteDomainTests(unittest.TestCase):
         with patch("builtins.open", side_effect=AssertionError("prompt must not read files")):
             prompt = typed_modeling_prompt(self.request)
         self.assertEqual(json.loads(prompt.rsplit("INPUT_JSON=", 1)[1]), to_data(self.request))
+        self.assertIn('exactly these six required root fields:\n'
+                      'schema_version="typed-domain-candidate/0.1", request_hash, status="unconfirmed",\n'
+                      'definition, traces, issues. Do not omit or add root fields.', prompt)
         self.assertNotIn("engineering-sample", prompt)
         self.assertNotIn("expected_rule", prompt)
 

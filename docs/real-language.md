@@ -56,6 +56,8 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 
 ## 验证与当前事实
 
+2026-10-03，公共提示 `typed-domain-proposal/0.1.1` 补全既有 `typed-domain-candidate/0.1` 的六个必需且封闭的根字段，明确 `schema_version="typed-domain-candidate/0.1"` 与 `status="unconfirmed"`。这只修正提示枚举遗漏；候选格式、严格检查器、完整原文及有限语言说明不变。缺失/错误判别值或额外根字段仍拒绝，不补默认值或修复历史候选。提示及方法源码字节已变化，须固定新计划；旧计划和固定旧源码哈希的独立评价基线应拒绝当前字节，历史计划/基线不回写。该修正不保证模型遵从格式或领域语义正确。
+
 2026-10-02首次0.3离线交付：prepare与execute固定JSON mode，既有提示、typed检查、adapter及审阅接口不变。针对性工程验证核对实际adapter构造的HTTP请求参数、双slot成功后拒第三次、格式删除/改写即使重算hash仍拒绝，以及HTTP400/refusal/incomplete/非法JSON/typed错误原件保留并阻止下一slot。合成响应不计真实语义成功。当时拟S01/S02各一次、每次4096，未释放；该旧准备计划零attempt冻结弃用，不修改原件或执行旧计划。
 
 随后用户明确将调用和输出额度各增加10倍：新增累计20次、每次最多40960输出tokens，旧3次失败仍计入历史。adapter 0.1.2据此接受请求预算1–20、输出上限1–40960，固定socket超时1200秒以适应非流式大输出；app仍0.3，提示与JSON mode不变。2MiB响应信封及256KiB typed候选边界保持，超限仍如实拒绝，不为扩输出额度削弱检查。新首个计划仅两input可执行，reserved_revision_slots=18表示后续需求变化/澄清/明确修复容量，由宿主按实际消耗统一管理，不能在本计划自动循环18次，也不要求耗完。失败保留后先诊断，宿主可在已授权总20次内明确分配恢复；无自动相同请求重试、换模型或备用方式。真实调用由指定宿主执行，工程prepare不冒充实验结果，后续独立评价消费实际可用候选。
