@@ -312,6 +312,34 @@ class LanguageRunTests(unittest.TestCase):
                 post.assert_not_called()
                 self.assertEqual(list((run / "attempts").iterdir()), [])
 
+    def test_expanded_budget_actual_payload_timeout_and_reported_usage_gate(self):
+        for limit, reported, allowed in ((40960, 40960, True), (40960, 40961, False), (4096, 4097, False)):
+            with self.subTest(limit=limit, reported=reported):
+                config = replace(self.config, max_requests=20, max_output_tokens=limit)
+                run = self.root / f"expanded-{limit}-{reported}"
+                prepared = app.prepare_run(run, self.paths, config, task_id="offline-expanded-boundary")
+                plan = json.loads((run / "plan.json").read_bytes())
+                self.assertEqual((plan["executable_slots"], plan["reserved_revision_slots"]), (2, 18))
+                self.assertEqual(plan["config"]["timeout_seconds"], 1200)
+                raw = envelope(candidate(self.requests[0]), usage={"input_tokens": 10,
+                               "output_tokens": reported, "total_tokens": 10 + reported})
+                with patch.object(wire.urllib.request, "build_opener") as build:
+                    build.return_value.open.return_value = http_response(
+                        raw, f"Content-Length: {len(raw)}\r\n".encode())
+                    receipt = app.execute_next(run, config, expected_plan_sha256=prepared["plan_sha256"])
+                    sent = build.return_value.open.call_args
+                    self.assertEqual(sent.kwargs["timeout"], 1200)
+                    payload = json.loads(sent.args[0].data)
+                    self.assertEqual(payload["max_output_tokens"], limit)
+                    self.assertEqual(payload["text"], {"format": {"type": "json_object"}})
+                    self.assertEqual(receipt["continue_allowed"], allowed)
+                    self.assertEqual(receipt["usage"]["output_tokens"], reported)
+                    self.assertEqual("reported_output_budget_exceeded" in receipt["stop_reasons"], not allowed)
+                    if not allowed:
+                        with self.assertRaisesRegex(wire.LanguageError, "previous_attempt_stopped"):
+                            app.execute_next(run, config, expected_plan_sha256=prepared["plan_sha256"])
+                    self.assertEqual(build.return_value.open.call_count, 1)
+
     def test_json_mode_failures_preserved_consume_slot_and_never_fallback(self):
         refusal = [{"type": "message", "role": "assistant", "status": "completed",
                     "content": [{"type": "refusal", "refusal": "engineering refusal"}]}]
@@ -617,8 +645,8 @@ class TransportTests(unittest.TestCase):
     def test_configuration_missing_empty_model_limits_and_no_secret_exception(self):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / ".env"
-            values = dict(zip(wire.NAMES, ["https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", "3", "4096"]))
-            for key, value in (("MODELSPINE_MODEL", ""), ("MODELSPINE_MAX_REQUESTS", "4"), ("MODELSPINE_MAX_OUTPUT_TOKENS", "4097")):
+            values = dict(zip(wire.NAMES, ["https://api.openai-proxy.org", "https://api.openai-proxy.org/v1", KEY, "gpt-6-luna", "20", "40960"]))
+            for key, value in (("MODELSPINE_MODEL", ""), ("MODELSPINE_MAX_REQUESTS", "21"), ("MODELSPINE_MAX_OUTPUT_TOKENS", "40961")):
                 changed = {**values, key: value}
                 path.write_text("\n".join(k + "=" + v for k, v in changed.items()), encoding="utf-8")
                 with self.assertRaises(wire.LanguageError) as caught:
@@ -628,7 +656,15 @@ class TransportTests(unittest.TestCase):
             with self.assertRaisesRegex(wire.LanguageError, "missing_configuration"):
                 wire.load_config(path)
             path.write_text("\n".join(k + "=" + v for k, v in values.items()))
-            self.assertEqual(wire.load_config(path).model, "gpt-6-luna")
+            config = wire.load_config(path)
+            self.assertEqual((config.model, config.max_requests, config.max_output_tokens), ("gpt-6-luna", 20, 40960))
+            replace(config, max_requests=1, max_output_tokens=1).validate()
+            for field, invalid in (("max_requests", 21), ("max_output_tokens", 40961),
+                                   ("max_requests", True), ("max_output_tokens", True),
+                                   ("max_requests", False), ("max_output_tokens", False),
+                                   ("max_requests", 0), ("max_output_tokens", 0)):
+                with self.subTest(field=field, invalid=invalid), self.assertRaises(wire.LanguageError):
+                    replace(config, **{field: invalid}).validate()
 
     def test_redirect_handler_rejects_before_authorization_can_be_forwarded(self):
         request = urllib.request.Request("https://api.openai-proxy.org/v1/responses", headers={"Authorization": "Bearer " + KEY})

@@ -12,9 +12,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "language-response/0.1.1"
+VERSION = "language-response/0.1.2"
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
-TIMEOUT_SECONDS = 120
+TIMEOUT_SECONDS = 1200
 NAMES = ("MODELSPINE_PROVIDER_URL", "MODELSPINE_BASE_URL", "MODELSPINE_API_KEY",
          "MODELSPINE_MODEL", "MODELSPINE_MAX_REQUESTS", "MODELSPINE_MAX_OUTPUT_TOKENS")
 
@@ -65,9 +65,9 @@ class Config:
             raise LanguageError("provider_url_mismatch")
         if not self.key or any(c.isspace() for c in self.key) or not self.key.isascii():
             raise LanguageError("invalid_credential")
-        if type(self.max_requests) is not int or not 1 <= self.max_requests <= 3:
+        if type(self.max_requests) is not int or not 1 <= self.max_requests <= 20:
             raise LanguageError("invalid_request_budget")
-        if type(self.max_output_tokens) is not int or not 1 <= self.max_output_tokens <= 4096:
+        if type(self.max_output_tokens) is not int or not 1 <= self.max_output_tokens <= 40960:
             raise LanguageError("invalid_output_budget")
         return self
 
