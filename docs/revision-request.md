@@ -8,6 +8,8 @@
 
 `verify_revision_request(envelope)`以保存会话完整重放重新构造整个输出，核对head/问题/动作/原件/摘要和精确prompt。输出ref.content_hash覆盖除ref外的全部内容，同输入生成同字节；任一prompt/响应/来源篡改都会失败。非法原候选也可准备修订上下文，但仍保持非法原件和诊断，不变成合法替代。
 
+重建使用当前typed提示；例如升级到`typed-domain-proposal/0.1.1`后，旧版本导出信封的prompt及摘要不再匹配，read/show会报`conflict: revision context/content hash mismatch`。旧导出按原方法版本保留与验证；新版从同一可重放审阅会话重新导出到新文件，不覆盖或修补旧信封。ReviewSession本身的解析合同未变。
+
 [apps/revision_request.py](../apps/revision_request.py)提供`export_revision_request(project_dir, output_path, expected_review_ref=..., action_refs=...)`与`read_revision_request(path)`。目录和输出路径须显式绝对，源会话在原锁内读取；输出使用排他创建、fsync及重读验证，不覆盖已有文件，失败抛错且保留现场，不自动删文件或重试。24MiB上限，symlink/junction拒绝。actor仍为宿主归属而非认证。
 
 ```text
