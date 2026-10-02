@@ -4,6 +4,36 @@ import json
 from pathlib import Path
 
 
+def project_instance(model: dict) -> list[dict]:
+    """Display the public finite ProjectModel exactly; never infer slot values."""
+    def part(key, title, columns, rows, value, paragraphs=()):
+        return {"key":key, "title":title, "columns":columns, "rows":rows,
+                "paragraphs":list(paragraphs), "open_detail":False,
+                "detail":json.dumps(value, ensure_ascii=False, indent=2)}
+    rows = []
+    for obj in model["objects"]:
+        if not obj["slots"]:
+            rows.append([obj["id"], obj["entity"], "无已提供字段", "缺失不等于 null", "—"])
+        for slot in obj["slots"]:
+            rows.append([obj["id"], obj["entity"], slot["field"], slot["state"],
+                         json.dumps(slot["value"], ensure_ascii=False)])
+    return [part("instance_objects", "实例对象与字段", ["对象 ID", "术语 ID", "字段 ID", "值状态", "精确值"], rows, model,
+                 ["实例 " + model["id"] + " · 版本 " + model["version"],
+                  "对象集合：" + ("声明完整" if model["population_complete"] else "不完整；缺失对象仍可能影响检查")]),
+            part("instance_links", "实例关系", ["关系 ID", "源对象", "目标对象"],
+                 [[link["relation"], link["source"], link["target"]] for link in model["links"]], model["links"])]
+
+
+def project_report(report: dict) -> dict:
+    """Keep each checker's outcome, including unknown/error/not_applicable."""
+    return {"key":"instance_report", "title":"实例检查结果", "open_detail":False,
+            "paragraphs":["检查器：" + report["checker"], "意图忠实性：" + report["requirement_fidelity"],
+                          "逐项结果仅适用于报告绑定的定义与实例，不代表需求语义已确认。"],
+            "columns":["检查义务", "目标", "状态", "原因"],
+            "rows":[[r["obligation"], r["target"], r["status"], r["reason"]] for r in report["outcomes"]],
+            "detail":json.dumps(report, ensure_ascii=False, indent=2)}
+
+
 def format_expression(expr: dict) -> str:
     """Format validated finite syntax, without evaluation or simplification."""
     op = expr["op"]
@@ -60,13 +90,35 @@ def project_review(view: dict) -> list[dict]:
         rows=[[t["element"], "\n".join(str(e["start_line"]) + "–" + str(e["end_line"]) + " 行：" + e["quote"] for e in t["evidence"])] for t in view["traces"]])
     add("用户确认", "confirmations", paragraphs=["仅登记用户看过的目标；不改变形式检查或接受候选。"],
         columns=["目标", "归属", "说明"], rows=[[", ".join(c["targets"]), c["provenance"]["actor"], c["provenance"]["text"]] for c in view["confirmations"]])
-    add("修订提案", "proposals", paragraphs=["提案只保存待采纳；当前候选未变。"], columns=["提案 ID", "采纳状态", "检查", "修改理由"],
+    add("修订提案", "proposals", paragraphs=["保存提案不改变候选；只有明确采纳合法提案才建立后继候选。"], columns=["提案 ID", "采纳状态", "检查", "修改理由"],
         rows=[[p["ref"]["artifact_id"], p["adoption"], p["inspection"]["status"], p["provenance"]["text"]] for p in view["proposals"]])
     add("已保存动作", "actions", columns=["动作 ID", "类型", "归属", "用户原话"],
         rows=[[a["action"]["id"], a["action"]["kind"], a["action"]["actor"], a["action"]["text"]] for a in view["actions"]])
     add("原响应文本", "candidate_text", paragraphs=["UTF-8 替换仅供显示；精确字节见下方 base64。"], open_detail=inspection["status"] == "rejected")
     add("原响应精确字节（base64）", "candidate_base64")
+    for index, entry in enumerate(view["projects"]):
+        sections.append({"key":"saved_project", "title":"已保存实例 · " + entry["project"]["id"],
+                         "paragraphs":["用途：" + entry["purpose"] + " · 归属：" + entry["actor"],
+                                       "保存不等于通过检查。报告须对当前候选重新执行，不跨候选继承。"],
+                         "columns":["绑定", "标识", "版本"],
+                         "rows":[[key, entry[key]["artifact_id"], entry[key]["revision"]] for key in
+                                 ("ref", "request_ref", "candidate_ref", "definition_ref", "based_on_review_ref")],
+                         "detail":json.dumps(entry, ensure_ascii=False, indent=2), "open_detail":False})
+        for part in project_instance(entry["project"]):
+            part["key"] += "_" + str(index)
+            sections.append(part)
     return sections
+
+
+def spec_template(view: dict) -> str | None:
+    """Unconfigured structural draft; no invented permission or initial-data decision."""
+    if view["definition_ref"] is None:
+        return None
+    return json.dumps({"schema_version":"local-project-web/0.1", "id":"", "version":"",
+        **{key:view[key] for key in ("project_id", "request_ref", "source_ref", "definition_ref", "candidate_ref", "review_ref")},
+        "initial_project_ref":None, "no_initial_data_reason":None, "edit_scope":None, "tasks":[], "views":[],
+        "storage":None, "access":None, "evidence":[], "acceptance_cases":[], "confirmation_refs":[],
+        "required_unresolved":[], "unsupported_requirements":[]}, ensure_ascii=False, indent=2)
 
 
 def review_page(action_token: str) -> str:
@@ -77,16 +129,17 @@ def review_page(action_token: str) -> str:
 <title>ModelSpine · 候选审阅</title><link rel="stylesheet" href="/review.css">
 <script src="/review.js" defer></script></head><body>
 <header><p>ModelSpine / 有限前置审阅</p><h1>理解候选，记录你的判断</h1>
-<p>形式检查、用户确认、待修订记录分别展示。已记录 ≠ 已修订或已接受；当前候选保持不变。</p>
-<p class="notice">这里仅保存你的意见和修订提案，修订仍待处理。尚未提供实例查看、提案采纳、自动生成新候选和应用生成功能。</p>
+<p>形式检查、用户确认、实例检查分别展示。记录意见不会改变候选；明确采纳合法提案后才建立后继版本。</p>
+<p class="notice">可离线保存和检查实例、采纳合法提案、导出修订材料及准备应用配置。未知和未决仍需处理；此页不调用语言服务或生成应用代码。</p>
 <nav><a href="/" target="_blank" rel="noopener">在新窗口读取最新记录</a>
 <button id="layout" type="button">切换单列 / 双列</button></nav>
 <p>每页固定所见版本；保存后从新窗口继续。旧页草稿保留，冲突不会自动换版本重发。操作人名称仅用于标记意见归属。</p>
 </header><main><p id="load-state" role="status">正在核验本地记录…</p>
+<section id="versions"><h2>候选版本与来源</h2><label>查看版本<select id="version-select"></select></label><p id="version-state"></p><div id="adoption-source"></div></section>
 <section id="identity"><h2>身份与状态</h2></section>
 <div id="panels" class="columns"></div><section id="actions"><h2>提交用户动作</h2>
-<p>提交只记录该页所见目标；取消只清空本表单草稿。完整提案以 UTF-8 文本提交，也可保留非法 JSON。</p>
-<div id="forms"></div></section></main><footer>意见保存后仍需处理；形式检查不能证明候选忠实表达了你的需求。</footer>
+<p>提交绑定该页所见目标；取消只清空本表单草稿。实例保存、实例检查与候选采纳各自执行，不等于语义通过。完整提案可保留非法 JSON。</p>
+<div id="forms"></div><div id="offline-tools"></div></section></main><footer>意见保存后仍需处理；形式检查不能证明候选忠实表达了你的需求。应用配置就绪也不表示应用已生成或验收。</footer>
 </body></html>'''
 
 

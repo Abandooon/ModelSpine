@@ -1,6 +1,16 @@
 # model-review/0.1：有限审阅与回答
 
-这是可调用的有限子合同；总体设计归[消费者0.2](../../protocols/contracts/consumers-0.2.md)。protocols.review唯一声明ReviewAction与校验；requirements.review拥有ReviewSession、问题、回答/确认及提案含义；apps/model_review.py拥有本地存储。既有typed_domain/domain_language与包导出不变，直接导入新子模块。本profile没有实例输入/实例检查、提案采纳、自动修订、UI或认证；不宣称F1/F2完成。
+## model-review-local/0.2：实例与显式采纳
+
+精确DTO及函数载荷见[消费者指南](../../../docs/model-review.md)。ReviewSession保留原封闭字段和初始原件，actions扩为ReviewAction|ProjectSubmission|ProposalAdoption的封闭联合；旧0.1存储无需迁移，序列化内容不自动改写。所有动作共用64项上限/ID空间，每条重放核对精确前缀head及当前request/candidate；后继review_ref对整个原件与动作链计算hash，版本计动作总数。
+
+ProjectSubmission绑定当前合法候选、独立definition和head，purpose为example/counterexample/project，不修改检查结果含义。requirements纯转换登记ProjectModel与来源，apps保存前调用现有check_project验证结构；violated/unknown实例可保存，非法结构/错定义拒绝。保存成功改变review head。read_project可读取归档实例，check_saved_project只允许当前候选实例，输出当前request/candidate/definition/review/project引用和原DomainReport、required_residuals、population_complete。报告只读即时产生、不持久化为可复用认证；旧candidate或旧head不能用于新检查，语义忠实始终not_checked。
+
+ProposalAdoption只引用当前已保存的完整提案，重新typed检查合法才采纳。当前request/source保持原件，candidate revision递增且hash绑定精确提案字节；原候选、回答、问题、残余、提案、确认、实例、父review_ref及采纳actor/text完整进入history。新候选的确认、当前实例及报告不继承，当前issues/residuals来自显式提案；允许用户改变要求，但保留旧未决，不将编辑内容伪装为原文。采纳不是自动修订、意图通过或kernel接受。
+
+同ID同载荷返回already_recorded及首次recorded_review_ref/next_candidate_ref，当前review_ref可能已前进；新ID旧head或同ID异内容conflict。相同的ProjectSubmission在采纳后重发仅查询已记录结果，不把旧实例变为当前实例。存储继续同一model-review.json的锁、pending、fsync、replace、读验机制；任何失败不返回recorded，pending阻止旧缓存回读。历史保留受原24MiB/64动作资源边界限制，不截断历史。
+
+这是可调用的有限子合同；总体设计归[消费者0.2](../../protocols/contracts/consumers-0.2.md)。protocols.review唯一声明ReviewAction与校验；requirements.review拥有ReviewSession、问题、回答/确认及提案含义；apps/model_review.py拥有本地存储。既有typed_domain/domain_language与包导出不变，直接导入新子模块。旧0.1仅四类动作；0.2新增实例与采纳见下节，仍无自动修订或认证；不宣称F1/F2完成。
 
 ## 输入与独立身份
 
@@ -30,7 +40,7 @@ ReviewAction={schema_version:"model-review/0.1",id,project_id,
 
 confirm的元素目标为finite稳定ID；整体目标使用共享常量`WHOLE_CANDIDATE="review:candidate"`。finite禁止ID含冒号，因此不会碰撞。`$candidate`是合法元素ID，仅确认该元素；`review:flag`等未知标识拒绝。非法候选仅可整体确认“已看过该原件”，仍不获得语义通过。
 
-提案可删除规则、residual或改变AND/OR；这些是显式用户需求修改，不强制继承旧业务意图，也不伪造为原文事实。原提案、旧候选和未决完整保留；引文只作attribution_only。有限语言不支持default等字段时提案检查rejected，原件仍可审阅。此版本没有采纳提案/替换当前候选操作；adoption=pending表示等待显式后续修订接口，不是判定原residual永久不可编辑。确认/回答不能绕过此边界。
+提案可删除规则、residual或改变AND/OR；这些是显式用户需求修改，不强制继承旧业务意图，也不伪造为原文事实。原提案、旧候选和未决完整保留；引文只作attribution_only。有限语言不支持default等字段时提案检查rejected，原件仍可审阅。旧ReviewAction不会采纳/替换候选；adoption=pending等待显式ProposalAdoption接口，不是判定原residual永久不可编辑。确认/回答不能绕过此边界。
 
 ## 公开纯函数与视图
 
@@ -38,7 +48,7 @@ confirm的元素目标为finite稳定ID；整体目标使用共享常量`WHOLE_C
 
 `apply_action(session, action)`返回`(successor, receipt)`；receipt含status、action_ref、review_ref、recorded_review_ref、next_candidate_ref=null及revision_status。新动作status=recorded；同ID同规范载荷重试status=already_recorded，不追加版本，recorded_review_ref保留首次记录版本、review_ref是当前版本。相同ID但actor/text/绑定/原提案任一变化→conflict。已记录的相同动作允许越过过期expected_ref作幂等查询；新ID旧expected_ref冲突。action_ref按完整规范动作哈希，动作来源与SourceSpan分开，包含actor/text/旧candidate及source上下文，并明确asserts_original_source=false。
 
-与完整草案对应：本profile直接以review_ref承担前置审阅版本绑定，不接受布局view_ref；actor字符串尚不是认证actor_ref；kind/text/proposal_base64分别收窄草案action/answer_text或reason/proposed_values。没有project_examples、外部reports、ApplicationSpec或代码交付入口；next_candidate_ref始终null，next_question_refs也不伪造生成。完整草案字段不能直接混入本封闭解码器。
+与完整草案对应：本profile直接以review_ref承担前置审阅版本绑定，不接受布局view_ref；actor字符串尚不是认证actor_ref；kind/text/proposal_base64分别收窄草案action/answer_text或reason/proposed_values。旧ReviewAction没有project_examples、外部reports、ApplicationSpec或代码交付入口；其next_candidate_ref为null，next_question_refs也不伪造生成。完整草案字段不能直接混入本封闭解码器。
 
 ## 本地保存、恢复和失败
 

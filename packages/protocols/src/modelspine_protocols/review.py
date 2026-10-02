@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from modelspine_protocols import ArtifactRef, ContractError, checked, dumps, require, validate_artifact_ref
+from modelspine_protocols.domain_language import ProjectModel
 
 
 REVIEW_VERSION = "model-review/0.1"
@@ -26,6 +27,53 @@ class ReviewAction:
     text: str
     targets: tuple[str, ...]
     proposal_base64: str | None
+
+
+@dataclass(frozen=True)
+class ProjectSubmission:
+    schema_version: Literal["model-review-project/0.1"]
+    id: str
+    project_id: str
+    request_ref: ArtifactRef
+    candidate_ref: ArtifactRef
+    expected_review_ref: ArtifactRef
+    actor: str
+    purpose: Literal["example", "counterexample", "project"]
+    project: ProjectModel
+
+
+@dataclass(frozen=True)
+class ProposalAdoption:
+    schema_version: Literal["model-review-adoption/0.1"]
+    id: str
+    project_id: str
+    request_ref: ArtifactRef
+    candidate_ref: ArtifactRef
+    expected_review_ref: ArtifactRef
+    actor: str
+    proposal_ref: ArtifactRef
+    text: str
+
+
+def validate_operation(value):
+    if isinstance(value, ReviewAction):
+        return validate_action(value)
+    require(type(value) in (ProjectSubmission, ProposalAdoption), "unknown review operation")
+    value = checked(value, type(value))
+    require(all(s.strip() for s in (value.id, value.project_id, value.actor)), "empty operation identity/actor")
+    refs = (value.request_ref, value.candidate_ref, value.expected_review_ref,
+            value.project.definition if isinstance(value, ProjectSubmission) else value.proposal_ref)
+    for ref in refs:
+        validate_artifact_ref(ref)
+        require(ref.project_id == value.project_id, "cross-project operation reference", "conflict")
+    if isinstance(value, ProposalAdoption):
+        require(bool(value.text.strip()) and len(value.text) <= 64 * 1024, "adoption reason required/too long")
+    try:
+        raw = dumps(value).encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ContractError("invalid", "operation is not UTF-8 representable") from exc
+    require(len(raw) <= 512 * 1024, "operation byte limit", "unsupported")
+    return value
 
 
 def proposal_bytes(encoded: str) -> bytes:

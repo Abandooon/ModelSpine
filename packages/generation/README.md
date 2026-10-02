@@ -1,6 +1,6 @@
 # 约束编译与生成修复
 
-已实现有限离线切片：单字段构造控制、固定编辑选项上的有界搜索与逐步记录、纯报告修复比较。图关系语义由显式适配器提供；无 LLM 或修复循环。
+已实现有限离线切片：单字段构造控制、固定编辑选项上的有界搜索与逐步记录、纯报告修复比较。图关系语义由显式适配器提供；无LLM或修复循环。另有[本机Web计划和静态模板](contracts/local-web.md)，消费有来源且明确确认的有限规格；目录物化、实际运行和文件保护由implementation负责。
 
 状态、依赖和证据由 [module.json](module.json) 维护。公开字段与错误/副作用/版本语义见 [合同](contracts/v0.1/README.md)，正反例见 [结构化样例](contracts/v0.1/examples.json)。共享结构只有 [protocols](../protocols/contracts/v0.1/README.md) 一处定义。
 

@@ -2,7 +2,7 @@
   "id": "interaction",
   "title": "任务界面与用户审查",
   "status": "implemented-slice",
-  "version": "0.2.0-experimental",
+  "version": "0.3.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -14,9 +14,12 @@
     "review_ui.format_expression",
     "review_ui.project_review",
     "review_ui.review_page",
-    "review_ui.review_asset"
+    "review_ui.review_asset",
+    "review_ui.project_instance",
+    "review_ui.project_report",
+    "review_ui.spec_template"
   ],
-  "scope": "有限前置候选审阅的纯文本/表格投影与页面资源；本机应用装配requirements纯审阅转换及apps/model_review.py保存接口。没有实例审阅、提案采纳、自动修订、业务CommandBinding执行或完整Studio。",
+  "scope": "有限候选、实例、规则检查及历史的审阅呈现；本机app装配显式采纳、离线回答下载与应用配置准备/确认/保存。无自动候选生成、业务CommandBinding或完整Studio。",
   "implementation_entrypoints": [
     "src/modelspine_interaction/review_ui.py"
   ],
@@ -42,5 +45,5 @@
     "InteractionPlan",
     "VisualAssetRef"
   ],
-  "implemented_scope": "Standard-library-only finite review presentation and static shell/assets; exact integer/rule text is projected on the server without evaluation, original details remain available. Local HTTP/action assembly belongs to apps/model_review_ui.py; no model state ownership, authentication service, instance review or application delivery."
+  "implemented_scope": "Standard-library-only finite review presentation/static resources and unconfigured application-spec structure. Exact integer/rule/project/spec text remains server-produced; explicit instance checks, proposal adoption and history are composed by the app through A public interfaces. Offline revision download and configuration preview/confirmation/save remain distinct from generation, runtime acceptance and semantic fidelity. No model state ownership, automatic model calls or authentication service."
 }

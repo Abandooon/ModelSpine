@@ -2,7 +2,7 @@
   "id": "protocols",
   "title": "共享协议与稳定引用",
   "status": "implemented-slice",
-  "version": "0.3.0-experimental",
+  "version": "0.4.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [],
   "runtime_dependencies": [],
@@ -28,18 +28,25 @@
     "domain_language.validate_definition",
     "domain_language.expression_type",
     "review.ReviewAction",
-    "review.validate_action"
+    "review.validate_action",
+    "review.ProjectSubmission",
+    "review.ProposalAdoption",
+    "application.LocalWebSpec",
+    "application.assess_application",
+    "application.spec_content_hash"
   ],
   "scope": "定义交换格式和版本策略；不承担所有领域语义。",
   "implementation_entrypoints": [
     "src/modelspine_protocols/__init__.py",
     "src/modelspine_protocols/domain_language.py",
-    "src/modelspine_protocols/review.py"
+    "src/modelspine_protocols/review.py",
+    "src/modelspine_protocols/application.py"
   ],
   "validation_evidence": [
     "../../docs/validation.md",
     "../../docs/domain-modeling.md",
-    "../../docs/model-review.md"
+    "../../docs/model-review.md",
+    "../../docs/application-spec.md"
   ],
   "review_targets": [
     "architecture"
@@ -47,7 +54,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor. Adds finite model-review/0.1 action envelopes with explicit request/candidate/review/question binding; no persistence or authentication.",
+  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor. Adds finite model-review/0.1 action envelopes with explicit request/candidate/review/question binding; no persistence or authentication. Adds explicit project/adoption envelopes and source-bound local-project-web/0.1 configuration/readiness. Positive public checker evidence and valid complete initial data are mandatory; target-specific build/runtime execution is the implementation consumer responsibility.",
   "reference_sources": [
     {
       "asset_id": "prime-code-audit-2026-09-21",

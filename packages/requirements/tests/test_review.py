@@ -5,7 +5,7 @@ from hashlib import sha256
 import unittest
 
 from modelspine_protocols import ArtifactRef, ContractError, decode, digest, dumps, to_data
-from modelspine_protocols.review import ReviewAction
+from modelspine_protocols.review import ReviewAction, ProposalAdoption
 from modelspine_requirements.domain_modeling import prepare_request
 from modelspine_requirements.review import apply_action, create_session, review_input, review_ref
 
@@ -38,6 +38,32 @@ def action_for(view, *, identity="a1", kind="answer", text="unknown", question=0
 
 
 class ReviewTransitionTests(unittest.TestCase):
+    def test_explicit_adoption_preserves_removed_residual_and_answer_in_parent(self):
+        request, data = fixture()
+        session = create_session(request, dumps(data).encode(), session_id="adoption")
+        session, _ = apply_action(session, action_for(review_input(session)))
+        changed = deepcopy(data)
+        changed["definition"]["residuals"] = []
+        changed["issues"] = []
+        changed["traces"] = [x for x in changed["traces"] if x["element"] != "limit"]
+        session, _ = apply_action(session, action_for(review_input(session), identity="edit", kind="propose_edit",
+                                                     raw=dumps(changed).encode(), text="User removes limit requirement"))
+        view = review_input(session)
+        adopt = ProposalAdoption("model-review-adoption/0.1", "adopt", view["project_id"],
+                                 decode(ArtifactRef, view["request_ref"]), decode(ArtifactRef, view["candidate_ref"]),
+                                 decode(ArtifactRef, view["review_ref"]), "actor", decode(ArtifactRef, view["proposals"][0]["ref"]), "accept edit")
+        successor, receipt = apply_action(session, adopt)
+        after = review_input(successor)
+        self.assertEqual(after["residuals"], [])
+        self.assertTrue(after["history"][0]["view"]["residuals"][0]["required"])
+        self.assertEqual(after["history"][0]["view"]["questions"][0]["resolution"], "unresolved")
+        self.assertEqual(after["history"][0]["view"]["actions"][0]["action"]["text"], "unknown")
+        self.assertEqual(after["source_text"], request.text)
+        self.assertEqual(after["candidate_ref"], receipt["next_candidate_ref"])
+        self.assertEqual(after["revision_status"], "not_run")
+        # The stored adoption must be replayed against its exact parent and proposal.
+        with self.assertRaises(ContractError):
+            review_input(replace(successor, actions=successor.actions[:-1] + (replace(adopt, proposal_ref=replace(adopt.proposal_ref, content_hash="0" * 64)),)))
     def setUp(self):
         self.request, self.data = fixture()
         self.session = create_session(self.request, dumps(self.data).encode(), session_id="s")

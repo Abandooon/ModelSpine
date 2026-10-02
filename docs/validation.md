@@ -2,7 +2,7 @@
 
 从仓库根运行 `python -B run_tests.py`；只使用 Python 3.10+ 标准库。离线贯穿示例为 `python -B apps/offline.py`，非法阈值反例为 `python -B apps/offline.py --threshold -1`，后者应明确失败并退出 2。
 
-可用 `python -B run_tests.py --package protocols` 单独验收一个包，包名还可选 model-kernel、assurance、generation、requirements；`python -B run_tests.py --integration` 验收跨包路径。默认入口在六个隔离子进程中运行五包单元验收和集成验收，单包测试不经 offline CLI 加载其他能力包。
+可用 `python -B run_tests.py --package protocols` 单独验收一个包，包名还可选model-kernel、assurance、generation、requirements、interaction、implementation；`python -B run_tests.py --integration` 验收跨包路径。默认入口在八个隔离子进程中运行七包单元验收和集成验收，单包测试不经 offline CLI 加载其他能力包。
 
 ## 有意义的验收
 
@@ -109,9 +109,9 @@ requirements 新增独立的原文建模合同：请求只需原始文本、来�
 
 ## 支持范围
 
-旧 ModelKernel 的内存表示仅含有限标量字段和显式依赖；新增 [finite-domain/0.1](../packages/protocols/contracts/finite-domain-0.1.md) 的 DomainDefinition 另支持实体、二元关系与有限表达式，并由独立实例检查器消费。事务只覆盖同一 ModelKernel 实例的内存状态，不覆盖磁盘、跨进程、构建或应用数据。assurance 内置领域义务仍为 integer_range/equals，另提供通用固定任务准备/评估；显式适配器另解释结构图和有限自动机配置的有限规则，见[支持矩阵](foundation-boundaries.md)。CLI 不执行真实业务批准，也不调用 LLM、外部求解器或付费 API。
+旧 ModelKernel 的内存表示仅含有限标量字段和显式依赖；新增 [finite-domain/0.1](../packages/protocols/contracts/finite-domain-0.1.md) 的 DomainDefinition 另支持实体、二元关系与有限表达式，并由独立实例检查器消费。事务只覆盖同一 ModelKernel 实例的内存状态，不覆盖磁盘、跨进程、构建或应用数据。assurance 内置领域义务仍为 integer_range/equals，另提供通用固定任务准备/评估；显式适配器另解释结构图和有限自动机配置的有限规则，见[支持矩阵](foundation-boundaries.md)。上述旧离线与领域检查入口不执行真实业务批准，也不调用 LLM、外部求解器或付费 API；显式真实语言调用由独立 language_modeling 入口负责。
 
-既有订单模型是工程夹具；具体金额、币种与角色不成为通用默认。一般行为合同形式化、代码恢复、完整任务/业务界面、文件所有权和应用交付仍需对应实现及独立验收；当前有限前置审阅界面见[本地候选审阅 UI](model-review-ui.md)。研究比较的条件、真值、失败分母和成本要求见[协议摘要](../studies/lifecycle/protocol.md)。
+既有订单模型是工程夹具；具体金额、币种与角色不成为通用默认。一般行为合同形式化、代码恢复和完整任务/业务界面仍需对应实现及独立验收。文件所有权与应用交付已有 [local-project-web 有限实现](local-web.md)，不涵盖通用业务生成、迁移或自动回滚；当前有限前置审阅界面见[本地候选审阅 UI](model-review-ui.md)。研究比较的条件、真值、失败分母和成本要求见[协议摘要](../studies/lifecycle/protocol.md)。
 
 ## 2026-09-28 有限领域语言、消费者合同与审核返修
 
@@ -155,3 +155,14 @@ D已记录的真实Edge浏览器行为及总领独立审核与本轮集成验证
 精确提取的真实截断JSON保留为原件，candidate SHA256为`1d93fcc3df52b2aa2046ae4dc3a29350e274777f8a1af2743584b3124894eba9`。既有typed-inspect退出2/invalid JSON，审阅状态rejected；D现有HTTP入口实际读取200，candidate_ref/base64原件一致，读取前后存储hash不变。没有手工替代、删围栏、修JSON、增上限或自动重试；因continue_allowed=false停止，S02 not_run、余1未再分派。既有UI浏览器套件未重复。
 
 原文是独立释放的合成需求，不是真实用户业务；截断失败候选不是成功的领域建模。语义not_checked、实例not_run，B正式语义评价未执行；未实现回答驱动修订、完整Studio或应用生成，不据此宣布P1-R2/F1/F2完成。完整原文/提示/信封/候选/receipt/HTTP读取及累计预算记录留在研究工作区交接，公开运行代码不依赖该目录、私人配置或凭据。
+
+
+## 2026-10-02 无付费离线产品代码合流
+
+最终 A/D/E 字节上运行一次 `python -B -I run_tests.py`：462项收集，456通过，6项因未安装外部BESSER环境跳过，退出0；七包单元与集成在八个隔离进程中执行，源码前后哈希一致。跳过项不计为通过，本目标无需安装BESSER。此前E的457项运行在最后多视图修复前，仅保留为历史执行记录，不替代本次最终结果。
+
+新增实际行为包括实例保存/有限规则检查、显式提案采纳与历史、离线回答修订信封、有来源且内容特定确认的应用规格、相应浏览器交互，以及单一本机Web模型编辑制品的构建/启动/保存重启与新目录更新。总领另用合同推导的独立输入验证精确整数、可选缺失与unknown、版本及确认绑定、写入失败、实际多视图路径拒绝、文件/数据冲突和旧版保护；独立HTTP制品运行禁止读取工作区。作者真实浏览器与独立浏览器/HTTP结果分别保留，不用截图或测试数替代路径验收。
+
+本机生成目标只负责完整ProjectModel的edit/check/save/load；至少一个完整编辑视图有全部四动作，并有可实际保存的公开成功例。不会把纯checker通过说成应用交付。生成依赖标准库及显式复制的三个已固定运行源，生产包不反向导入apps/研究。新目录更新保留旧版、数据历史和可保留人工文件，冲突在写入前拒绝；迁移、自动回滚、崩溃恢复和任意业务代码生成不在实现范围。
+
+本批工程输入均为明确标记的人工样例，项目模型/API新增调用0；真实自然语言合法候选、回答驱动生成及正式独立语义仍未完成，不据此宣布F1–F4或比较优势成立。冻结交付、完整运行、独立脚本和初次脚本错误均由研究工作区的协调记录关联；旧失败及旧基线不改写。使用入口见[审阅UI](model-review-ui.md)、[应用规格](application-spec.md)、[离线修订](revision-request.md)和[本机应用交付](local-web.md)。

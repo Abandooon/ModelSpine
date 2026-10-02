@@ -13,8 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bootstrap
 bootstrap.activate(("requirements",))
 
-from modelspine_protocols import ArtifactRef, ContractError, dumps, loads, require
-from modelspine_protocols.review import ReviewAction
+from modelspine_protocols import ArtifactRef, ContractError, checked, decode, dumps, loads, require, to_data
+from modelspine_protocols.review import ReviewAction, ProjectSubmission, ProposalAdoption
+from modelspine_protocols.domain_language import DomainDefinition, ProjectModel
+from domain_checks import check_project
 from modelspine_requirements.domain_modeling import ModelingRequest
 from modelspine_requirements.review import (
     ReviewSession, apply_action, create_session, review_input, review_ref,
@@ -122,14 +124,68 @@ def read_review(project_dir, *, expected_review_ref: ArtifactRef | None = None) 
         return review_input(session)
 
 
-def submit_action(project_dir, action: ReviewAction) -> dict:
+def _definition(view):
+    require(view["inspection"]["status"] == "valid", "invalid candidate cannot execute")
+    return decode(DomainDefinition, view["inspection"]["checks"]["candidate"]["definition"])
+
+
+def _submit(project_dir, action) -> dict:
     root = _directory(project_dir)
     with _locked(root):
         session = _load(root)
         successor, receipt = apply_action(session, action)
         if successor != session:
+            if isinstance(action, ProjectSubmission):
+                # Structural validity belongs to the actual checker. Violated/unknown
+                # outcomes are legitimate stored examples, not save failures.
+                view = review_input(session)
+                check_project(_definition(view), action.project, project_id=view["project_id"])
             _persist(root, successor)
     return receipt
+
+
+def submit_action(project_dir, action: ReviewAction) -> dict:
+    return _submit(project_dir, checked(action, ReviewAction))
+
+
+def save_project(project_dir, submission: ProjectSubmission) -> dict:
+    return _submit(project_dir, checked(submission, ProjectSubmission))
+
+
+def adopt_proposal(project_dir, adoption: ProposalAdoption) -> dict:
+    return _submit(project_dir, checked(adoption, ProposalAdoption))
+
+
+def _project_entry(view, project_ref, expected_review_ref):
+    require(to_data(expected_review_ref) == view["review_ref"], "stale review for instance read/check", "conflict")
+    for snapshot in (view, *(item["view"] for item in view["history"])):
+        for entry in snapshot["projects"]:
+            if entry["ref"] == to_data(project_ref):
+                return entry
+    raise ContractError("conflict", "project reference does not belong to this review")
+
+
+def read_project(project_dir, project_ref: ArtifactRef, *, expected_review_ref: ArtifactRef) -> dict:
+    root = _directory(project_dir)
+    with _locked(root):
+        return _project_entry(review_input(_load(root)), project_ref, expected_review_ref)
+
+
+def check_saved_project(project_dir, project_ref: ArtifactRef, *, expected_review_ref: ArtifactRef) -> dict:
+    root = _directory(project_dir)
+    with _locked(root):
+        view = review_input(_load(root))
+        entry = _project_entry(view, project_ref, expected_review_ref)
+        require(entry["candidate_ref"] == view["candidate_ref"] and entry["request_ref"] == view["request_ref"]
+                and entry["definition_ref"] == view["definition_ref"], "instance belongs to an archived candidate", "conflict")
+        definition = _definition(view)
+        project = decode(ProjectModel, entry["project"])
+        report = check_project(definition, project, project_id=view["project_id"])
+        return {"status": "checked", "project_ref": entry["ref"], "purpose": entry["purpose"],
+                "request_ref": view["request_ref"], "candidate_ref": view["candidate_ref"],
+                "definition_ref": view["definition_ref"], "review_ref": view["review_ref"],
+                "population_complete": project.population_complete,
+                "required_residuals": [r.id for r in definition.residuals if r.required], "report": to_data(report)}
 
 
 def engineering_demo(project_dir) -> dict:
@@ -171,7 +227,7 @@ def engineering_demo(project_dir) -> dict:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("create", "show", "act", "demo"):
+    for name in ("create", "show", "act", "demo", "save-project", "read-project", "check-project", "adopt"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--project-dir", required=True, type=Path)
         if name == "create":
@@ -180,6 +236,13 @@ def main(argv=None):
             cmd.add_argument("--session-id", required=True)
         if name == "act":
             cmd.add_argument("--action", type=Path, required=True)
+        if name == "save-project":
+            cmd.add_argument("--submission", type=Path, required=True)
+        if name == "adopt":
+            cmd.add_argument("--adoption", type=Path, required=True)
+        if name in ("read-project", "check-project"):
+            cmd.add_argument("--project-ref", type=Path, required=True)
+            cmd.add_argument("--expected-review-ref", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "create":
@@ -191,6 +254,15 @@ def main(argv=None):
         elif args.command == "act":
             action = loads(ReviewAction, _read_bytes(args.action, 512 * 1024).decode("utf-8"))
             output = submit_action(args.project_dir, action)
+        elif args.command == "save-project":
+            output = save_project(args.project_dir, loads(ProjectSubmission, _read_bytes(args.submission, 512 * 1024).decode("utf-8")))
+        elif args.command == "adopt":
+            output = adopt_proposal(args.project_dir, loads(ProposalAdoption, _read_bytes(args.adoption, 512 * 1024).decode("utf-8")))
+        elif args.command in ("read-project", "check-project"):
+            project_ref = loads(ArtifactRef, _read_bytes(args.project_ref, 64 * 1024).decode("utf-8"))
+            expected = loads(ArtifactRef, _read_bytes(args.expected_review_ref, 64 * 1024).decode("utf-8"))
+            output = (read_project if args.command == "read-project" else check_saved_project)(
+                args.project_dir, project_ref, expected_review_ref=expected)
         else:
             output = engineering_demo(args.project_dir)
         print(json.dumps(output, ensure_ascii=False, indent=2))

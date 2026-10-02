@@ -8,6 +8,7 @@ from modelspine_protocols import ArtifactRef, ContractError, checked, decode, di
 from modelspine_protocols.domain_language import DomainDefinition, definition_ids
 from modelspine_protocols.review import (
     MAX_PROPOSAL_BYTES, REVIEW_VERSION, WHOLE_CANDIDATE, ReviewAction, proposal_bytes, validate_action,
+    ProjectSubmission, ProposalAdoption, validate_operation,
 )
 from modelspine_requirements.domain_modeling import ModelingRequest, validate_request
 from modelspine_requirements.typed_domain import inspect_typed_candidate
@@ -22,7 +23,7 @@ class ReviewSession:
     id: str
     request: ModelingRequest
     candidate_base64: str
-    actions: tuple[ReviewAction, ...]
+    actions: tuple[ReviewAction | ProjectSubmission | ProposalAdoption, ...]
 
 
 def _ref(session, name, revision, content_hash):
@@ -62,11 +63,11 @@ def _inspection(request, raw):
             "requirement_fidelity": "not_checked", "instance_conformance": "not_run"}, result.candidate
 
 
-def _initial_view(session):
+def _initial_view(session, candidate_revision=1):
     raw = proposal_bytes(session.candidate_base64)
     inspection, candidate = _inspection(session.request, raw)
     request_ref = _ref(session, "request", 1, digest(session.request))
-    candidate_ref = _ref(session, "candidate", 1, sha256(raw).hexdigest())
+    candidate_ref = _ref(session, "candidate", candidate_revision, sha256(raw).hexdigest())
     questions = []
     issues = to_data(candidate.issues) if candidate else []
     for issue in issues:
@@ -99,13 +100,17 @@ def _initial_view(session):
             "issues": issues, "traces": to_data(candidate.traces) if candidate else [],
             "questions": questions, "actions": [], "proposals": [], "confirmations": [],
             "revision_status": "not_run", "next_candidate_ref": None,
-            "requirement_fidelity": "not_checked", "instance_conformance": "not_run"}
+            "requirement_fidelity": "not_checked", "instance_conformance": "not_run",
+            "capability_version": "model-review-local/0.2", "projects": [], "history": [],
+            "parent_candidate_ref": None}
 
 
 def _check_binding(view, action, expected):
     require(action.project_id == view["project_id"] and to_data(action.request_ref) == view["request_ref"]
             and to_data(action.candidate_ref) == view["candidate_ref"] and action.expected_review_ref == expected,
             "stale or mismatched review/request/candidate binding", "conflict")
+    if not isinstance(action, ReviewAction):
+        return
     if action.kind in ("answer", "decline"):
         require(any(q["ref"] == to_data(action.question_ref) for q in view["questions"]),
                 "question does not belong to this candidate/source", "conflict")
@@ -142,38 +147,76 @@ def _record(view, session, action):
         view["revision_status"] = "pending"
 
 
+def _transition(view, session, operation):
+    if isinstance(operation, ReviewAction):
+        _record(view, session, operation)
+    elif isinstance(operation, ProjectSubmission):
+        require(view["inspection"]["status"] == "valid", "invalid candidate cannot accept executable instances")
+        require(to_data(operation.project.definition) == view["definition_ref"], "wrong project definition", "conflict")
+        require(len(operation.project.objects) <= 256 and len(operation.project.links) <= 4096,
+                "project size limit", "unsupported")
+        view["projects"].append({"ref": to_data(_ref(session, "project/" + operation.id, 1, digest(operation.project))),
+                                "project": to_data(operation.project), "purpose": operation.purpose,
+                                "actor": operation.actor, "request_ref": view["request_ref"],
+                                "candidate_ref": view["candidate_ref"], "definition_ref": view["definition_ref"],
+                                "based_on_review_ref": to_data(operation.expected_review_ref)})
+    else:
+        proposal = next((p for p in view["proposals"] if p["ref"] == to_data(operation.proposal_ref)), None)
+        require(proposal is not None, "proposal is not saved under current candidate", "conflict")
+        raw = proposal_bytes(proposal["raw_base64"])
+        inspection, _ = _inspection(session.request, raw)
+        require(inspection["status"] == "valid", "cannot adopt rejected proposal")
+        parent = {k: v for k, v in view.items() if k != "history"}
+        successor = _initial_view(create_session(session.request, raw, session_id=session.id),
+                                  int(view["candidate_ref"]["revision"]) + 1)
+        successor["parent_candidate_ref"] = view["candidate_ref"]
+        successor["history"] = view["history"] + [{"view": parent, "adoption": to_data(operation)}]
+        view = successor
+    return view
+
+
 def review_input(session: ReviewSession) -> dict:
     """Replay and verify the entire chain; returned view is detached from session."""
     session = checked(session, ReviewSession)
     base = create_session(session.request, proposal_bytes(session.candidate_base64), session_id=session.id)
     require(len(session.actions) <= MAX_ACTIONS, "review action limit", "unsupported")
     view = _initial_view(base)
+    view["review_ref"] = to_data(review_ref(base))
     seen = set()
     for action in session.actions:
-        action = validate_action(action)
+        action = validate_operation(action)
         require(action.id not in seen, "duplicate action in stored chain", "conflict")
         _check_binding(view, action, review_ref(base))
-        _record(view, base, action)
+        view = _transition(view, base, action)
         base = replace(base, actions=base.actions + (action,))
+        view["review_ref"] = to_data(review_ref(base))
         seen.add(action.id)
     view["review_ref"] = to_data(review_ref(base))
     return view
 
 
-def apply_action(session: ReviewSession, action: ReviewAction) -> tuple[ReviewSession, dict]:
+def _receipt(session, recorded, action, status):
     view = review_input(session)
-    action = validate_action(action)
+    recorded_view = review_input(recorded)
+    result = {"status": status, "action_ref": to_data(_ref(session, "action/" + action.id, 1, digest(action))),
+              "review_ref": view["review_ref"], "recorded_review_ref": recorded_view["review_ref"],
+              "next_candidate_ref": recorded_view["candidate_ref"] if isinstance(action, ProposalAdoption) else None,
+              "revision_status": view["revision_status"]}
+    if isinstance(action, ProjectSubmission):
+        result["project_ref"] = recorded_view["projects"][-1]["ref"]
+    return result
+
+
+def apply_action(session: ReviewSession, action: ReviewAction | ProjectSubmission | ProposalAdoption) -> tuple[ReviewSession, dict]:
+    view = review_input(session)
+    action = validate_operation(action)
     for index, old in enumerate(session.actions):
         if old.id == action.id:
             require(old == action, "action ID reused with different content", "conflict")
             recorded = replace(session, actions=session.actions[:index + 1])
-            return session, {"status": "already_recorded", "action_ref": to_data(_ref(session, "action/" + action.id, 1, digest(action))),
-                             "review_ref": view["review_ref"], "recorded_review_ref": to_data(review_ref(recorded)),
-                             "next_candidate_ref": None, "revision_status": view["revision_status"]}
+            return session, _receipt(session, recorded, action, "already_recorded")
     require(len(session.actions) < MAX_ACTIONS, "review action limit", "unsupported")
     _check_binding(view, action, review_ref(session))
-    _record(view, session, action)
+    _transition(view, session, action)
     successor = replace(session, actions=session.actions + (action,))
-    return successor, {"status": "recorded", "action_ref": to_data(_ref(session, "action/" + action.id, 1, digest(action))),
-                       "review_ref": to_data(review_ref(successor)), "recorded_review_ref": to_data(review_ref(successor)),
-                       "next_candidate_ref": None, "revision_status": view["revision_status"]}
+    return successor, _receipt(successor, successor, action, "recorded")

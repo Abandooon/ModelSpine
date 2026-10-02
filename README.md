@@ -2,19 +2,21 @@
 
 ModelSpine 研究以元模型为中心的人机协作软件开发，目标平台为 **ModelSpine Studio**。相对代码中心、规格中心和模型辅助方法的比较优势仍是待检验假设。
 
-当前九模块已有合同设计；`protocols`、`model-kernel`、`assurance`、`generation` 提供有限离线模型变更实现，`requirements` 增加显式有限解释上的结构化澄清及来源绑定的 typed 领域候选检查。本批有限交付已验收：有限领域语言及实例检查、必填且不可空的纯标量定义无损投影；投影遇关系、规则、残余或可选/可空字段整项拒绝。`interaction` 已提供有限审阅呈现；其他三模块为 planned。尚无完整无代码平台、应用运行时或研究比较结果。模块实际状态以各 `module.json` 和源码为准；详细语言及消费者合同仍为 draft，不代表复杂执行器已实现。
+当前九模块已有合同设计；`protocols`、`model-kernel`、`assurance`、`generation` 提供有限离线模型变更实现，`requirements` 增加显式有限解释上的结构化澄清及来源绑定的 typed 领域候选检查。本批有限交付已验收：有限领域语言及实例检查、必填且不可空的纯标量定义无损投影；投影遇关系、规则、残余或可选/可空字段整项拒绝。`interaction` 已提供有限审阅呈现，`implementation` 增加单一本机Web目标的生成制品运行与新目录更新；code-intelligence、component-reuse继续planned。尚无完整无代码平台或研究比较结果。模块实际状态以各 `module.json` 和源码为准；详细语言及消费者合同仍为 draft，不代表复杂执行器已实现。
 
 版本化任务合同与固定目标检查已提供公共验收边界：共享信封归 protocols，来源与声明评估归 assurance，有限规则由适配器解释，apps 装配已有内核保存。当前[有限澄清闭环](docs/clarification.md)进一步将来源、解释、行为问题和回答连接到显式后继任务与模型提案。独立参考验收留在测试侧，和开发检查分别记录；此前固定任务切片的范围见[任务合同交接](docs/next-iteration.md)。
 
 当前开发优先级是自然语言驱动的领域建模：**原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核**。当前已实现[原文请求、提示准备与外部候选检查](docs/domain-modeling.md)，不需要正确模型作为输入；新增 `typed-prompt`、`typed-inspect` 和有限 `check-project` 入口。新增[有界真实语言入口](docs/real-language.md)，按显式模型/端点/预算从原文获取候选并连接审阅保存；真实运行结果与失败见[验证记录](docs/validation.md)。回答驱动细化与独立语义验收尚未完成。现有有限澄清、任务绑定和报告边界可提供支撑；手写元模型中的标量字段、固定图编辑选项和脚本回答不等于已完成自然语言建模，也不提供完整领域语义。目标与当前能力的区别见[框架设计](docs/architecture.md)和[需求能力目标合同](packages/requirements/contracts/design.md)。
 
-新增[有限审阅接口 model-review/0.1](docs/model-review.md)：外部候选原件、独立审阅版本及answer/decline/confirm/propose_edit可在显式本地目录保存与恢复，检查拒绝的原件也可审阅。回答和编辑保留pending，不自动修订/采纳候选，不提供实例检查。新增[本地候选审阅 UI](docs/model-review-ui.md)消费此接口，展示来源、结构、规则与未决项并提交四种动作；完整TaskView、Studio及应用交付尚未实现。既有clarification的进程内会话与此本地保存入口分别维护。
+新增[有限审阅接口 model-review/0.1](docs/model-review.md)：外部候选原件、审阅动作和实例可在显式本地目录保存与恢复，检查拒绝的原件也可审阅；实例按声明的有限规则实际检查，合法完整提案须明确采纳才产生后继候选，旧确认和报告保留在历史中。[本地候选审阅 UI](docs/model-review-ui.md)提供相应编辑、检查、采纳和历史查看。回答还可导出[离线修订材料](docs/revision-request.md)，有来源的[有限应用规格](docs/application-spec.md)须另行配置及确认。这些功能不自动调用模型或完成语义验收，完整TaskView和Studio仍未实现。既有clarification的进程内会话与此本地保存入口分别维护。
 
 基础产品目标是需求完善、领域建模/验证、代码前模型审阅、代码生成、运行交付和同项目修改的完整流程。自然语言建模是上游；更强语义保障与演化研究在该流程上增强，不以研究成功作为基础UI、生成和维护的前置。当前尚未贯通，来源组件须经实际适配与验收才能登记为可用。
 
+当前无付费代码入口包括实例审阅/提案采纳、离线回答材料、显式应用规格，以及[本机模型编辑应用生成与更新](docs/local-web.md)。生成制品可独立启动并检查、保存和读取完整ProjectModel；它只覆盖声明的本地编辑任务，不生成任意业务应用，也不把手写工程输入当作真实语言链验收。
+
 ## 运行
 
-使用 Python 3.10+，当前只依赖标准库，无安装步骤。从本仓库根执行：
+使用 Python 3.10+，Python 代码只依赖标准库，无第三方 Python 包安装步骤。生成或更新本机 Web 制品还需要 PATH 中可用的 Git 和具有有效 HEAD 的平台 checkout，用于记录实际来源版本；已生成制品独立运行只需 Python 标准库。从本仓库根执行：
 
 ```text
 python -B run_tests.py

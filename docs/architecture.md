@@ -12,7 +12,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 自然语言建模的候选与解释仍归 requirements，来源完整性与已支持部分的检查可消费 protocols 和 assurance；apps 装配可审查流程。新的候选产物先按实际消费者设计，不强塞入现有同元模型 `ChangeProposal`，也不提前实现通用元模型迁移。模型提交继续由 kernel 负责，候选草案、人工确认、形式检查和已接受模型分别记录。
 
-[有限审阅接口](model-review.md)已提供独立候选/审阅身份及四种追加动作：protocols.review定义封闭动作，requirements.review负责纯审阅转换与重放，apps/model_review.py在显式本地目录互斥保存、恢复并拒绝旧版本/损坏。原件检查拒绝仍可审阅，propose_edit只保存待采纳完整候选；没有实例输入或自动修订。apps/model_review_ui.py通过本机HTTP装配该保存入口，interaction只提供纯文本/表格投影和页面资源，不拥有审阅状态。该本地保存不改变旧clarification会话只在进程内的边界，也不构成已接受模型提交。
+[有限审阅接口](model-review.md)已提供独立候选/审阅身份及四种追加动作：protocols.review定义封闭动作，requirements.review负责纯审阅转换与重放，apps/model_review.py在显式本地目录互斥保存、恢复并拒绝旧版本/损坏。原件检查拒绝仍可审阅，propose_edit保存待采纳完整候选；实例另行保存及执行检查，显式adopt_proposal建立后继候选并保留旧版本，不自动继承确认或旧实例。回答可导出离线修订信封，尚无自动模型修订。apps/model_review_ui.py通过本机HTTP装配该保存入口，interaction只提供纯文本/表格投影和页面资源，不拥有审阅状态。该本地保存不改变旧clarification会话只在进程内的边界，也不构成已接受模型提交。
 
 有界 DAG 构造、三条件记录和候选批次重放保留为保障机制与比较方法的工程支撑。[候选后端合同](candidate-backend-contract.md)是这条支线的接入设计，当前主线不要求先完成其外部 API。具体支线按任务启动，目录或可运行入口的存在不决定下一优先级。
 
@@ -20,12 +20,12 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 | 模块 | 拥有的状态或产物 | 公开边界及当前范围 |
 |---|---|---|
-| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验、finite-domain/0.1值对象及静态检查；新增model-review/0.1动作信封，不持有项目状态 |
+| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验、finite-domain/0.1值对象及静态检查；新增审阅/实例/采纳信封及local-project-web/0.1规格和就绪检查，不持有项目状态 |
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；新增必填且不可空的纯标量定义只读无损投影，拒绝关系/规则/残余及可选/可空字段；无持久化或跨进程事务 |
 | [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清、原文/typed候选提示与检查；新增有限审阅会话及用户动作，文件保存归apps；无自动抽取、自动修订或直接模型写权，通用诊断仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
-| [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录和纯报告比较；DAG 语义留在适配器，无 LLM 或完整修复循环 |
-| [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | planned；承担文件所有权、业务绑定和交付边界 |
+| [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录、纯报告比较及有限本机Web计划/模板；DAG语义留在适配器，无LLM或完整修复循环 |
+| [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | 已实现单一本机Web制品物化、构建、完整实例检查/保存及新目录更新；通用CommandBinding、迁移和自动回滚仍为设计 |
 | [interaction](../packages/interaction/contracts/design.md) | TaskView、交互计划、用户请求 | 已实现有限前置审阅投影与页面资源；完整TaskView/InteractionPlan仍为设计，业务界面与开发审查台分开，无模型或业务授权权力 |
 | [code-intelligence](../packages/code-intelligence/contracts/design.md) | 实现事实、恢复假设、追踪、语义差异 | planned；必须记录来源和未覆盖部分，不能以代码事实覆盖意图 |
 | [component-reuse](../packages/component-reuse/contracts/design.md) | 外部能力说明、兼容性结果、适配建议 | planned；相似或来源声明不等于行为兼容 |
@@ -34,7 +34,7 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 ## 依赖与装配
 
-当前运行依赖是 `model-kernel → protocols`、`assurance → protocols`、`generation → protocols`、`requirements → protocols`；protocols 不依赖其他能力包；interaction的有限呈现仅依赖标准库。其余三模块没有运行实现。module.json 的 `runtime_dependencies` 表达这层实际依赖；planned 模块为 null，不能将 null 解读为已实现独立运行。
+当前运行依赖是 `model-kernel → protocols`、`assurance → protocols`、`generation → protocols`、`requirements → protocols`；protocols 不依赖其他能力包；interaction的有限呈现仅依赖标准库；implementation实际依赖protocols/generation。code-intelligence及component-reuse尚无运行实现。module.json 的 `runtime_dependencies` 表达这层实际依赖；planned 模块为 null，不能将 null 解读为已实现独立运行。
 
 `depends_on` 保留目标设计所消费的能力合同：requirements/code-intelligence 消费 kernel，assurance 消费 kernel 的模型边界，generation/component-reuse 消费 assurance 的公开义务与报告，implementation 消费 generation，interaction 消费 kernel 与 implementation 的 CommandBinding。设计依赖不授权直接导入另一包内部实现。
 
@@ -70,7 +70,7 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 意图、事实和假设用 category 区分；confirmed 是确认状态，不能改变来源类别。requirements 和恢复模块形成候选，kernel 经 preview/check/decide/apply 接受模型变化。检查报告绑定候选、计划、范围、前提和真实工具版本；接收成功字符串不等于执行检查。
 
-修复改善、模型保存、业务操作许可、应用交付是四种决定。当前切片只处理修复进展和设计模型保存；有残余的保存不能被说成业务可运行。包含边不自动传播语义失效；影响看变更前后依赖，缺依赖信息为 unknown，历史报告保持不变。
+修复改善、模型保存、业务操作许可、应用交付是四种决定。旧内核切片处理修复进展和设计模型保存；新增local-project-web目标只允许完整且无违反/未知/错误的实例写入应用数据，不能由有残余的设计保存推导业务可运行。包含边不自动传播语义失效；影响看变更前后依赖，缺依赖信息为 unknown，历史报告保持不变。
 
 生成期控制说明在哪一阶段排除哪些非法候选、哪些义务仍需终验。应用业务 UI 与服务实现通过版本化 CommandBinding 连接，业务权限在后端判断；代码前审阅绑定需求/候选版本，由 requirements 或对应提案消费者处理回答和编辑，不要求已有应用服务。文件物化必须区分 generated/human/third_party、目标路径和期望旧哈希，模型保存与文件写入不是一个已实现的全局事务。
 
@@ -90,4 +90,4 @@ apps 负责装配当前能力；studies 可装配替代方法、检查器、条�
 
 研究运行要求见[公开协议摘要](../studies/lifecycle/protocol.md)，工程验收见[validation.md](validation.md)。
 
-generation 的[有界构造](bounded-construction.md)通过领域回调消费固定编辑空间，DAG 适配器在提案前排除成环端点，所有任务义务继续终验；行为构造尚未实现。requirements 的有限消费者和 interaction 的有限审阅呈现已实现，implementation、code-intelligence、component-reuse 仍为 planned；工程实现不升级论文结论。固定编辑/候选空间不等于元模型表达空间的穷尽搜索，无可区分探针或有限无解不证明 representation_gap。
+generation 的[有界构造](bounded-construction.md)通过领域回调消费固定编辑空间，DAG 适配器在提案前排除成环端点，所有任务义务继续终验；行为构造尚未实现。requirements 的有限消费者和 interaction 的有限审阅呈现已实现，implementation已有单一本机Web编辑器交付切片，code-intelligence、component-reuse仍为planned；工程实现不升级论文结论。固定编辑/候选空间不等于元模型表达空间的穷尽搜索，无可区分探针或有限无解不证明 representation_gap。

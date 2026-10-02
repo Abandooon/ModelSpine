@@ -1,6 +1,8 @@
 # 需求澄清与模型细化
 
-新增[有限审阅合同](contracts/review.md)：[review.py](src/modelspine_requirements/review.py)提供create_session/review_input/apply_action/review_ref，绑定外部候选原件、问题和独立审阅版本，追加回答、拒答、目标确认与完整候选提案。纯状态处理不写文件；[应用入口](../../apps/model_review.py)负责显式本地目录保存/恢复，与下文旧clarification进程内Session分开。未实现实例审阅、候选采纳、回答驱动自动修订或UI；actor只记录宿主提供的归属。来源绑定、结构合法和用户确认都不自动等于意图忠实。
+新增[有限审阅合同](contracts/review.md)：[review.py](src/modelspine_requirements/review.py)提供create_session/review_input/apply_action/review_ref，绑定外部候选原件、问题和独立审阅版本，记录回答、拒答、确认、完整候选提案、实例及显式提案采纳。采纳建立后继候选并保留旧审阅历史，旧确认和实例报告不移作新版本证据。纯状态处理不写文件；[应用入口](../../apps/model_review.py)负责显式本地目录保存/恢复和装配实例检查，与下文旧clarification进程内Session分开。actor只记录宿主提供的归属，结构合法和用户确认都不自动等于意图忠实。
+
+[revision_request.py](src/modelspine_requirements/revision_request.py)提供确定性离线修订材料：保留原文和已记录回答/拒答的独立归属及候选/审阅版本。它不调用模型或创建后继候选；保存、导出与校验见[修订材料说明](../../docs/revision-request.md)。有限应用配置的共享合同由protocols持有，见[应用规格说明](../../docs/application-spec.md)。
 
 新增[原文输入与领域候选合同](contracts/domain-modeling.md)：从 UTF-8 原文准备 ModelingRequest 和固定提示，解析带出处的概念、属性、关系/基数、规则及未决项，明确结构有效与语义未验收。当前 [CLI](../../apps/domain_modeling.py) 可 prepare/prompt/inspect；无需人工正确元模型。该新增入口没有语言传输或自动抽取，旧有限澄清范围如下。
 

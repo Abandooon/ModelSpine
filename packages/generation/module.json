@@ -2,7 +2,7 @@
   "id": "generation",
   "title": "约束编译与生成修复",
   "status": "implemented-slice",
-  "version": "0.1.2-experimental",
+  "version": "0.2.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -20,15 +20,20 @@
     "EditOption",
     "ConstructionDecision",
     "CandidateEvaluation",
-    "ConstructionRun"
+    "ConstructionRun",
+    "local_web.LocalWebPlan",
+    "local_web.plan",
+    "local_web.render"
   ],
   "scope": "承接 ATLAS 可复用机制；记录生成期约束、剩余义务和实际干预，未知不算通过。",
   "implementation_entrypoints": [
     "src/modelspine_generation/__init__.py",
-    "src/modelspine_generation/bounded.py"
+    "src/modelspine_generation/bounded.py",
+    "src/modelspine_generation/local_web.py"
   ],
   "validation_evidence": [
-    "../../docs/validation.md"
+    "../../docs/validation.md",
+    "../../docs/local-web.md"
   ],
   "review_targets": [
     "architecture"
@@ -46,7 +51,10 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Single-field controls; bounded fixed-option control/build/evaluate search with complete terminal checks and step records; DAG edge redirect via explicit adapter; pure report regression gate; no LLM, behavior constructor or repair loop",
+  "implemented_scope": "Single-field controls; bounded fixed-option control/build/evaluate search with complete terminal checks and step records; DAG edge redirect via explicit adapter; pure report regression gate; no LLM, behavior constructor or repair loop Adds a deterministic local-project-web/0.1 plan and static-page template consuming actual assessed configuration. No filesystem writes or model calls; implementation owns target preflight, materialization, build and runtime.",
   "design_contract_entrypoint": "contracts/design.md",
-  "design_contract_maturity": "draft"
+  "design_contract_maturity": "draft",
+  "additional_contract_entrypoints": [
+    "contracts/local-web.md"
+  ]
 }

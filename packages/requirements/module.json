@@ -2,7 +2,7 @@
   "id": "requirements",
   "title": "需求澄清与模型细化",
   "status": "implemented-slice",
-  "version": "0.4.0-experimental",
+  "version": "0.5.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -38,20 +38,24 @@
     "review.create_session",
     "review.review_input",
     "review.apply_action",
-    "review.review_ref"
+    "review.review_ref",
+    "revision_request.prepare_revision_request",
+    "revision_request.verify_revision_request"
   ],
   "scope": "保留显式有限解释澄清及原文/typed候选检查；新增有限候选审阅和用户动作记录，无语言传输、自动抽取或回答驱动自动修订。",
   "implementation_entrypoints": [
     "src/modelspine_requirements/__init__.py",
     "src/modelspine_requirements/domain_modeling.py",
     "src/modelspine_requirements/typed_domain.py",
-    "src/modelspine_requirements/review.py"
+    "src/modelspine_requirements/review.py",
+    "src/modelspine_requirements/revision_request.py"
   ],
   "validation_evidence": [
     "../../docs/clarification.md",
     "../../docs/validation.md",
     "../../docs/domain-modeling.md",
-    "../../docs/model-review.md"
+    "../../docs/model-review.md",
+    "../../docs/revision-request.md"
   ],
   "review_targets": [
     "architecture"
@@ -59,7 +63,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Explicit finite interpretation lists with raw-byte-pinned sources, injected preview/observation, minimax boolean questions, immutable answer history and successor-task-bound proposals; standard library and protocols only; no exhaustive interpretation search, automatic gap classification, semantic fidelity proof, model writes or LLM judge; raw UTF-8 source requests and unconfirmed domain definition candidates with attributed concepts/attributes/relations/rules/issues, strict structural inspection and prompt preparation, no language transport/extraction or rule execution Adds source/request-bound typed-domain-candidate/0.1 inspection and finite-language prompt preparation; no live language transport, answer-driven revision, or independent semantic acceptance. Instance rule execution belongs to the explicit apps adapter, not this package. Adds immutable finite candidate review sessions, independent review revisions and user-action provenance; answer/decline/confirmation/edit proposals remain separate from semantic acceptance and automatic candidate revision. Persistence belongs to the explicit app.",
+  "implemented_scope": "Explicit finite interpretation lists with raw-byte-pinned sources, injected preview/observation, minimax boolean questions, immutable answer history and successor-task-bound proposals; standard library and protocols only; no exhaustive interpretation search, automatic gap classification, semantic fidelity proof, model writes or LLM judge; raw UTF-8 source requests and unconfirmed domain definition candidates with attributed concepts/attributes/relations/rules/issues, strict structural inspection and prompt preparation, no language transport/extraction or rule execution Adds source/request-bound typed-domain-candidate/0.1 inspection and finite-language prompt preparation; no live language transport, answer-driven revision, or independent semantic acceptance. Instance rule execution belongs to the explicit apps adapter, not this package. Adds immutable finite candidate review sessions, independent review revisions and user-action provenance; answer/decline/confirmation/edit proposals remain separate from semantic acceptance and automatic candidate revision. Persistence belongs to the explicit app. Adds saved ProjectModel references, deliberate whole-proposal adoption with immutable prior candidate/review history and cross-version isolation; offline revision-context/0.1 separates source text from recorded user answers/declines. No automatic revision model call or semantic acceptance.",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft",
   "additional_contract_entrypoints": [

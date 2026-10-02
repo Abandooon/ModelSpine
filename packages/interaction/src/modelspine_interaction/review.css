@@ -12,4 +12,8 @@ textarea{min-height:100px}label{display:block}pre{white-space:pre-wrap;overflow-
 details{margin:10px 0}summary{cursor:pointer}footer{color:#536776}input[type=checkbox]{margin-right:10px}
 table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #d9e1e6;overflow-wrap:anywhere;white-space:pre-wrap}th{background:#edf4f3}.table-scroll{overflow-x:auto}p{overflow-wrap:anywhere;white-space:pre-wrap}
 [data-section=rules]{grid-column:1/-1}
+[data-operation=check-project] .result.success{color:inherit}
+#spec-json{font:14px/1.5 Consolas,monospace}#spec-version{min-height:46px}#spec-preview{border-left:3px solid #ac7400;padding-left:12px}
+td[data-status=satisfied]{color:#075e55}td[data-status=violated],td[data-status=error]{color:#a22525}
+td[data-status=unknown]{color:#885600}td[data-status=not_applicable]{color:#536776}
 @media(max-width:800px){.columns{grid-template-columns:1fr}header,main,footer{padding:16px}}

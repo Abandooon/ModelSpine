@@ -1,23 +1,72 @@
 """Loopback-only finite review host; one explicit local project per process."""
 import argparse
+from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import secrets
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_review import create_review, read_review, submit_action
+from model_review import adopt_proposal, check_saved_project, create_review, read_review, save_project, submit_action
+from application_spec import read_spec, save_spec
+from revision_request import export_revision_request
+from domain_checks import check_project
 
-# This package is not yet in bootstrap's registered package list. Local app assembly
-# exposes its single source directory; integration owns the later manifest update.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages/interaction/src"))
-from modelspine_interaction.review_ui import project_review, review_asset, review_page
-from modelspine_protocols import ContractError, loads
-from modelspine_protocols.review import ReviewAction, WHOLE_CANDIDATE
+import bootstrap
+bootstrap.activate(("interaction",))
+from modelspine_interaction.review_ui import project_report, project_review, review_asset, review_page, spec_template
+from modelspine_protocols import ArtifactRef, ContractError, decode, loads, require, to_data
+from modelspine_protocols.application import LocalWebSpec, acceptance_digest, assess_application, spec_content_hash, validate_spec
+from modelspine_protocols.review import ProjectSubmission, ProposalAdoption, ReviewAction, WHOLE_CANDIDATE
 from modelspine_requirements.domain_modeling import ModelingRequest
 
 MAX_ACTION_BYTES = 512 * 1024
+
+
+@dataclass(frozen=True)
+class _ProjectCheck:
+    """HTTP arguments for A's readonly function, not a new shared action."""
+    project_ref: ArtifactRef
+    expected_review_ref: ArtifactRef
+
+
+@dataclass(frozen=True)
+class _RevisionExport:
+    expected_review_ref: ArtifactRef
+    action_refs: tuple[ArtifactRef, ...]
+
+
+@dataclass(frozen=True)
+class _SpecEdit:
+    spec: LocalWebSpec
+    expected_spec_ref: ArtifactRef | None
+
+
+@dataclass(frozen=True)
+class _SpecPrepare(_SpecEdit):
+    next_version: str | None
+
+
+@dataclass(frozen=True)
+class _SpecConfirm(_SpecEdit):
+    content_hash: str
+    id: str
+
+
+def optional_spec(root):
+    """Only the public store's missing fixed file means no draft yet."""
+    try:
+        return read_spec(root)
+    except FileNotFoundError as exc:
+        if Path(exc.filename) != root / "application-spec.json":
+            raise
+        return None
+
+
+def exact_spec(result):
+    return {**result, "spec_text":json.dumps(result["spec"], ensure_ascii=False, indent=2)}
 
 
 class ReviewServer(ThreadingHTTPServer):
@@ -88,7 +137,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.fail(status, code, str(exc))
 
     def do_GET(self):
-        if not self.guard(private=self.path == "/api/review"):
+        if not self.guard(private=self.path in ("/api/review", "/api/spec")):
             return
         if self.headers.get("Content-Length", "0") != "0":
             self.fail(400, "invalid_http", "GET body unsupported")
@@ -102,7 +151,12 @@ class ReviewHandler(BaseHTTPRequestHandler):
             elif self.path == "/api/review":
                 view = read_review(self.server.project_dir)
                 self.reply(200, {"view": view, "presentation":project_review(view), "actor":self.server.actor,
+                                 "history_presentation":[project_review(h["view"]) for h in view["history"]],
+                                 "spec_template":spec_template(view),
                                  "whole_candidate":WHOLE_CANDIDATE})
+            elif self.path == "/api/spec":
+                result = optional_spec(self.server.project_dir)
+                self.reply(200, exact_spec(result) if result is not None else {"status":"not_saved"})
             else:
                 self.fail(404, "not_found", "unknown route; project directory is fixed at startup")
         except (ValueError, OSError, RecursionError) as exc:
@@ -111,7 +165,10 @@ class ReviewHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.guard(action=True):
             return
-        if self.path != "/api/action":
+        routes = {"/api/action":(ReviewAction, submit_action),
+                  "/api/project":(ProjectSubmission, save_project),
+                  "/api/adopt":(ProposalAdoption, adopt_proposal)}
+        if self.path not in (*routes, "/api/project/check", "/api/revision/export", "/api/spec/save", "/api/spec/prepare", "/api/spec/confirm"):
             self.fail(404, "not_found", "unknown action route")
             return
         if self.headers.get("Content-Type") != "application/json":
@@ -129,11 +186,53 @@ class ReviewHandler(BaseHTTPRequestHandler):
             raw = self.rfile.read(size)
             if len(raw) != size:
                 raise ValueError("incomplete request body")
-            action = loads(ReviewAction, raw.decode("utf-8"))
-            if action.actor != self.server.actor:
-                raise ValueError("actor differs from host attribution label")
-            receipt = submit_action(self.server.project_dir, action)
-            self.reply(200, receipt)
+            if self.path == "/api/revision/export":
+                query = loads(_RevisionExport, raw.decode("utf-8"))
+                # Server-owned scratch path only; never accept a client filesystem path.
+                with tempfile.TemporaryDirectory(prefix="modelspine-revision-") as scratch:
+                    envelope = export_revision_request(self.server.project_dir, Path(scratch) / "revision.json",
+                        expected_review_ref=query.expected_review_ref, action_refs=query.action_refs)
+                self.reply(200, {"envelope_text":json.dumps(envelope, ensure_ascii=False, indent=2)})
+            elif self.path.startswith("/api/spec/"):
+                dto = {"/api/spec/save":_SpecEdit, "/api/spec/prepare":_SpecPrepare, "/api/spec/confirm":_SpecConfirm}[self.path]
+                query = loads(dto, raw.decode("utf-8"))
+                spec = validate_spec(query.spec)
+                if self.path == "/api/spec/save":
+                    self.reply(200, exact_spec(save_spec(self.server.project_dir, spec, expected_spec_ref=query.expected_spec_ref)))
+                    return
+                view = read_review(self.server.project_dir, expected_review_ref=spec.review_ref)
+                current = optional_spec(self.server.project_dir)
+                require(to_data(query.expected_spec_ref) == (current["spec_ref"] if current else None), "stale application-spec head", "conflict")
+                if self.path == "/api/spec/prepare":
+                    # Explicit preparation computes only public digests, not checker expectations or defaults.
+                    cases = tuple(replace(c, ref=replace(c.ref, content_hash=acceptance_digest(c))) for c in spec.acceptance_cases)
+                    spec = validate_spec(replace(spec, version=query.next_version if query.next_version is not None else spec.version,
+                                                 acceptance_cases=cases))
+                    self.reply(200, exact_spec({"spec":to_data(spec), "assessment":assess_application(spec, view, checker=check_project),
+                                               "content_hash":spec_content_hash(spec)}))
+                else:
+                    require(query.content_hash == spec_content_hash(spec), "configuration changed after preview", "conflict")
+                    assessment = assess_application(spec, view, checker=check_project)
+                    require(not any(b.startswith("binding:") for b in assessment["blockers"]), "configuration review binding changed", "conflict")
+                    action = ReviewAction("model-review/0.1", query.id, spec.project_id, spec.request_ref, spec.candidate_ref,
+                        spec.review_ref, None, self.server.actor, "confirm", "approve-local-web-spec:" + query.content_hash,
+                        (WHOLE_CANDIDATE,), None)
+                    receipt = submit_action(self.server.project_dir, action)
+                    bound = replace(spec, review_ref=decode(ArtifactRef, receipt["review_ref"]),
+                                    confirmation_refs=(decode(ArtifactRef, receipt["action_ref"]),))
+                    self.reply(200, exact_spec({"spec":to_data(bound), "receipt":receipt}))
+            elif self.path == "/api/project/check":
+                query = loads(_ProjectCheck, raw.decode("utf-8"))
+                checked = check_saved_project(self.server.project_dir, query.project_ref,
+                                             expected_review_ref=query.expected_review_ref)
+                self.reply(200, {"check":checked, "presentation":project_report(checked["report"]),
+                                 "exact_details":json.dumps(checked, ensure_ascii=False, indent=2)})
+            else:
+                dto, consumer = routes[self.path]
+                action = loads(dto, raw.decode("utf-8"))
+                if action.actor != self.server.actor:
+                    raise ValueError("actor differs from host attribution label")
+                self.reply(200, consumer(self.server.project_dir, action))
         except (ValueError, OSError, RecursionError) as exc:
             self.error_from(exc)
 

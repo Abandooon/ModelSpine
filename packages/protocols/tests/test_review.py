@@ -3,10 +3,24 @@ from dataclasses import replace
 import unittest
 
 from modelspine_protocols import ArtifactRef, ContractError, decode, dumps, loads, to_data
-from modelspine_protocols.review import ReviewAction, proposal_bytes, validate_action
+from modelspine_protocols.review import ReviewAction, ProposalAdoption, ProjectSubmission, proposal_bytes, validate_action, validate_operation
+from modelspine_protocols.domain_language import ProjectModel
 
 
 class ReviewEnvelopeTests(unittest.TestCase):
+    def test_instance_and_adoption_closed_envelopes(self):
+        ref = ArtifactRef("p", "d", "1", "a" * 64)
+        project = ProjectModel("finite-project/0.1", "instances", "1", ref, (), (), False)
+        instance = ProjectSubmission("model-review-project/0.1", "save", "p", ref, ref, ref, "actor", "example", project)
+        adopt = ProposalAdoption("model-review-adoption/0.1", "adopt", "p", ref, ref, ref, "actor", ref, "explicit")
+        for operation in (instance, adopt):
+            self.assertEqual(validate_operation(loads(type(operation), dumps(operation))), operation)
+            with self.assertRaises(ContractError): validate_operation(replace(operation, actor=" "))
+            with self.assertRaises(ContractError): validate_operation(replace(operation, project_id="other"))
+            data = to_data(operation); data["extra"] = None
+            with self.assertRaises(ContractError): decode(type(operation), data)
+        with self.assertRaises(ContractError): validate_operation(replace(instance, purpose="default"))
+        with self.assertRaises(ContractError): validate_operation(replace(adopt, text=""))
     def setUp(self):
         self.ref = ArtifactRef("p", "a", "1", "a" * 64)
         self.action = ReviewAction("model-review/0.1", "x", "p", self.ref, self.ref, self.ref,
