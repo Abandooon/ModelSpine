@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from language_response import (VERSION, LanguageError, encoded, extract_response, load_config,
                                post_response, redact, strict_json)
 
-METHOD = "typed-language-run/0.2"
+METHOD = "typed-language-run/0.3"
 PROMPT_VERSION = "typed-language-assembly/0.1"
 OUTPUT_INSTRUCTIONS = """Return one complete compact JSON object, without Markdown or commentary.
 Use short unique IDs and no indentation or repeated explanations. Retain every required
@@ -128,7 +128,7 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
         request = load_request(path)
         prompt = language_prompt(request)
         payload = encoded({"model": config.model, "input": prompt, "store": False, "stream": False,
-                           "max_output_tokens": config.max_output_tokens})
+                           "max_output_tokens": config.max_output_tokens, "text": {"format": {"type": "json_object"}}})
         files = {"source.txt": request.text.encode("utf-8"), "request.json": dumps(request).encode("utf-8"),
                  "prompt.txt": prompt.encode("utf-8"), "payload.json": payload}
         if any(redact(raw, config.key)[1] for raw in files.values()):
@@ -182,7 +182,8 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
             prompt = language_prompt(request).encode("utf-8")
             payload = load(folder / "payload.json")
             expected_payload = encoded({"model": config.model, "input": prompt.decode("utf-8"), "store": False,
-                                        "stream": False, "max_output_tokens": config.max_output_tokens})
+                                        "stream": False, "max_output_tokens": config.max_output_tokens,
+                                        "text": {"format": {"type": "json_object"}}})
             if (digest(request) != item["request_hash"] or prompt != load(folder / "prompt.txt")
                     or request.text.encode("utf-8") != load(folder / "source.txt") or payload != expected_payload):
                 raise LanguageError("request_binding_conflict")

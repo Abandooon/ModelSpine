@@ -1,8 +1,10 @@
-# 有界真实语言入口（typed-language-run/0.2）
+# 有界真实语言入口（typed-language-run/0.3）
 
 `apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。这是P1-R2有限入口，不包含自动修复、回答驱动修订、实例生成/检查、提案采纳或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
 
-协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求只带model、装配后的typed提示input、store=false、stream=false、max_output_tokens；不传previous_response_id、工具、温度或假定模型支持的额外推理设置。服务实际支持与模型身份须以调用结果验证，目录可见不等于生成成功。
+协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定`text.format={"type":"json_object"}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
+
+0.3仅增加[Responses JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs)，完整保留0.2/SRC-01提示。官方合同约束可解析JSON，不保证typed schema，且仍须处理不完整等边界；本入口继续使用已有typed检查，不新增Schema层。供应商的一般兼容声明及官方模型能力不能证明当前代理实际执行该格式，尚须真实观察；即使返回合法JSON也不能证明内部约束实现或原文忠实。HTTP400不支持参数、refusal、不完整响应、completed但非法JSON或typed不合法均沿用停止与原件保留规则，不自动改参数再试。拒答content不被提取为候选，记录unsupported_output_shape；可提取但非法的候选仍供审阅。
 
 ## 配置与准备
 
@@ -15,6 +17,8 @@ python -B -I apps/language_modeling.py prepare --env-file "E:/private/.env" --ru
 ```
 
 prepare不联网。它保存每份原文的完整UTF-8（包括尾LF）、规范ModelingRequest、精确装配提示和无认证头的实际请求JSON。plan.json绑定请求、原文、提示/提示版本、请求参数、实际1或2个顺序slot、方法源码SHA及显式预算，返回plan_sha256。两请求不共享对方原文、响应或参考答案。原始请求文件的JSON排版不作为候选来源，保存的request.json是既有dumps规范编码，原文source.txt保持原字节。
+
+宿主可先用假key和公开配置离线prepare，task_id绑定预算提案及历史收据；最终真实release再绑定精确plan SHA和唯一账本，不回写plan制造循环。prepare不等于释放预算。旧批次耗尽后，新目录不会自动产生额度，须另有明确新批次授权。有限批停止后，已有合法自动候选即可交独立评价；若只有第一份合法，执行其可用部分，缺失来源/配对及其他不可用分母保持not_run，不要求两份都合法才开始评价。
 
 装配提示`typed-language-assembly/0.1`完整保留既有typed_modeling_prompt前缀，然后追加固定通用输出说明和SOURCE_LINES_JSON。行表使用与检查器相同的`request.text.splitlines()`、一基行号和精确行文本，不把CRLF、空行或Unicode行分隔的显示当作新需求；证据按选中完整行精确以LF连接，不加行号前缀，也不在该join结果之外额外加换行；选中末行为空时join产生的末尾LF必须保留。原始source.txt不归一化。行表明确是数据，不能提供业务参考模型。要求紧凑JSON、短ID、无缩进/围栏/重复解释，但不得省略必要键、原文条件、例外、未决、问题或残余，也不得缩短quote。宿主不修回模型的引文/行号或JSON；既有typed检查仍可拒绝它。此呈现调整不保证4096输出预算内得到完整或忠实候选。
 
@@ -51,6 +55,8 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 候选hash在提取、检查、审阅candidate_ref及UI的base64原件间核对；definition_ref不能替代候选身份。UI保存后仍为未确认候选，未决/不支持不被清除。
 
 ## 验证与当前事实
+
+2026-10-02的0.3为离线最小实现：prepare与execute固定JSON mode，既有提示、typed检查、adapter及审阅接口不变。针对性工程验证核对实际adapter构造的HTTP请求参数、双slot成功后拒第三次、格式删除/改写即使重算hash仍拒绝，以及HTTP400/refusal/incomplete/非法JSON/typed错误原件保留并阻止下一slot。合成响应不计真实语义成功。拟新S01/S02各一次、每次4096的预算仍未释放；旧3/3耗尽与下述失败事实不变，不因离线prepare授权新的POST。
 
 0.2增加单输入预算和确定性行表的离线回归，保留既有双输入、AUD01–04和同一候选经审阅/UI读取的工程检查。新提示和方法hash只用于新计划，不回填旧0.1/0.1.1运行。0.2及末尾空行提示窄修经有限工程验收后，宿主已明确放行并执行唯一v2一次；总预算3/3已耗尽。工程通过与来源呈现不证明自动候选合法或忠实。
 

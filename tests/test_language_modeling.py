@@ -81,13 +81,15 @@ class LanguageRunTests(unittest.TestCase):
             receipt = app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
             self.assertEqual(post.call_count, 1)
             self.assertEqual(post.call_args.args[1], (self.run / "input-1/payload.json").read_bytes())
+            self.assertEqual(json.loads(post.call_args.args[1])["text"], {"format": {"type": "json_object"}})
         return receipt
 
     def test_prepare_is_network_free_and_exact_prompt_payload(self):
         payload = wire.strict_json((self.run / "input-1/payload.json").read_bytes())
         self.assertEqual(payload["input"], app.language_prompt(self.requests[0]))
         self.assertTrue(payload["input"].startswith(app.typed_modeling_prompt(self.requests[0]) + "\n\n"))
-        self.assertEqual(set(payload), {"model", "input", "store", "stream", "max_output_tokens"})
+        self.assertEqual(set(payload), {"model", "input", "store", "stream", "max_output_tokens", "text"})
+        self.assertEqual(payload["text"], {"format": {"type": "json_object"}})
         self.assertEqual((self.run / "input-1/source.txt").read_bytes(), self.requests[0].text.encode())
         self.assertFalse(payload["store"])
         self.assertNotIn(self.requests[1].text, payload["input"])
@@ -262,9 +264,21 @@ class LanguageRunTests(unittest.TestCase):
         self.assertIsNone(receipt["review_project"])
 
     def test_persistent_budget_two_calls_no_third_and_no_reset(self):
-        self.execute()
-        with patch.object(app, "post_response", return_value=wire.Exchange(200, envelope(candidate(self.requests[1])), "received")):
-            second = app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+        bodies = [envelope(candidate(request)) for request in self.requests]
+        # Exercise the actual adapter/Request construction, with only I/O replaced.
+        with patch.object(wire.urllib.request, "build_opener") as build:
+            build.return_value.open.side_effect = [
+                http_response(body, f"Content-Length: {len(body)}\r\n".encode()) for body in bodies]
+            for slot in (1, 2):
+                second = app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+                self.assertTrue(second["continue_allowed"])
+                sent = build.return_value.open.call_args.args[0]
+                self.assertEqual(sent.data, (self.run / f"input-{slot}/payload.json").read_bytes())
+                self.assertEqual(json.loads(sent.data)["text"], {"format": {"type": "json_object"}})
+            self.assertEqual(build.return_value.open.call_count, 2)
+            with self.assertRaisesRegex(wire.LanguageError, "planned_budget_exhausted"):
+                app.execute_next(self.run, self.config, expected_plan_sha256=self.expected)
+            self.assertEqual(build.return_value.open.call_count, 2)
         self.assertEqual(second["slot"], 2)
         code = ("import sys;sys.path.insert(0," + repr(str(app.REPO / 'apps')) + ");import language_modeling as a;"
                 "from language_response import Config;"
@@ -276,6 +290,61 @@ class LanguageRunTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             app.prepare_run(self.run, self.paths, self.config, task_id="offline-test")
         self.assertEqual(len(list((self.run / "attempts").iterdir())), 2)
+
+    def test_json_mode_tamper_or_delete_rejected_even_with_rehashed_plan(self):
+        for label in ("changed", "deleted"):
+            with self.subTest(label=label), patch.object(app, "post_response") as post:
+                run = self.root / label
+                app.prepare_run(run, self.paths, self.config, task_id="offline-format-binding")
+                path = run / "input-1/payload.json"
+                payload = json.loads(path.read_bytes())
+                if label == "changed":
+                    payload["text"]["format"]["type"] = "text"
+                else:
+                    del payload["text"]
+                path.write_bytes(wire.encoded(payload))
+                plan_path = run / "plan.json"
+                plan = json.loads(plan_path.read_bytes())
+                plan["items"][0]["files"]["payload.json"] = app.hash_bytes(path.read_bytes())
+                plan_path.write_bytes(wire.encoded(plan))
+                with self.assertRaisesRegex(wire.LanguageError, "request_binding_conflict"):
+                    app.execute_next(run, self.config, expected_plan_sha256=app.hash_bytes(plan_path.read_bytes()))
+                post.assert_not_called()
+                self.assertEqual(list((run / "attempts").iterdir()), [])
+
+    def test_json_mode_failures_preserved_consume_slot_and_never_fallback(self):
+        refusal = [{"type": "message", "role": "assistant", "status": "completed",
+                    "content": [{"type": "refusal", "refusal": "engineering refusal"}]}]
+        cases = (
+            ("unsupported", 400, b'{"error":{"message":"unsupported text.format"}}', "http_failure", None),
+            ("refusal", 200, envelope(b"", output=refusal), "unsupported_output_shape", None),
+            ("incomplete", 200, envelope(b'{"', status="incomplete"), "response_not_completed", b'{"'),
+            ("non_json", 200, envelope(b'{"issues":['), "candidate_rejected", b'{"issues":['),
+            ("wrong_typed_shape", 200, envelope(b'{}'), "candidate_rejected", b'{}'),
+        )
+        for label, status, raw, reason, extracted in cases:
+            with self.subTest(label=label):
+                run = self.root / label
+                prepared = app.prepare_run(run, self.paths, self.config, task_id="offline-format-failure")
+                with patch.object(app, "post_response", return_value=wire.Exchange(status, raw, "received")) as post:
+                    receipt = app.execute_next(run, self.config, expected_plan_sha256=prepared["plan_sha256"])
+                    self.assertFalse(receipt["continue_allowed"])
+                    self.assertIn(reason, receipt["stop_reasons"])
+                    self.assertEqual(json.loads(post.call_args.args[1])["text"], {"format": {"type": "json_object"}})
+                    self.assertEqual((run / "attempts/001/response.body").read_bytes(), raw)
+                    self.assertEqual(receipt["response_bytes"], "original_http_body")
+                    if extracted is None:
+                        self.assertIsNone(receipt["candidate"])
+                        self.assertIsNone(receipt["review_project"])
+                    else:
+                        self.assertEqual((run / "attempts/001/candidate.raw").read_bytes(), extracted)
+                        view = app.read_review(Path(receipt["review_project"]))
+                        self.assertEqual(view["inspection"]["status"], "rejected")
+                    with self.assertRaisesRegex(wire.LanguageError, "previous_attempt_stopped"):
+                        app.execute_next(run, self.config, expected_plan_sha256=prepared["plan_sha256"])
+                    self.assertEqual(post.call_count, 1)
+                self.assertEqual([p.name for p in (run / "attempts").iterdir()], ["001"])
+                self.assertTrue((run / "attempts/001/reservation.json").is_file())
 
     def test_tampered_request_plan_method_and_configuration_refuse_before_network(self):
         with patch.object(app, "post_response") as post:
