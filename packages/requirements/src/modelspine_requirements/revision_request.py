@@ -4,6 +4,7 @@ from modelspine_protocols.review import ReviewAction
 from modelspine_requirements.review import ReviewSession, review_input, review_ref
 from modelspine_requirements.typed_domain import typed_modeling_prompt
 from hashlib import sha256
+import base64
 
 VERSION = "revision-context/0.1"
 
@@ -103,15 +104,27 @@ def prepare_execution_revision(session, *, expected_review_ref, action_refs):
     require(review_ref(session) == expected_review_ref, "stale execution revision", "conflict")
     view = review_input(session)
     context = execution_context(session.request, view, action_refs)
+    raw = base64.b64decode(context["parent_candidate_base64"], validate=True)
+    try:
+        parent_text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        require(False, "revision parent requires strict UTF-8; original remains available for review", "unsupported")
+    projection = {"schema_version": "revision-parent-projection/0.1",
+                  "candidate_ref": context["parent_candidate_ref"],
+                  "raw_sha256": sha256(raw).hexdigest(), "text_status": "exact_utf8", "text": parent_text}
+    # Context/ref still covers immutable raw bytes; presentation omits only base64.
+    # No execution_context change: old registered/adopted history replays as before.
+    prompt_context = {k: v for k, v in context.items() if k != "parent_candidate_base64"}
     prompt = (INSTRUCTIONS + "\nREQUEST_HASH=" + digest(session.request) + "\nORIGINAL_REQUEST_JSON=" + dumps(session.request)
-              + "\nREVISION_CONTEXT_JSON=" + dumps(context) + "\nSOURCE_LINES_JSON=" + dumps(
+              + "\nREVISION_CONTEXT_JSON=" + dumps(prompt_context)
+              + "\nPARENT_CANDIDATE_PROJECTION_JSON=" + dumps(projection) + "\nSOURCE_LINES_JSON=" + dumps(
                   [{"line": i, "text": s} for i, s in enumerate(session.request.text.splitlines(), 1)]))
-    return {"schema_version": "execution-revision-envelope/0.1", "review_session": to_data(session),
-            "action_refs": to_data(tuple(action_refs)), "context": context, "prompt": prompt}
+    return {"schema_version": "execution-revision-envelope/0.2", "review_session": to_data(session),
+            "action_refs": to_data(tuple(action_refs)), "context": context, "parent_projection": projection, "prompt": prompt}
 
 
 def verify_execution_revision(envelope):
-    require(type(envelope) is dict and set(envelope) == {"schema_version", "review_session", "action_refs", "context", "prompt"},
+    require(type(envelope) is dict and set(envelope) == {"schema_version", "review_session", "action_refs", "context", "parent_projection", "prompt"},
             "invalid execution revision envelope")
     session = decode(ReviewSession, envelope["review_session"])
     expected = prepare_execution_revision(session, expected_review_ref=review_ref(session),

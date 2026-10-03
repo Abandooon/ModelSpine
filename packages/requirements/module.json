@@ -2,7 +2,7 @@
   "id": "requirements",
   "title": "需求澄清与模型细化",
   "status": "implemented-slice",
-  "version": "0.6.0-experimental",
+  "version": "0.6.1-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -44,7 +44,8 @@
     "typed_revision.RevisionCandidate",
     "typed_revision.inspect_revision_candidate",
     "revision_request.prepare_execution_revision",
-    "revision_request.verify_execution_revision"
+    "revision_request.verify_execution_revision",
+    "revision_schema.response_format"
   ],
   "scope": "有限需求/候选及审阅纯转换；新增原文与澄清分离的修订信封和严格后继候选检查。网络与持久化仅由app装配，无语义验收声明。",
   "implementation_entrypoints": [
@@ -53,7 +54,8 @@
     "src/modelspine_requirements/typed_domain.py",
     "src/modelspine_requirements/review.py",
     "src/modelspine_requirements/revision_request.py",
-    "src/modelspine_requirements/typed_revision.py"
+    "src/modelspine_requirements/typed_revision.py",
+    "src/modelspine_requirements/revision_schema.py"
   ],
   "validation_evidence": [
     "../../docs/clarification.md",
@@ -68,7 +70,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Explicit finite interpretation/clarification with immutable answer history; strict raw-source and typed-domain-candidate inspection; source/request-bound finite review sessions, saved instance references, explicit proposal adoption and prior-version isolation. Offline revision-context/0.1 remains available. Execution-revision-envelope/0.1 and revision-context/0.2 separately preserve original source and verified question/action evidence; typed-domain-revision/0.1 inspection validates the new finite syntax and exact evidence. Saved revision proposals pin actual method instructions for stable replay. Bounded real language calls and local persistence are composed by apps; this package has no transport, persistence, automatic semantic acceptance or fidelity proof.",
+  "implemented_scope": "Explicit finite interpretation/clarification with immutable answer history; strict raw-source and typed-domain-candidate inspection; source/request-bound finite review sessions, saved instance references, explicit proposal adoption and prior-version isolation. Offline revision-context/0.1 remains available. Execution-revision-envelope/0.1 and revision-context/0.2 separately preserve original source and verified question/action evidence; typed-domain-revision/0.1 inspection validates the new finite syntax and exact evidence. Saved revision proposals pin actual method instructions for stable replay. Bounded real language calls and local persistence are composed by apps; this package has no transport, persistence, automatic semantic acceptance or fidelity proof. Fixed revision-output-schema/0.1 constrains the complete revision generation shape; execution-revision-envelope/0.2 provides an exact UTF-8 parent projection while preserving historical context replay. Transport compatibility and candidate fidelity require actual validation.",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft",
   "additional_contract_entrypoints": [

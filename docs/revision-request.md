@@ -1,12 +1,16 @@
 # 回答修订请求与有界执行
 
-新增 `execution-revision-envelope/0.1` / `revision-context/0.2` 接口见[执行修订合同](../packages/requirements/contracts/execution-revision.md)。它支持外加复合问题、更正、真实回答分别归属，候选可引用原文完整行或已验证 question/action 原话。旧 source-only 合同及下列旧离线入口继续保留。
+当前 `execution-revision-envelope/0.2` / `revision-context/0.2` 接口见[执行修订合同](../packages/requirements/contracts/execution-revision.md)。它支持外加复合问题、更正、真实回答分别归属，候选可引用原文完整行或已验证 question/action 原话。旧 source-only 合同及下列旧离线入口继续保留。
 
-当前提示方法为 `typed-domain-revision-proposal/0.1.2`：明确 Constraint.context、关系端点、Get/Navigate、trace/issue 等交叉引用的声明 ID 与 ArtifactRef 来源，禁止使用显示名代替 ID；通用说明用户回答须结合所采纳的问题及更正，required 是 slot 存在要求，unknown 值不等于 optional。0.1.2 消除叶节点说明矛盾：仅 literal/instant/duration 有非 null value，分别为普通标量、UTC 时间戳、signed64 秒；其余算子 value=null。时间位移须为 Duration，负整数 literal 仍为 Int，不隐式转换。数组项须为指定对象而非解释字符串；ArtifactRef 精确字段为 project_id/artifact_id/revision/content_hash。候选/语言 DTO、严格解析和执行语义未改。此前真实响应虽 HTTP200/completed，仍因规则 context 使用显示名被拒绝；未证明是输出上限截断，原件不修补。后续 0.1.1 真实响应同样 completed，因 traces 数组混入字符串被拒绝；对未改写 definition 子树的诊断还发现时间加法使用 Int literal。两次均未证明是输出上限截断，原件不修补。新提示不保证输出合法、引用或语义正确，原失败与新调用计划分别保留。既存项目仍按已保存 method_instructions 重放；新 prepare 使用新提示/hash，旧冻结 run 不按新方法重放。
+先前提示方法 `typed-domain-revision-proposal/0.1.2`：明确 Constraint.context、关系端点、Get/Navigate、trace/issue 等交叉引用的声明 ID 与 ArtifactRef 来源，禁止使用显示名代替 ID；通用说明用户回答须结合所采纳的问题及更正，required 是 slot 存在要求，unknown 值不等于 optional。0.1.2 消除叶节点说明矛盾：仅 literal/instant/duration 有非 null value，分别为普通标量、UTC 时间戳、signed64 秒；其余算子 value=null。时间位移须为 Duration，负整数 literal 仍为 Int，不隐式转换。数组项须为指定对象而非解释字符串；ArtifactRef 精确字段为 project_id/artifact_id/revision/content_hash。候选/语言 DTO、严格解析和执行语义未改。此前真实响应虽 HTTP200/completed，仍因规则 context 使用显示名被拒绝；未证明是输出上限截断，原件不修补。后续 0.1.1 真实响应同样 completed，因 traces 数组混入字符串被拒绝；对未改写 definition 子树的诊断还发现时间加法使用 Int literal。两次均未证明是输出上限截断，原件不修补。新提示不保证输出合法、引用或语义正确，原失败与新调用计划分别保留。既存项目仍按已保存 method_instructions 重放；新 prepare 使用新提示/hash，旧冻结 run 不按新方法重放。
+
+当前方法 `typed-domain-revision-proposal/0.2` 使用完整固定 strict JSON Schema，见[生成与投影合同](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)。所有字段 required、对象封闭，包含 residuals/Trace、证据 union 和递归表达式；仍须本地 strict 解析、类型/引用/来源检查，再交独立语义评价。第三方代理支持未验证；不支持/拒答/不完整即停止，没有 JSON mode 回退。此前三份真实修订均完整但严格拒绝，没有采纳后继，不能把 Schema 工程测试记作自动生成成功。
+
+新版 envelope 增加 parent_projection：父候选原字节严格 UTF-8 文本、candidate_ref、raw_sha256、固定 exact_utf8 状态和版本。prompt 显示这份可读原文，省去 context 展示中的 base64；冻结 context/session 仍保留完整原件。非 UTF-8 明确 unsupported，留给 UI 审阅，不产生 replacement 提示。execution_context 不改，旧已登记/采纳历史仍按保存方法恢复；旧运行按原代码冻结。
 
 宿主先用 `model_review.record_clarification(project_dir, ExternalClarification)` 记录外加澄清，或用既有 submit_action 记录候选问题的 answer/decline。actor 是宿主归属，不是认证；不能把外加问题冒作某一旧 issue 的回答。完整 DTO 见合同和 `modelspine_protocols.review`。
 
-有界调用使用 `language_modeling.prepare_revision_run(run_dir, project_dir, config, expected_review_ref=..., action_refs=..., task_id=...)`；它冻结一个输入、完整原文/父候选/原话/当前方法/payload，不联网。方法 `typed-language-run/0.4` 重用同一 Responses transport、原预算 reservation/receipt/锁、无自动重试。执行持有父审阅锁，核对父 head、所有原件及完整方法，期间其他协作写者收到 busy。输出文件使用排他创建，4MiB 单个准备工件上限、2MiB 响应信封和 256KiB 候选上限不扩大。
+有界调用使用 `language_modeling.prepare_revision_run(run_dir, project_dir, config, expected_review_ref=..., action_refs=..., task_id=...)`；它冻结一个输入、完整原文/父候选/原话/当前方法/payload，不联网。方法 `typed-language-run/0.5` 重用同一 Responses transport、原预算 reservation/receipt/锁、无自动重试。执行持有父审阅锁，核对父 head、所有原件及完整方法，期间其他协作写者收到 busy。输出文件使用排他创建，4MiB 单个准备工件上限、2MiB 响应信封和 256KiB 候选上限不扩大。
 
 ```text
 python -B -I apps/language_modeling.py prepare-revision --run-dir ABS_NEW_RUN --project-dir ABS_PROJECT --bindings ABS_BINDINGS --task-id HOST_ALLOCATION_ID --env-file HOST_PRIVATE_CONFIG

@@ -1,4 +1,4 @@
-# 有界回答修订 execution-revision-envelope/0.1
+# 有界回答修订 execution-revision-envelope/0.2
 
 本合同补充旧 [revision-request 指南](../../../docs/revision-request.md)，不改写原文 ModelingRequest、SourceSpan 或旧 typed-domain-candidate/0.1。新版定义用 [finite-domain/0.2](../../protocols/contracts/finite-domain-0.2.md)；候选常量为 `typed-domain-revision/0.1`。结构和完整引用通过仍不证明意图忠实，候选只能 unconfirmed。
 
@@ -6,7 +6,7 @@
 
 ReviewSession 的纯转换 `apply_action`、本地 `model_review.record_clarification` 使用同一 expected-head / project / request / candidate 检查、全链重放、同 ID 同内容幂等、异内容冲突和 pending/busy 保存责任。它只推进审阅版本，不替换当前候选。原问题答案和外加澄清都可以被选择；伪造 action/question、跨项目/会话、旧版本拒绝。
 
-`prepare_execution_revision(session,expected_review_ref=...,action_refs=...)` 返回封闭 `{schema_version,review_session,action_refs,context,prompt}`，版本 `execution-revision-envelope/0.1`。1–64 个不重复真实回答/拒答引用从当前/历史视图核对。context 版本 `revision-context/0.2` 包括父 request/candidate/review、原文 source/text、父原件 base64、完整回答归属、`derived_modeling_request=null` 和方法提示 hash。ref 绑定除自身外的 context；prompt 冻结完整新输出语法、完整原始 request、该 context 及准确 splitlines 行表。原源字节从不拼接回答；`verify_execution_revision` 重新重放并逐字段比较完整信封/提示。
+`prepare_execution_revision(session,expected_review_ref=...,action_refs=...)` 返回封闭 `{schema_version,review_session,action_refs,context,parent_projection,prompt}`，版本 `execution-revision-envelope/0.2`。1–64 个不重复真实回答/拒答引用从当前/历史视图核对。context 版本 `revision-context/0.2` 包括父 request/candidate/review、原文 source/text、父原件 base64、完整回答归属、`derived_modeling_request=null` 和方法提示 hash。ref 绑定除自身外的 context；prompt 冻结完整新输出语法、完整原始 request、context 的展示（只省略 parent_candidate_base64）、可读父候选及准确 splitlines 行表。原源字节从不拼接回答；`verify_execution_revision` 重新重放并逐字段比较完整信封/提示。
 
 新版候选恰有 `schema_version,request_hash,revision_ref,status,definition,traces,issues`。revision_ref 必须为该已验证 context.ref，request_hash 仍绑定原 request。Trace={element,evidence}，每定义元素一条。Issue={id,kind,text,related_ids,question,evidence}，kind 同旧合同。非空 evidence 列表只接受两个封闭分支：
 
@@ -22,3 +22,14 @@ ReviewSession 的纯转换 `apply_action`、本地 `model_review.record_clarific
 既有 `ProposalAdoption` 显式选择已记录 proposal。它重新检查当前 head、proposal、上下文及原候选字节，生成同项目/同 request 的后继候选引用与 history，保留父视图回答/未决，重新建立当前问题，不继承旧确认、实例、检查报告。用户可以明确改变需求，旧 residual 不被永久锁为不可编辑；其删除或改变的正当性仍需来源/语义审阅。不是内核接受/语义批准。
 
 旧 `propose_edit` 仍只支持旧 source-only 候选；新版编辑必须带 RevisionProposal 上下文。旧 revision-context/0.1 export 仍是旧离线动作入口；不要把新外加澄清压成其中的旧单段 answer。依赖保持 requirements→protocols，无 apps/research 导入。
+
+
+## 固定生成形状与可读父候选
+
+方法 `typed-domain-revision-proposal/0.2`、装配 `typed-language-run/0.5` 仅对回答修订请求使用 `revision_schema.response_format()`：Responses `text.format={type:"json_schema",name:"modelspine_revision_01",strict:true,schema:...}`。Schema 版本 `revision-output-schema/0.1`，固定而非通用 DTO 生成框架；所有对象 additionalProperties=false，所有字段 required，包括空 residuals/issues。Evidence 用 anyOf 区分 source/action；Expression 用递归 $ref 与判别分支覆盖全部算子，固定 args 数量、symbol 与三类叶节点 value；Constraint 区分 invariant/null operation 与 eligibility/string operation。原文 v0.1 路径继续 JSON mode，不自动作为修订失败的备用方式。
+
+此 Schema 仅是服务端生成形状约束。非空/唯一 ID、signed64 与 Gregorian 时间范围、引用/词法作用域、操作数类型、资源上限、精确 source/action 引文、残余义务仍由本地严格检查负责。JSON Schema integer 可能接受数学整数 1.0，本地 DTO 仍拒绝 float；不放宽 parser。Schema 不能保证业务忠实或 B 评价通过。第三方代理是否支持并执行该格式尚未验证；HTTP 不支持、refusal、incomplete 或 schema/typed 不合法均保留失败并停止，无 text 回退、补 JSON、自动重试或降级。
+
+`parent_projection` 恰为 `{schema_version:"revision-parent-projection/0.1",candidate_ref,raw_sha256,text_status:"exact_utf8",text}`。从已重放父候选 base64 原字节严格解码；非 UTF-8 报 unsupported，原件仍供已有 UI 读取，不生成 replacement 文本。text 是准确原文 JSON 文本，不替父候选补字段、重新序列化或纠正；非法但 UTF-8 的原件也可被展示并保留其非法状态。父解释不是用户要求/来源证据。原 source 和用户原话不变，prompt 不要求模型解码 base64。
+
+execution_context body/ref 与 revision-context/0.2 不变，可读投影只在新 envelope/prompt。保存历史仍使用原 method_instructions 重建旧 context，registered/adopted 不随当前 schema 或 prompt 改变而损坏。旧 execution-revision-envelope/0.1 导出和运行仅由其冻结代码验证，不能按新版 prepare 执行；新导出使用新路径，原件不覆盖。verify_execution_revision 重算投影、prompt 和全部信封，不能仅相信其中自行声明的 hash。plan 同时冻结新 schema 模块源码与实际 payload；prepare 与联网前重建同一个 response_format，篡改或改回 json_object 被拒绝。

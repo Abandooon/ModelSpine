@@ -1,12 +1,14 @@
-# 有界真实语言入口（typed-language-run/0.4）
+# 有界真实语言入口（typed-language-run/0.5）
 
 `apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。0.4 新增[回答修订入口](revision-request.md)，冻结同项目父审阅与单独归属的用户原话，严格检查原样后继提案，明确登记/采纳才推进审阅/候选。无自动修复、实例生成或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
 
-0.1.2 修订提示消除 literal/instant/duration 与 value=null 的矛盾，限定对象数组项与精确 ArtifactRef 字段；不改变解析器或执行语义，也不保证模型输出合法。原文 v0.1 提示和检查继续保留；修订使用 `typed-domain-revision-proposal/0.1.2` 与 `finite-domain/0.2`，不拼接原 source、补 JSON 或推断固定业务字段。来源引用可绑定原文完整行或经过重放验证的问题/更正/回答段；方法指令原文随提案保存，后续提示变化不应破坏历史读取。保守 Filter 的未知结果不等于精确业务允许/拒绝，保留 required residual 和生命周期未决。新增接口的假传输回归不是新的真实实验结果；真实调用由授权宿主另行执行。
+0.1.2 修订提示消除 literal/instant/duration 与 value=null 的矛盾，限定对象数组项与精确 ArtifactRef 字段；不改变解析器或执行语义，也不保证模型输出合法。原文 v0.1 提示和检查继续保留；当前修订使用 `typed-domain-revision-proposal/0.2` 与 `finite-domain/0.2`，不拼接原 source、补 JSON 或推断固定业务字段。来源引用可绑定原文完整行或经过重放验证的问题/更正/回答段；方法指令原文随提案保存，后续提示变化不应破坏历史读取。保守 Filter 的未知结果不等于精确业务允许/拒绝，保留 required residual 和生命周期未决。新增接口的假传输回归不是新的真实实验结果；真实调用由授权宿主另行执行。
 
-协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定`text.format={"type":"json_object"}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
+协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定输出格式：原文入口为 `text.format={"type":"json_object"}`，修订入口为 `text.format={"type":"json_schema","name":"modelspine_revision_01","strict":true,"schema":完整固定schema}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
 
-0.3仅增加[Responses JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs)，完整保留0.2/SRC-01提示。官方合同约束可解析JSON，不保证typed schema，且仍须处理不完整等边界；本入口继续使用已有typed检查，不新增Schema层。供应商的一般兼容声明及官方模型能力不能证明当前代理实际执行该格式，尚须真实观察；即使返回合法JSON也不能证明内部约束实现或原文忠实。HTTP400不支持参数、refusal、不完整响应、completed但非法JSON或typed不合法均沿用停止与原件保留规则，不自动改参数再试。拒答content不被提取为候选，记录unsupported_output_shape；可提取但非法的候选仍供审阅。
+0.3仅增加[Responses JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs)，完整保留0.2/SRC-01提示。官方合同约束可解析JSON，不保证typed schema，且仍须处理不完整等边界；该版本的原文入口继续使用已有typed检查，未增加Schema层；0.5 修订入口的新增格式见下段。供应商的一般兼容声明及官方模型能力不能证明当前代理实际执行该格式，尚须真实观察；即使返回合法JSON也不能证明内部约束实现或原文忠实。HTTP400不支持参数、refusal、不完整响应、completed但非法JSON或typed不合法均沿用停止与原件保留规则，不自动改参数再试。拒答content不被提取为候选，记录unsupported_output_shape；可提取但非法的候选仍供审阅。
+
+0.5 对回答修订加入[完整生成合同及父可读投影](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)：所有嵌套对象/union/表达式均有固定封闭 Schema，联网前重建并核对。Schema 不代替本地类型、引用和精确证据检查，更不证明语义忠实。依据宿主已核对的[官方 Structured Outputs 合同](https://developers.openai.com/api/docs/guides/structured-outputs)，格式支持递归与 required/nullable；官方模型能力不证明代理支持。无自动格式回退，400/拒答/incomplete/非法候选均停止并保存。父候选以严格 UTF-8、带原件 hash 的版本投影呈现，非 UTF-8 不准备模型请求；旧审阅历史结构不改。
 
 ## 配置与准备
 
@@ -71,3 +73,7 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 0.1.1的离线回归使用假凭据、真实标准库HTTPResponse/本机socketpair及公开submit_action，覆盖截断转义回显落盘、短Content-Length、超时21字节前缀、完整配对输入、pending审阅、错request/candidate和合法回答后的继续。没有新增依赖、配置或恢复服务。旧调用的0.1方法hash、失败原件和预算不随修复改写，旧plan在新方法下应拒绝执行；本修复不授权重放或额外真实调用。
 
 定向离线验收：`python -B -I tests/test_language_modeling.py`。合成响应均为工程自测，不计真实样本。覆盖配置、重定向、预算重开/失败/损坏、身份冲突、HTTP/超时/截断、无usage、错模型、非法原件、密钥隔离，以及同一候选经D现有HTTP入口读取。真实供应商配置已由宿主提供；生成次数、最终调用计划、真实结果及独立语义评价须查本轮运行证据，不能由离线测试推出。2026-09-30累计3次POST尝试，预算3/3已耗尽、余0。首次原环境network_error、HTTP状态null、0字节、usage unknown。第二次经显式有界宿主恢复，S01收到HTTP200/gpt-6-luna，但incomplete/max_output_tokens；输入976、输出4096（含推理1763），报告5072 tokens，截断候选被拒绝。第三次使用已审行表/紧凑提示v2，HTTP200、transport received、response completed、返回gpt-6-luna；输入1455、输出3488（含推理1379），报告4943 tokens，输出未达4096上限。其7407字节候选仍因JSON语法错误被拒绝：候选文本末尾报`Expecting ',' delimiter`，typed-inspect退出2。服务端completed不等于JSON合法，本次也没有已证实的token上限截断。独立审核只读取原件中完整可解析的traces子数组：13条full-line引文匹配、0越界，说明引用绑定改善，不证明语义、完整性或候选合法。两次失败候选均保存原件，现有D HTTP入口读取200且candidate_ref/base64一致、存储hash不变；未运行新的完整浏览器验收。已知用量小计10015 tokens加首次未知，金额未测。S02及B正式86/34/5在该时点均not_run；该旧批次无剩余额度，不重试、补JSON或替换失败原件。真实收据与generation_provenance=not_verified分开，审阅仍rejected、语义not_checked、实例not_run，R2/F1/F2未完成。该时点未分配新调用；后续JSON mode与扩额授权见本节2026-10-02记录，不改写上述历史失败。
+
+### 2026-10-04 完整形状方法的首次真实观察
+
+一次回答修订使用 fixed strict Schema 与精确父候选投影：HTTP200/completed，8022 输入、7380 输出 tokens，未截断。原始输出满足发送的形状约束，但因集合参与 Boolean 运算等静态类型错误被本地检查拒绝；未登记或采纳，父项目未变。此观察说明该请求获得响应，不证明代理强制实施 Schema，也不证明候选语义忠实。原件和失败由授权宿主保留，不能修补后冒称原始成功；后续方法与请求须另行固定。

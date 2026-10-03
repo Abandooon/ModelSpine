@@ -24,6 +24,24 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from test_finite_execution import fixture
 
 
+def schema_accepts(value, node, definitions):
+    """Test-only interpreter for the small emitted schema vocabulary, not a product validator."""
+    if "$ref" in node: return schema_accepts(value, definitions[node["$ref"].split("/")[-1]], definitions)
+    if "anyOf" in node: return any(schema_accepts(value, n, definitions) for n in node["anyOf"])
+    types = node["type"] if isinstance(node["type"], list) else [node["type"]]
+    kind = {dict:"object", list:"array", str:"string", int:"integer", bool:"boolean", type(None):"null"}.get(type(value))
+    # JSON Schema integer is mathematical; the local DTO parser is stricter.
+    if type(value) is float and value.is_integer(): kind="integer"
+    if kind not in types or ("enum" in node and value not in node["enum"]): return False
+    if kind == "object":
+        return (set(node["required"]) <= set(value) <= set(node["properties"]) and
+                all(schema_accepts(v, node["properties"][k], definitions) for k,v in value.items()))
+    if kind == "array":
+        return (node.get("minItems",0) <= len(value) <= node.get("maxItems",float("inf")) and
+                all(schema_accepts(v,node["items"],definitions) for v in value))
+    return True
+
+
 def response(raw, **updates):
     data={"id":"engineering","object":"response","model":"gpt-6-luna","status":"completed","error":None,
           "incomplete_details":None,"usage":{"input_tokens":12,"output_tokens":20,"total_tokens":32},
@@ -75,7 +93,7 @@ class RevisionExecutionTests(unittest.TestCase):
 
     def test_prompt_declares_reference_targets_and_presence_without_domain_answers(self):
         from modelspine_requirements.typed_revision import INSTRUCTIONS
-        self.assertTrue(INSTRUCTIONS.startswith("typed-domain-revision-proposal/0.1.2\n"))
+        self.assertTrue(INSTRUCTIONS.startswith("typed-domain-revision-proposal/0.2\n"))
         for text in ("Constraint.context must equal an existing Entity.id, never its name/display label.",
                      "get.symbol must be a declared Field.id belonging to the operand object's inferred entity type.",
                      "var.symbol must exactly equal a lexically enclosing filter.symbol",
@@ -142,6 +160,138 @@ class RevisionExecutionTests(unittest.TestCase):
             with self.subTest(path=path),self.assertRaises(ContractError):
                 inspect_revision_candidate(request,raw,self.envelope["context"])
             self.assertIn(b"Engineering explanation",raw)
+
+    def test_schema_closed_DTO_coverage_unions_and_recursive_expression(self):
+        from dataclasses import fields
+        from typing import get_args, get_type_hints
+        from modelspine_requirements import typed_revision as t
+        from modelspine_protocols import finite_execution as f
+        from modelspine_protocols.domain_language import Bounds, BinaryRelation, Residual
+        schema=app.revision_response_format()["schema"]; defs=schema["$defs"]
+        for name,cls in (("ArtifactRef",ArtifactRef),("SourceSpan",t.SourceSpan),("SourceEvidence",t.SourceEvidence),
+                         ("ActionEvidence",t.ActionEvidence),("Trace",t.Trace),("Issue",t.Issue),
+                         ("Field",f.Field),("EntityType",f.EntityType),("Cardinality",Bounds),
+                         ("BinaryRelation",BinaryRelation),("Residual",Residual),("Constraint",f.Constraint),
+                         ("Expression",f.Expression),("DomainDefinition",f.DomainDefinition),(None,t.RevisionCandidate)):
+            node=schema if name is None else defs[name]
+            for branch in node.get("anyOf",[node]):
+                self.assertEqual(set(branch["properties"]),{x.name for x in fields(cls)},name)
+                self.assertEqual(set(branch["required"]),set(branch["properties"]));self.assertIs(branch["additionalProperties"],False)
+        ops={op for b in defs["Expression"]["anyOf"] for op in b["properties"]["op"]["enum"]}
+        self.assertEqual(ops,set(get_args(get_type_hints(f.Expression)["op"])))
+        for name,cls,key in (("Field",f.Field,"value_type"),("Issue",t.Issue,"kind"),
+                             ("SourceEvidence",t.SourceEvidence,"kind"),("ActionEvidence",t.ActionEvidence,"kind"),
+                             ("ActionEvidence",t.ActionEvidence,"part"),("DomainDefinition",f.DomainDefinition,"schema_version"),
+                             (None,t.RevisionCandidate,"schema_version"),(None,t.RevisionCandidate,"status")):
+            node=schema if name is None else defs[name]
+            self.assertEqual(set(node["properties"][key]["enum"]),set(get_args(get_type_hints(cls)[key])))
+        self.assertEqual({s for b in defs["Constraint"]["anyOf"] for s in b["properties"]["scope"]["enum"]},
+                         set(get_args(get_type_hints(f.Constraint)["scope"])))
+        self.assertEqual(defs["Constraint"]["anyOf"][0]["properties"]["operation"],{"type":"null"})
+        self.assertEqual(defs["Constraint"]["anyOf"][1]["properties"]["operation"],{"type":"string"})
+        self.assertEqual(defs["Cardinality"]["properties"]["maximum"]["anyOf"],
+                         [{"type":"integer"},{"type":"string","enum":["unbounded"]}])
+        def walk(node):
+            if isinstance(node,dict):
+                if "$ref" in node:self.assertIn(node["$ref"].split("/")[-1],defs)
+                if node.get("type")=="object":
+                    self.assertIs(node["additionalProperties"],False);self.assertEqual(set(node["required"]),set(node["properties"]))
+                for v in node.values():walk(v)
+            elif isinstance(node,list):
+                for v in node:walk(v)
+        walk(schema)
+        raw=json.loads(candidate(self.envelope));self.assertTrue(schema_accepts(raw,schema,defs))
+        for path in (("definition","residuals"),("traces",0,"evidence"),("revision_ref","revision")):
+            data=json.loads(candidate(self.envelope));parent=data
+            for key in path[:-1]:parent=parent[key]
+            del parent[path[-1]];self.assertFalse(schema_accepts(data,schema,defs))
+        for value in (None,"A question?"):self.assertTrue(schema_accepts(value,defs["Issue"]["properties"]["question"],defs))
+        for value in (None,True,"7",7):
+            e={"op":"duration","args":[],"symbol":None,"value":value}
+            self.assertEqual(schema_accepts(e,defs["Expression"],defs),type(value) is int)
+        for branch in defs["Expression"]["anyOf"]:
+            props=branch["properties"];op=props["op"]["enum"][0];n=props["args"]["minItems"]
+            leaf={"op":"literal","args":[],"symbol":None,"value":True}
+            e={"op":op,"args":[leaf]*n,"symbol":"v" if props["symbol"].get("type")=="string" else None,
+               "value":7 if op in ("literal","duration") else "2026-01-01T00:00:00Z" if op=="instant" else None}
+            self.assertTrue(schema_accepts(e,defs["Expression"],defs),op)
+            e["args"].append(leaf);self.assertFalse(schema_accepts(e,defs["Expression"],defs),op)
+        raw["traces"].append("explanation");self.assertFalse(schema_accepts(raw,schema,defs))
+        data=json.loads(candidate(self.envelope));data["traces"][0]["evidence"][0]["span"]["start_line"]=1.0
+        self.assertTrue(schema_accepts(data,schema,defs))
+        with self.assertRaises(ContractError):inspect_revision_candidate(decode(review.ModelingRequest,self.envelope["review_session"]["request"]),wire.encoded(data),self.envelope["context"])
+        # Fresh format values must not share mutable state across calls.
+        schema["required"].clear();self.assertEqual(len(app.revision_response_format()["schema"]["required"]),7)
+
+    def test_readable_parent_projection_is_exact_and_recomputed(self):
+        projection=self.envelope["parent_projection"]
+        raw=base64.b64decode(self.envelope["context"]["parent_candidate_base64"])
+        self.assertEqual(projection["text"].encode(),raw)
+        self.assertEqual(projection["raw_sha256"],app.hash_bytes(raw))
+        self.assertEqual(projection["candidate_ref"],self.envelope["context"]["parent_candidate_ref"])
+        self.assertEqual(projection["text_status"],"exact_utf8")
+        self.assertNotIn(self.envelope["context"]["parent_candidate_base64"],self.envelope["prompt"])
+        for field in ("text","raw_sha256","text_status","candidate_ref"):
+            changed=json.loads(wire.encoded(self.envelope));changed["parent_projection"][field]="forged"
+            with self.subTest(field=field),self.assertRaises(ContractError):verify_execution_revision(changed)
+        other=self.root/"invalid-parent";other.mkdir()
+        review.create_review(other,decode(review.ModelingRequest,self.envelope["review_session"]["request"]),b"\xffbroken",session_id="invalid")
+        v=review.read_review(other)
+        op=replace(self.operation,request_ref=decode(ArtifactRef,v["request_ref"]),candidate_ref=decode(ArtifactRef,v["candidate_ref"]),expected_review_ref=decode(ArtifactRef,v["review_ref"]))
+        recorded=review.record_clarification(other,op)
+        stored=(other/review.STATE).read_bytes()
+        with review._locked(other),self.assertRaises(ContractError) as error:
+            prepare_execution_revision(review._load(other),expected_review_ref=decode(ArtifactRef,recorded["review_ref"]),action_refs=(decode(ArtifactRef,recorded["action_ref"]),))
+        self.assertEqual(error.exception.code,"unsupported")
+        self.assertEqual((other/review.STATE).read_bytes(),stored)
+        self.assertEqual(base64.b64decode(review.read_review(other)["candidate_base64"]),b"\xffbroken")
+
+    def test_schema_payload_tampering_and_rehashed_inputs_stop_before_POST(self):
+        original={p:p.read_bytes() for p in self.run.rglob("*") if p.is_file()}
+        for case in ("format","schema","prompt","projection","method","plan"):
+            for p,raw in original.items():p.write_bytes(raw)
+            plan=json.loads(original[self.run/"plan.json"])
+            file="payload.json" if case in ("format","schema") else "prompt.txt" if case=="prompt" else "revision.json"
+            if case in ("format","schema"):
+                payload=json.loads((self.run/"input-1"/file).read_bytes())
+                if case=="format":payload["text"]["format"]={"type":"json_object"}
+                else:payload["text"]["format"]["schema"]["$defs"]["DomainDefinition"]["required"].remove("residuals")
+                raw=wire.encoded(payload)
+            elif case=="prompt":raw=b"forged prompt"
+            elif case=="projection":
+                env=json.loads(wire.encoded(self.envelope));env["parent_projection"]["text"]="forged";raw=wire.encoded(env)
+            else:raw=None
+            if raw is not None:
+                (self.run/"input-1"/file).write_bytes(raw);plan["items"][0]["files"][file]=app.hash_bytes(raw)
+            if case=="method":plan["method_sha256"]["packages/requirements/src/modelspine_requirements/revision_schema.py"]="0"*64
+            (self.run/"plan.json").write_bytes(wire.encoded(plan))
+            expected=app.hash_bytes(wire.encoded(plan)) if case!="plan" else "0"*64
+            with self.subTest(case=case),patch.object(app,"post_response") as post:
+                with self.assertRaises((wire.LanguageError,ContractError)):app.execute_next(self.run,self.config,expected_plan_sha256=expected)
+                post.assert_not_called()
+            self.assertFalse(list((self.run/"attempts").iterdir()))
+
+    def test_strict_format_reaches_transport_failures_preserve_raw_and_never_fallback(self):
+        for case in ("http400","refusal","incomplete","missing_residuals","trace_string"):
+            run=self.root/("format-"+case)
+            prepared=app.prepare_revision_run(run,self.parent,self.config,expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering-only-"+case)
+            env=json.loads((run/"input-1/revision.json").read_bytes());data=json.loads(candidate(env))
+            if case=="missing_residuals":del data["definition"]["residuals"]
+            if case=="trace_string":data["traces"].append("not an object")
+            raw=wire.encoded(data);body=response(raw)
+            if case=="http400":body=b'{"error":"unsupported json_schema"}'
+            if case=="incomplete":body=response(raw,status="incomplete")
+            if case=="refusal":
+                r=json.loads(body);r["output"][0]["content"]=[{"type":"refusal","refusal":"cannot comply"}];body=wire.encoded(r)
+            with patch.object(app,"post_response",return_value=wire.Exchange(400 if case=="http400" else 200,body,"received")) as post:
+                result=app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+                sent=json.loads(post.call_args.args[1]);self.assertEqual(sent["text"]["format"],app.revision_response_format())
+                self.assertFalse(result["continue_allowed"])
+                with self.assertRaises(wire.LanguageError):app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+                self.assertEqual(post.call_count,1)
+            self.assertEqual((run/"attempts/001/response.body").read_bytes(),body)
+            if case not in ("http400","refusal"):self.assertEqual((run/"attempts/001/candidate.raw").read_bytes(),raw)
+            self.assertEqual(review.read_review(self.parent)["candidate_ref"],self.view["candidate_ref"])
 
     def propose(self):
         return app.revision_proposal_from_run(self.run,expected_plan_sha256=self.prepared["plan_sha256"],action_id="generated",actor="host")
@@ -260,6 +410,30 @@ class RevisionExecutionTests(unittest.TestCase):
                         action_refs=(decode(ArtifactRef,self.record["action_ref"]),))
                 self.assertNotEqual(fresh["context"]["method_instructions_sha256"],self.envelope["context"]["method_instructions_sha256"])
             self.assertEqual((self.parent/review.STATE).read_bytes(),raw)
+
+    def test_pre_schema_method_registered_and_adopted_reopen_with_current_code(self):
+        from modelspine_requirements import typed_revision
+        # Engineering old-method history, not a real generated candidate or copied source snapshot.
+        old="typed-domain-revision-proposal/0.1.2\nFrozen engineering method before structured output."
+        with patch.object(typed_revision,"INSTRUCTIONS",old):
+            self.run=self.root/"old-method"
+            self.prepared=app.prepare_revision_run(self.run,self.parent,self.config,
+                expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),
+                action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering-old-method")
+            self.envelope=json.loads((self.run/"input-1/revision.json").read_bytes())
+            self.execute();proposal=self.propose();review.submit_revision_proposal(self.parent,proposal)
+        for adopted in (False,True):
+            v=review.read_review(self.parent)
+            if adopted:
+                op=ProposalAdoption("model-review-adoption/0.1","adopt-old",v["project_id"],
+                    decode(ArtifactRef,v["request_ref"]),decode(ArtifactRef,v["candidate_ref"]),
+                    decode(ArtifactRef,v["review_ref"]),"user",decode(ArtifactRef,v["proposals"][-1]["ref"]),"Engineering explicit adoption")
+                review.adopt_proposal(self.parent,op);v=review.read_review(self.parent)
+            stored=(self.parent/review.STATE).read_bytes()
+            run=subprocess.run([sys.executable,"-B","-I",str(app.REPO/"apps/model_review.py"),"show",
+                                "--project-dir",str(self.parent)],capture_output=True)
+            self.assertEqual(run.returncode,0,run.stderr.decode());self.assertEqual(json.loads(run.stdout),v)
+            self.assertEqual((self.parent/review.STATE).read_bytes(),stored)
 
     def test_reservation_failure_keeps_consumed_slot_without_network(self):
         with patch.object(app.os,"fsync",side_effect=OSError("engineering reservation fsync")), patch.object(app,"post_response") as post:
