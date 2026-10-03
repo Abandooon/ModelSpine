@@ -2,7 +2,7 @@
   "id": "interaction",
   "title": "任务界面与用户审查",
   "status": "implemented-slice",
-  "version": "0.4.0-experimental",
+  "version": "0.4.1-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -46,5 +46,5 @@
     "InteractionPlan",
     "VisualAssetRef"
   ],
-  "implemented_scope": "Standard-library exact finite-domain/0.1 and /0.2 presentation: expressions, invariant versus eligibility scope, original-source/action evidence, external question/correction/answer and separately attributed interpretation. The app consumes shared clarification, method-pinned revision registration, deliberate adoption/history and saved-instance eligibility APIs. Unknown/error remain visible, qualification never implies action execution, and v0.2 application configuration is explicitly unsupported. Legacy offline ordinary-answer export and v0.1 specification preview/confirmation/save remain. No state ownership, evaluator duplication, model transport or authentication service."
+  "implemented_scope": "Standard-library exact finite-domain/0.1 and /0.2 presentation: expressions, invariant versus eligibility scope, original-source/action evidence, external question/correction/answer and separately attributed interpretation. The app consumes shared clarification, method-pinned revision registration, deliberate adoption/history and saved-instance eligibility APIs. Unknown/error remain visible, qualification never implies action execution, and v0.2 application configuration is explicitly unsupported. Legacy offline ordinary-answer export and v0.1 specification preview/confirmation/save remain. No state ownership, evaluator duplication, model transport or authentication service. Pending proposals are projected from their own inspection and immutable raw content before adoption, with stable-ID, JSON-type-preserving content comparison against the bound current parent; rejected proposals retain their own diagnostics and raw text without invented partial models or inherited current reports."
 }

@@ -581,5 +581,126 @@ class RevisionExecutionTests(unittest.TestCase):
         with self.assertRaises(ContractError) as error: review.read_review(self.parent)
         self.assertEqual(error.exception.code,"incomplete_write")
 
+    def failed_output(self, envelope=None):
+        data=json.loads(candidate(envelope or self.envelope))
+        data["definition"]["constraints"][0]["assertion"]={"op":"eq","args":[
+            {"op":"get","args":[{"op":"self","args":[],"symbol":None,"value":None}],"symbol":"deadline","value":None},
+            {"op":"literal","args":[],"symbol":None,"value":"2000-01-01T00:00:00Z"}],"symbol":None,"value":None}
+        return wire.encoded(data)
+
+    def prepare_feedback(self, name="feedback", source=None, prepared=None):
+        source=self.run if source is None else source;prepared=self.prepared if prepared is None else prepared
+        target=self.root/name
+        result=app.prepare_feedback_run(target,self.parent,self.config,failed_run_dir=source,
+            expected_failed_plan_sha256=prepared["plan_sha256"],expected_failed_receipt_sha256=app.hash_bytes((source/"attempts/001/receipt.json").read_bytes()),
+            expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering-one-explicit-feedback")
+        return target,result
+
+    def test_feedback_recomputed_attribution_complete_raw_and_valid_explicit_adoption(self):
+        raw=self.failed_output();self.execute(raw)
+        stored=(self.parent/review.STATE).read_bytes();run,prepared=self.prepare_feedback()
+        feedback=json.loads((run/"input-1/feedback.json").read_bytes())
+        obs=feedback["observation"]
+        self.assertFalse(obs["user_requirement"]);self.assertEqual(obs["failed_candidate_text"].encode(),raw)
+        diag=obs["expression_diagnostics"][0]
+        self.assertEqual(diag["path"],"/definition/constraints/0/assertion")
+        self.assertEqual(diag["operand_types"],[["instant",False],["string",False]])
+        env=json.loads((run/"input-1/revision.json").read_bytes());self.assertEqual(env,self.envelope)
+        self.assertIn("Re-read the entire original requirements",(run/"input-1/prompt.txt").read_text(encoding="utf-8"))
+        self.assertNotIn("checker",env["context"]["responses"][0]["verbatim"]["answer"])
+        good=candidate(env)
+        with patch.object(app,"post_response",return_value=wire.Exchange(200,response(good),"received")) as post:
+            result=app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+            self.assertTrue(result["continue_allowed"]);self.assertEqual(post.call_count,1)
+            with self.assertRaises(wire.LanguageError):app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+            self.assertEqual(post.call_count,1)
+        self.assertEqual((self.parent/review.STATE).read_bytes(),stored)
+        proposal=app.review_proposal_from_run(run,expected_plan_sha256=prepared["plan_sha256"],
+            expected_receipt_sha256=app.hash_bytes((run/"attempts/001/receipt.json").read_bytes()),action_id="feedback-result",actor="host")
+        self.assertEqual(base64.b64decode(proposal.proposal_base64),good)
+        review.submit_revision_proposal(self.parent,proposal);view=review.read_review(self.parent)
+        self.assertEqual(view["candidate_ref"],self.view["candidate_ref"])
+        action=ProposalAdoption("model-review-adoption/0.1","adopt-feedback",view["project_id"],decode(ArtifactRef,view["request_ref"]),
+            decode(ArtifactRef,view["candidate_ref"]),decode(ArtifactRef,view["review_ref"]),"user",decode(ArtifactRef,view["proposals"][-1]["ref"]),"Engineering explicit adoption")
+        review.adopt_proposal(self.parent,action)
+        self.assertEqual(base64.b64decode(review.read_review(self.parent)["candidate_base64"]),good)
+
+    def test_rejected_complete_result_exports_unconfirmed_but_cannot_be_adopted(self):
+        raw=self.failed_output();result=self.execute(raw);self.assertEqual(result["stop_reasons"],["candidate_rejected"])
+        receipt=(self.run/"attempts/001/receipt.json").read_bytes()
+        with self.assertRaises(ContractError):self.propose()
+        with self.assertRaises(ContractError):app.review_proposal_from_run(self.run,expected_plan_sha256=self.prepared["plan_sha256"],
+            expected_receipt_sha256=None,action_id="missing-authority",actor="host")
+        with self.assertRaises(ContractError):app.prepare_feedback_run(self.root/"missing-authority",self.parent,self.config,
+            failed_run_dir=self.run,expected_failed_plan_sha256=self.prepared["plan_sha256"],expected_failed_receipt_sha256=None,
+            expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering")
+        proposal=app.review_proposal_from_run(self.run,expected_plan_sha256=self.prepared["plan_sha256"],
+            expected_receipt_sha256=app.hash_bytes(receipt),action_id="invalid-result",actor="host")
+        review.submit_revision_proposal(self.parent,proposal);v=review.read_review(self.parent)
+        self.assertEqual(v["candidate_ref"],self.view["candidate_ref"])
+        self.assertEqual(v["proposals"][-1]["inspection"]["status"],"rejected")
+        action=ProposalAdoption("model-review-adoption/0.1","reject-adoption",v["project_id"],decode(ArtifactRef,v["request_ref"]),
+            decode(ArtifactRef,v["candidate_ref"]),decode(ArtifactRef,v["review_ref"]),"user",decode(ArtifactRef,v["proposals"][-1]["ref"]),"Cannot adopt invalid proposal")
+        with self.assertRaises(ContractError):review.adopt_proposal(self.parent,action)
+        self.assertEqual((self.run/"attempts/001/receipt.json").read_bytes(),receipt)
+
+    def test_feedback_and_export_reject_corrupt_inputs_receipt_checker_scope_and_stale_head(self):
+        self.execute(self.failed_output());run,prepared=self.prepare_feedback()
+        original={p:p.read_bytes() for p in self.run.rglob("*") if p.is_file()}
+        receipt_sha=app.hash_bytes(original[self.run/"attempts/001/receipt.json"])
+        for name in ("input-1/source.txt","input-1/payload.json","attempts/001/candidate.raw","attempts/001/response.body", "attempts/001/inspection.json","attempts/001/receipt.json"):
+            path=self.run/name;path.write_bytes(original[path]+b"changed")
+            with self.subTest(name=name),patch.object(app,"post_response") as post:
+                with self.assertRaises((wire.LanguageError,ContractError)):app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+                post.assert_not_called()
+            path.write_bytes(original[path])
+        plan=json.loads(original[self.run/"plan.json"]);plan["method_sha256"]["packages/protocols/src/modelspine_protocols/finite_execution.py"]="0"*64
+        (self.run/"plan.json").write_bytes(wire.encoded(plan))
+        with self.assertRaises(ContractError):app.prepare_feedback_run(self.root/"wrong-checker",self.parent,self.config,failed_run_dir=self.run,
+            expected_failed_plan_sha256=app.hash_bytes(wire.encoded(plan)),expected_failed_receipt_sha256=receipt_sha,
+            expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering")
+        (self.run/"plan.json").write_bytes(original[self.run/"plan.json"])
+        # Rehashing a forged observation cannot make it a recomputed checker fact.
+        feedback=json.loads((run/"input-1/feedback.json").read_bytes());feedback["observation"]["inspection"]["diagnostics"][0]["message"]="invented"
+        (run/"input-1/feedback.json").write_bytes(wire.encoded(feedback));plan=json.loads((run/"plan.json").read_bytes())
+        plan["items"][0]["files"]["feedback.json"]=app.hash_bytes(wire.encoded(feedback));(run/"plan.json").write_bytes(wire.encoded(plan))
+        with patch.object(app,"post_response") as post:
+            with self.assertRaises(ContractError):app.execute_next(run,self.config,expected_plan_sha256=app.hash_bytes(wire.encoded(plan)))
+            post.assert_not_called()
+        v=review.read_review(self.parent);review.submit_action(self.parent,ReviewAction("model-review/0.1","new-head",v["project_id"],decode(ArtifactRef,v["request_ref"]),
+            decode(ArtifactRef,v["candidate_ref"]),decode(ArtifactRef,v["review_ref"]),None,"user","confirm","",("review:candidate",),None))
+        with self.assertRaises(ContractError):self.prepare_feedback("stale")
+        self.assertFalse(list((run/"attempts").iterdir()))
+
+    def test_feedback_chain_bounded_and_nonreproducible_failures_stop(self):
+        self.execute(self.failed_output());source=self.run;prepared=self.prepared
+        for index in range(3):
+            run,current=self.prepare_feedback("chain-"+str(index),source,prepared)
+            env=json.loads((run/"input-1/revision.json").read_bytes())
+            with patch.object(app,"post_response",return_value=wire.Exchange(200,response(self.failed_output(env)),"received")):
+                result=app.execute_next(run,self.config,expected_plan_sha256=current["plan_sha256"])
+            self.assertEqual(result["stop_reasons"],["candidate_rejected"]);source,prepared=run,current
+        with self.assertRaises(ContractError) as error:self.prepare_feedback("fourth",source,prepared)
+        self.assertEqual(error.exception.code,"unsupported");self.assertFalse((self.root/"fourth").exists())
+        from modelspine_requirements.revision_feedback import observe
+        request=decode(review.ModelingRequest,self.envelope["review_session"]["request"])
+        with self.assertRaises(ContractError):observe(request,b"\xff",self.envelope["context"])
+        data=json.loads(candidate(self.envelope));data["revision_ref"]=self.view["candidate_ref"]
+        with self.assertRaises(ContractError):observe(request,wire.encoded(data),self.envelope["context"])
+
+    def test_unsafe_transport_results_never_export_to_review(self):
+        for case in ("http","refusal","incomplete","credential"):
+            run=self.root/("unsafe-"+case);prepared=app.prepare_revision_run(run,self.parent,self.config,
+                expected_review_ref=decode(ArtifactRef,self.record["review_ref"]),action_refs=(decode(ArtifactRef,self.record["action_ref"]),),task_id="engineering")
+            env=json.loads((run/"input-1/revision.json").read_bytes());body=response(candidate(env));http=200
+            if case=="http":http=400
+            if case=="incomplete":body=response(candidate(env),status="incomplete")
+            if case=="credential":body=response(candidate(env),echo=self.config.key)
+            if case=="refusal":
+                value=json.loads(body);value["output"][0]["content"]=[{"type":"refusal","refusal":"no"}];body=wire.encoded(value)
+            with patch.object(app,"post_response",return_value=wire.Exchange(http,body,"received")):app.execute_next(run,self.config,expected_plan_sha256=prepared["plan_sha256"])
+            with self.subTest(case=case),self.assertRaises(ContractError):app.review_proposal_from_run(run,expected_plan_sha256=prepared["plan_sha256"],
+                expected_receipt_sha256=app.hash_bytes((run/"attempts/001/receipt.json").read_bytes()),action_id="unsafe",actor="host")
+
 
 if __name__ == "__main__": unittest.main(verbosity=2)

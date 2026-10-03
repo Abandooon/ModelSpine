@@ -73,15 +73,17 @@ def definition_version(view: dict) -> str | None:
     return view["inspection"]["checks"]["candidate"]["definition"]["schema_version"]
 
 
-def project_review(view: dict) -> list[dict]:
-    """Text/table projection only. Exact JSON and integer spelling stay available."""
+def _section(title, key, value, *, paragraphs=(), columns=(), rows=(), open_detail=False):
+    return {"title":title, "key":key, "paragraphs":list(paragraphs),
+            "columns":list(columns), "rows":list(rows), "open_detail":open_detail,
+            "detail":value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)}
+
+
+def _model_sections(view):
+    """Shared tables for a verified current candidate or a separately checked proposal."""
     sections = []
-    def add(title, key, *, paragraphs=(), columns=(), rows=(), open_detail=False):
-        value = view[key]
-        sections.append({"title":title, "key":key, "paragraphs":list(paragraphs),
-                         "columns":list(columns), "rows":list(rows), "open_detail":open_detail,
-                         "detail":value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)})
-    add("需求原文", "source_text", paragraphs=[view["source_text"]])
+    def add(title, key, **options):
+        sections.append(_section(title, key, view[key], **options))
     term_rows = []
     names = {t["id"]: t["name"] + " [" + t["id"] + "]" for t in view["terms"]}
     for term in view["terms"]:
@@ -112,11 +114,6 @@ def project_review(view: dict) -> list[dict]:
         ["仅格式化 finite 表达式，不求值或自动解释。字段与计数保留稳定 ID；括号保留 AND/OR 组合。" +
          (" 未支持定义版本：" + str(version) if version not in (None, "finite-domain/0.1") else "")],
         columns=["规则 ID", "上下文", *(["作用域", "操作标识"] if v2 else []), "适用 applies", "断言 assertion", "例外 unless"], rows=rule_rows)
-    kinds={"candidate_issue":"候选中的原问题", "inspection_diagnostic":"原件诊断问题", "external_clarification":"外加澄清（独立记录）"}
-    add("问题与回答状态", "questions", columns=["问题 ID", "来源类别", "问题", "回答状态", "解决状态"],
-        rows=[[q["id"], kinds.get(q.get("kind", "candidate_issue"), "未支持问题类别"), q["text"],
-               {"open":"未回答", "answer_recorded":"答复已记录", "declined":"已拒答"}[q["status"]],
-               q["resolution"] + "（仍未决）"] for q in view["questions"]])
     add("候选未决项", "issues", columns=["ID", "类别", "说明", "相关元素", "问题"],
         rows=[[i["id"], i["kind"], i["text"], ", ".join(i["related_ids"]), i["question"] or "无提问"] for i in view["issues"]])
     add("残余", "residuals", columns=["ID", "语义族", "说明", "必要性", "状态"],
@@ -141,11 +138,88 @@ def project_review(view: dict) -> list[dict]:
                 trace_rows.append([trace["element"], "未支持来源类型", "未解释", "见完整详情"])
     add("来源追踪", "traces", paragraphs=["原始来源与后续动作分开；总领解释不是用户逐字原话。完整引用及原件在详情中。"],
         columns=["元素 ID", "来源类别", "引用 / 位置", "原话"], rows=trace_rows)
+    return sections
+
+
+def _proposal_section(proposal, view):
+    """Read only A's proposal inspection; never decode rejected bytes as a model."""
+    inspection = proposal["inspection"]
+    provenance = proposal["provenance"]
+    parent = provenance["based_on_candidate_ref"]
+    part = _section("未采纳提案预览 · " + proposal["ref"]["artifact_id"], "proposal_preview", proposal,
+        paragraphs=["提案采纳状态：" + proposal["adoption"] + " · 本提案形式检查：" + inspection["status"],
+                    "以下内容属于这份提案，不是当前模型。登记与预览不改变候选；形式合法不等于规则执行通过或用户接受。",
+                    "来源归属：" + provenance["actor"] + " · " + provenance["kind"]],
+        columns=["对象", "标识", "版本"], rows=[
+            ["所查看候选", view["candidate_ref"]["artifact_id"], view["candidate_ref"]["revision"]],
+            ["提案所依据候选", parent["artifact_id"], parent["revision"]],
+            ["独立提案", proposal["ref"]["artifact_id"], proposal["ref"]["revision"]],
+            ["登记时审阅", proposal["based_on_review_ref"]["artifact_id"], proposal["based_on_review_ref"]["revision"]]])
+    children = []
+    part["children"] = children
+    children.append(_section("提案来源与完整绑定", "proposal_provenance", provenance,
+        paragraphs=[provenance["text"] if provenance["kind"] == "user_action" else
+                    "外部修订产物；生成来源 not_verified。原始来源、用户动作和方法绑定见详情；检查诊断不是用户要求。"],
+        columns=["来源引用", "标识", "版本"], rows=[
+            [key, value["artifact_id"], value["revision"]]
+            for key, value in provenance.items() if key.endswith("_ref")]))
+    if proposal.get("revision_context") is not None:
+        children.append(_section("提案生成时的问答与方法原件", "proposal_context", proposal["revision_context"],
+            paragraphs=["仅适用于本提案的父版本问答与冻结方法；独立解释不当作用户原话。"]))
+    if inspection["status"] == "valid" and parent == view["candidate_ref"]:
+        candidate = inspection["checks"]["candidate"]
+        definition = candidate["definition"]
+        projection = {"inspection":inspection, "terms":definition["entities"],
+            "relations":definition["relations"], "rules":definition["constraints"],
+            "residuals":definition["residuals"], "issues":candidate["issues"], "traces":candidate["traces"],
+            "requirement_fidelity":inspection["requirement_fidelity"],
+            "instance_conformance":inspection["instance_conformance"]}
+        if view["inspection"]["status"] == "valid":
+            rows = []
+            for key in ("terms", "relations", "rules", "residuals", "issues"):
+                old = {item["id"]:item for item in view[key]}
+                new = {item["id"]:item for item in projection[key]}
+                for identity in sorted(old.keys() | new.keys()):
+                    state = "新增" if identity not in old else "移除" if identity not in new else (
+                        "内容变化" if json.dumps(old[identity], sort_keys=True) != json.dumps(new[identity], sort_keys=True) else "内容相同")
+                    rows.append([{"terms":"术语 / 含字段", "relations":"关系", "rules":"规则",
+                                  "residuals":"残余", "issues":"未决项"}[key], identity, state])
+            children.append(_section("与所查看候选的内容对照", "proposal_comparison", rows,
+                paragraphs=["按稳定 ID 对照内容，不推断语义等价、改动正确性或规则结果。"],
+                columns=["类别", "ID", "内容对照"], rows=rows))
+        else:
+            part["paragraphs"].append("所查看候选未通过形式检查，未生成结构差异对照。")
+        children.extend(_model_sections(projection))
+    else:
+        part["paragraphs"].append("本提案不能作为合法模型展示或采纳；原件未修复，不从失败内容拼接结构。" if inspection["status"] != "valid"
+                                  else "提案父版本与所查看候选不匹配；不展示结构或对照，请重新读取记录。")
+        children.append(_section("本提案检查与诊断", "proposal_inspection", inspection,
+            paragraphs=["形式检查：" + inspection["status"], "诊断为空也不表示规则通过或实例已检查。"],
+            columns=["诊断代码", "消息"], rows=[[d["code"], d["message"]] for d in inspection["diagnostics"]]))
+    children.append(_section("本提案原响应文本", "proposal_text", proposal["text"],
+        paragraphs=["仅供显示；精确字节保留在提案完整详情 raw_base64。"], open_detail=inspection["status"] != "valid"))
+    return part
+
+
+def project_review(view: dict) -> list[dict]:
+    """Text/table projection only. Exact JSON and integer spelling stay available."""
+    sections = []
+    def add(title, key, **options):
+        sections.append(_section(title, key, view[key], **options))
+    add("需求原文", "source_text", paragraphs=[view["source_text"]])
+    sections.extend(_model_sections(view))
+    kinds={"candidate_issue":"候选中的原问题", "inspection_diagnostic":"原件诊断问题", "external_clarification":"外加澄清（独立记录）"}
+    add("问题与回答状态", "questions", columns=["问题 ID", "来源类别", "问题", "回答状态", "解决状态"],
+        rows=[[q["id"], kinds.get(q.get("kind", "candidate_issue"), "未支持问题类别"), q["text"],
+               {"open":"未回答", "answer_recorded":"答复已记录", "declined":"已拒答"}[q["status"]],
+               q["resolution"] + "（仍未决）"] for q in view["questions"]])
+    inspection = view["inspection"]
     add("用户确认", "confirmations", paragraphs=["仅登记用户看过的目标；不改变形式检查或接受候选。"],
         columns=["目标", "归属", "说明"], rows=[[", ".join(c["targets"]), c["provenance"]["actor"], c["provenance"]["text"]] for c in view["confirmations"]])
     add("修订提案", "proposals", paragraphs=["登记只推进审阅记录，当前候选未变；只有明确采纳合法提案才建立后继候选。语言生成来源未因登记而被认证。"], columns=["提案 ID", "采纳状态", "检查", "说明"],
         rows=[[p["ref"]["artifact_id"], p["adoption"], p["inspection"]["status"],
                p["provenance"]["text"] if p["provenance"]["kind"] == "user_action" else "外部修订产物；生成来源 not_verified"] for p in view["proposals"]])
+    sections.extend(_proposal_section(proposal, view) for proposal in view["proposals"])
     action_rows, clarification_rows = [], []
     for record in view["actions"]:
         action = record["action"]

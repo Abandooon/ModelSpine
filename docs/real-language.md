@@ -1,4 +1,4 @@
-# 有界真实语言入口（typed-language-run/0.5）
+# 有界真实语言入口（typed-language-run/0.6）
 
 `apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。0.4 新增[回答修订入口](revision-request.md)，冻结同项目父审阅与单独归属的用户原话，严格检查原样后继提案，明确登记/采纳才推进审阅/候选。无自动修复、实例生成或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
 
@@ -10,9 +10,11 @@
 
 0.5 对回答修订加入[完整生成合同及父可读投影](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)：所有嵌套对象/union/表达式均有固定封闭 Schema，联网前重建并核对。Schema 不代替本地类型、引用和精确证据检查，更不证明语义忠实。依据宿主已核对的[官方 Structured Outputs 合同](https://developers.openai.com/api/docs/guides/structured-outputs)，格式支持递归与 required/nullable；官方模型能力不证明代理支持。无自动格式回退，400/拒答/incomplete/非法候选均停止并保存。父候选以严格 UTF-8、带原件 hash 的版本投影呈现，非 UTF-8 不准备模型请求；旧审阅历史结构不改。
 
-当前固定格式 `revision-output-schema/0.2` 按 Object/Set/Int/String/Bool/Instant/Duration 返回类别递归分组，规则根/逻辑限 Bool、count 限 Set，排除已知错误组合。is_null 仍接受全部类别；Get 类型/nullability、词法及引用继续本地校验。Filter 和时间异类参数的 items union 是扩大允许范围，不保证参数位置；详见[分组边界](../packages/requirements/contracts/execution-revision.md#02-返回类别分组及本地检查边界)。没有新 DTO/执行语义/提示业务答案或反馈循环；版本及 hash 进入新计划，旧失败不改写。
+当前固定格式 `revision-output-schema/0.2` 按 Object/Set/Int/String/Bool/Instant/Duration 返回类别递归分组，规则根/逻辑限 Bool、count 限 Set，排除已知错误组合。is_null 仍接受全部类别；Get 类型/nullability、词法及引用继续本地校验。Filter 和时间异类参数的 items union 是扩大允许范围，不保证参数位置；详见[分组边界](../packages/requirements/contracts/execution-revision.md#02-返回类别分组及本地检查边界)。该 Schema 分组没有新 DTO/执行语义/提示业务答案或反馈循环；版本及 hash 进入新计划，旧失败不改写。
 
 ## 配置与准备
+
+0.6 新增[显式检查反馈与失败提案导出](revision-request.md#显式检查反馈与结果审阅导出06)。它从绑定的既有失败运行重新核对原件并执行当前兼容检查器，将检查观察放入独立反馈信封；不是用户需求或来源证据，不将失败输出替代当前已保存、仍未确认的父候选。每个新计划仍只有一次明确 POST，没有自动反馈循环。完整原件且唯一停止原因为 `candidate_rejected` 的当前方法结果可导出到审阅，仍为 rejected、不可采纳；收据不改成成功。其他传输、拒答、不完整或完整性失败不得导出。工程假传输验证不证明新的真实候选合法或忠实。
 
 仅标准库，无SDK/自动重试。宿主显式提供公开仓库外的绝对`.env`路径，进程只解析六个精确名称：MODELSPINE_PROVIDER_URL、MODELSPINE_BASE_URL、MODELSPINE_API_KEY、MODELSPINE_MODEL、MODELSPINE_MAX_REQUESTS、MODELSPINE_MAX_OUTPUT_TOKENS。值必须完整，模型和端点必须上述显式值；本计划请求预算1–20、每次输出上限1–40960（包括服务计入的推理输出）。prepare接受显式1或2个请求，数量不得大于配置预算；空输入、超过2个输入、重复请求或空任务身份拒绝。不得打印配置文件或把key放进命令行、提示、工件及公开仓库。TLS保持验证，urllib使用宿主已有系统/环境代理；不关闭TLS、不换域名，全部重定向拒绝。
 

@@ -1,5 +1,7 @@
 # 有界回答修订 execution-revision-envelope/0.2
 
+当前附加装配合同为 `checker-feedback/0.1` / `typed-language-run/0.6`，见本文件末节；下文 Schema 0.2 本身不实现反馈循环。
+
 本合同补充旧 [revision-request 指南](../../../docs/revision-request.md)，不改写原文 ModelingRequest、SourceSpan 或旧 typed-domain-candidate/0.1。新版定义用 [finite-domain/0.2](../../protocols/contracts/finite-domain-0.2.md)；候选常量为 `typed-domain-revision/0.1`。结构和完整引用通过仍不证明意图忠实，候选只能 unconfirmed。
 
 外加澄清 `ExternalClarification` 属于协议模块 review，封闭字段：`schema_version="model-review-clarification/0.1", id, project_id, request_ref, candidate_ref, expected_review_ref, question_text, question_actor, correction_text, correction_actor, response_kind="answer"|"decline", response_text, actor, interpretation_text, interpretation_actor`。question/更正/答复逐字保存，各自归属；interpretation 只属于解释者，不是用户原话。更正和解释可为空，有文本必须有对应 owner；answer 不得为空，decline 可为空。没有默认/自动解析用户意图。它生成独立 question_ref（覆盖父候选、原来源、问题、更正、动作 ID）及 action_ref（覆盖整操作），不冒用候选旧 issue 的问题。宿主负责输入真实归属，无密码学认证声明。
@@ -43,4 +45,14 @@ Int 保留整数加减，Duration 保留秒数加减及 Instant−Instant，Inst
 
 Filter 的 args.items 使用 SetExpr|BoolExpr，Instant 算术使用 InstantExpr|DurationExpr。这是为保留合法异类参数而扩大允许范围：并不保证先后顺序或各出现一次，错误的 Filter(Bool,Set)、Instant 反向加法或两个 Instant 相加可能通过 Schema，仍由原检查器拒绝。不使用未经确认的 prefixItems，也不声称 Schema 已保证完整类型。wrong Get、nullable Boolean 用于逻辑、未绑定变量、关系端点、引文与词法作用域继续在本地检查。
 
-新分组可排除 and(Filter)、count(Boolean)、comparison(Object)、get(scalar)、navigate(scalar) 等确定错误，但不提供业务答案或语义忠实保障。原 0.1 完整真实响应是形状可接受但静态类型被拒的失败原件，不被改写为供应商格式失效或截断。0.2 是否由供应商执行及新真实输出结果须另行观察。app/提示版本、DTO、执行器及历史重放不变；Schema version/name、源码 hash 和新 plan 区分本次方法。没有 checker-feedback 或自动修复循环。
+新分组可排除 and(Filter)、count(Boolean)、comparison(Object)、get(scalar)、navigate(scalar) 等确定错误，但不提供业务答案或语义忠实保障。原 0.1 完整真实响应是形状可接受但静态类型被拒的失败原件，不被改写为供应商格式失效或截断。0.2 是否由供应商执行及新真实输出结果须另行观察。该分组交付未改 app/提示版本、DTO、执行器及历史重放；Schema version/name、源码 hash 和新 plan 区分该方法。Schema 本身没有 checker-feedback 或自动修复循环。
+
+## 显式工具反馈 checker-feedback/0.1
+
+独立反馈信封恰有 schema_version、source_run、source_plan_sha256、source_receipt_sha256、response_sha256、candidate_sha256、parent_candidate_ref、parent_review_ref、checker_method_sha256、observation。observation 恰有 kind=local_checker_observation、inspection、expression_diagnostics、failed_candidate_text、semantic_fidelity=not_checked、user_requirement=false。expression_diagnostics 项含 path/operator/code/message/operand_types；它是现有静态类型检查器的定位补充，不是完整业务错误枚举。不存在可由调用方填写并直接信任的诊断接口。
+
+装配核对原运行和当前父作用域，重新执行兼容检查器；完整响应且仅 candidate_rejected、可重现 invalid 的失败才可准备。拒答、不完整、传输/凭据/绑定失败、不支持或非 UTF-8 均停止。旧方法只接受已审 0.5 app 身份及其余方法逐字节匹配的明确兼容集，详见[调用指南](../../../docs/revision-request.md#显式检查反馈与结果审阅导出06)。新准备与联网前都重建整个反馈并核对；每计划一个 POST，最多三层显式反馈来源，不自动重试或补额。
+
+原始 source/request、逐字问题/更正/回答与当前已保存、仍未确认的父候选不变。失败候选不是父版本；工具观察不是需求或 SourceEvidence/ActionEvidence，不允许引用工具反馈代替用户来源。方法通用要求整体重新核对完整原文及回答，不提供业务修复 AST。新反馈仅进入调用 prompt/payload/独立工件；原历史 context/ref 和已保存 method_instructions 重放责任不变，完整生成方法身份由 plan 及 receipt 固定。
+
+结果导出可接收当前方法的完整合法结果或仅 candidate_rejected 的完整原件；严格复核后返回原 RevisionProposal，仍不自动登记或采纳。非法提案保持 rejected 且不可采纳，收据不改成 continue_allowed。其他停止原因排除；旧方法结果不由此导出。登记重新核对原 expected_review_ref，旧页冲突或已有幂等行为沿用原审阅合同。结构通过、反馈定位或用户采用补充要求都不等于语义忠实或旧候选已确认。

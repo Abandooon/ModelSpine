@@ -22,11 +22,13 @@ from modelspine_requirements.revision_request import prepare_execution_revision,
 from modelspine_requirements.review import review_input, review_ref
 from modelspine_requirements.typed_domain import typed_modeling_prompt
 from modelspine_requirements.revision_schema import response_format as revision_response_format
+from modelspine_requirements.revision_feedback import observe as observe_failure, INSTRUCTIONS as FEEDBACK_INSTRUCTIONS
+from modelspine_requirements.review import _inspection
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from language_response import (VERSION, LanguageError, encoded, extract_response, load_config,
                                post_response, redact, strict_json)
 
-METHOD = "typed-language-run/0.5"
+METHOD = "typed-language-run/0.6"
 PROMPT_VERSION = "typed-language-assembly/0.1"
 OUTPUT_INSTRUCTIONS = """Return one complete compact JSON object, without Markdown or commentary.
 Use short unique IDs and no indentation or repeated explanations. Retain every required
@@ -58,7 +60,12 @@ METHOD_PATHS = (
     "packages/requirements/src/modelspine_requirements/typed_revision.py",
     "packages/requirements/src/modelspine_requirements/revision_request.py",
     "packages/requirements/src/modelspine_requirements/revision_schema.py",
+    "packages/requirements/src/modelspine_requirements/revision_feedback.py",
 )
+
+# One audited predecessor, not arbitrary tolerance of historical method drift.
+LEGACY_APP_SHA = "493809940e3d7e72a1db672d36fce381ced3b4d576179041340d16db845a1ad7"
+FEEDBACK_PATH = "packages/requirements/src/modelspine_requirements/revision_feedback.py"
 
 
 def now():
@@ -140,6 +147,133 @@ def prepare_revision_run(run_dir, project_dir, config, *, expected_review_ref, a
                             revision={"project_dir": str(root), "envelope": envelope})
 
 
+def prepare_feedback_run(run_dir, project_dir, config, *, failed_run_dir, expected_failed_plan_sha256,
+                         expected_failed_receipt_sha256, expected_review_ref, action_refs, task_id):
+    """One explicitly requested feedback slot; diagnostics cannot be supplied by callers."""
+    root = review_store._directory(project_dir)
+    require(config.max_requests == 1, "feedback requires one request budget")
+    with review_store._locked(root):
+        session = review_store._load(root)
+        envelope = prepare_execution_revision(session, expected_review_ref=expected_review_ref, action_refs=action_refs)
+        feedback = _feedback(failed_run_dir, expected_failed_plan_sha256, expected_failed_receipt_sha256,
+                             envelope, str(root))
+        return _prepare_run(run_dir, (session.request,), config, task_id=task_id,
+                            revision={"project_dir": str(root), "envelope": envelope, "feedback": feedback})
+
+
+def _revision_prompt(envelope, feedback=None):
+    if feedback is None:
+        return envelope["prompt"]
+    return envelope["prompt"] + "\n" + FEEDBACK_INSTRUCTIONS + "\nCHECKER_FEEDBACK_JSON=" + encoded(feedback).decode("utf-8")
+
+
+def _feedback(run_dir, plan_sha, receipt_sha, envelope, project_dir, depth=0):
+    require(depth < 3, "feedback ancestry exceeds three", "unsupported")
+    require(type(receipt_sha) is str and len(receipt_sha) == 64, "explicit failed receipt hash required", "conflict")
+    result = _verified_revision_result(run_dir, plan_sha, receipt_sha, legacy=True, depth=depth + 1)
+    require(result["receipt"]["stop_reasons"] == ["candidate_rejected"], "feedback source is not an isolated candidate failure")
+    require(result["envelope"] == envelope and result["plan"]["parent_project_dir"] == project_dir,
+            "feedback source/parent/action scope mismatch", "conflict")
+    return {"schema_version": "checker-feedback/0.1", "source_run": str(safe_path(run_dir)),
+            "source_plan_sha256": plan_sha, "source_receipt_sha256": receipt_sha,
+            "response_sha256": hash_bytes(result["response"]), "candidate_sha256": hash_bytes(result["candidate"]),
+            "parent_candidate_ref": envelope["context"]["parent_candidate_ref"],
+            "parent_review_ref": envelope["context"]["parent_review_ref"],
+            "checker_method_sha256": method_hashes(),
+            "observation": observe_failure(result["request"], result["candidate"], envelope["context"])}
+
+
+def _verified_revision_result(run_dir, plan_sha, receipt_sha, *, legacy=False, depth=0):
+    """Verify actual input/transport/inspection bytes. This does not mutate a review."""
+    require(depth <= 3, "feedback ancestry exceeds three", "unsupported")
+    root = safe_path(run_dir)
+    with locked(root):
+        plan_raw = load(root / "plan.json")
+        require(hash_bytes(plan_raw) == plan_sha, "wrong revision plan", "conflict")
+        plan = strict_json(plan_raw)
+        current = method_hashes()
+        old = {p:h for p,h in current.items() if p != FEEDBACK_PATH}
+        old["apps/language_modeling.py"] = LEGACY_APP_SHA
+        require((plan["method"] == METHOD and plan["method_sha256"] == current) or
+                (legacy and plan["method"] == "typed-language-run/0.5" and plan["method_sha256"] == old),
+                "incompatible revision/checker method", "conflict")
+        require(plan.get("feedback") in (None, "checker-feedback/0.1") and
+                (plan["method"] != "typed-language-run/0.5" or not plan.get("feedback")), "unsupported feedback profile", "unsupported")
+        require(plan.get("mode") == "answer_revision/0.1" and plan["executable_slots"] == 1 and
+                len(plan["items"]) == 1 and plan["automatic_retries"] == 0, "wrong revision scope", "conflict")
+        item = plan["items"][0]
+        names = {"request.json", "source.txt", "prompt.txt", "payload.json", "revision.json"}
+        if plan.get("feedback"):
+            names.add("feedback.json")
+        require(set(item["files"]) == names and item["slot"] == 1, "wrong revision inputs", "conflict")
+        folder = root / "input-1"
+        for name, h in item["files"].items():
+            require(hash_bytes(load(folder / name)) == h, "revision input changed", "conflict")
+        envelope = verify_execution_revision(strict_json(load(folder / "revision.json")))
+        request = load_request(folder / "request.json")
+        require(to_data(request) == envelope["review_session"]["request"] and digest(request) == item["request_hash"]
+                and request.text.encode("utf-8") == load(folder / "source.txt") and
+                item["source_ref"] == to_data(request.source) and plan["parent_review_ref"] == envelope["context"]["parent_review_ref"],
+                "revision request/source scope mismatch", "conflict")
+        feedback = None
+        if plan.get("feedback"):
+            feedback = strict_json(load(folder / "feedback.json"))
+            require(feedback == _feedback(feedback["source_run"], feedback["source_plan_sha256"],
+                    feedback["source_receipt_sha256"], envelope, plan["parent_project_dir"], depth),
+                    "feedback observation changed", "conflict")
+        prompt = _revision_prompt(envelope, feedback)
+        config = plan["config"]
+        payload = encoded({"model": config["model"], "input": prompt, "store": False, "stream": False,
+                           "max_output_tokens": config["max_output_tokens"], "text": {"format": revision_response_format()}})
+        require(load(folder / "prompt.txt") == prompt.encode("utf-8") and load(folder / "payload.json") == payload,
+                "revision payload changed", "conflict")
+        require(plan["endpoint"] == config["base_url"] + "/responses", "revision endpoint mismatch", "conflict")
+        attempt = root / "attempts/001"
+        require(sorted(p.name for p in (root / "attempts").iterdir()) == ["001"], "wrong revision attempts", "conflict")
+        receipt_raw = load(attempt / "receipt.json")
+        require((receipt_sha is None or hash_bytes(receipt_raw) == receipt_sha) and
+                hash_bytes(receipt_raw) == load(attempt / "receipt.sha256").decode("ascii"), "receipt changed", "conflict")
+        receipt = strict_json(receipt_raw)
+        require(receipt["method"] == plan["method"] and receipt["adapter"] == plan["adapter"] and
+                receipt.get("adoption") == "not_requested", "receipt method/adoption mismatch", "conflict")
+        artifacts = {"reservation.json", "response.body", "candidate.raw", "inspection.json"}
+        require(set(receipt["artifact_sha256"]) == artifacts, "incomplete revision artifacts", "conflict")
+        for name,h in receipt["artifact_sha256"].items():
+            require(hash_bytes(load(attempt / name)) == h, "revision output changed", "conflict")
+        require(receipt["plan_sha256"] == plan_sha and receipt["slot"] == 1 and
+                receipt["payload_sha256"] == hash_bytes(payload) and receipt["request_hash"] == digest(request),
+                "receipt request mismatch", "conflict")
+        reservation = strict_json(load(attempt / "reservation.json"))
+        require(reservation == {k:receipt[k] for k in ("plan_sha256", "slot", "reserved_utc", "payload_sha256", "request_hash")},
+                "reservation mismatch", "conflict")
+        require(receipt["http_status"] == 200 and receipt["transport_status"] == "received" and
+                receipt["response_bytes"] == "original_http_body" and receipt["stop_reasons"] in ([], ["candidate_rejected"]),
+                "incomplete/unsafe response cannot be exported", "unsupported")
+        response = load(attempt / "response.body")
+        candidate = load(attempt / "candidate.raw")
+        extracted, info = extract_response(response, config["model"])
+        require(extracted == candidate and not info["stop_reasons"] and info["incomplete_details"] is None and
+                info["usage"]["output_tokens"] <= config["max_output_tokens"], "response cannot be exported", "unsupported")
+        require(all(receipt[k] == v for k,v in info.items() if k != "stop_reasons") and receipt["requested_model"] == config["model"] and
+                receipt["received_sha256"] == receipt["stored_sha256"] == hash_bytes(response), "response receipt mismatch", "conflict")
+        context = envelope["context"]
+        require(receipt["candidate"] == {"path":"candidate.raw", "sha256":hash_bytes(candidate),
+                "origin":"response.output.message.output_text_utf8"} and receipt["revision_ref"] == context["ref"] and
+                receipt["parent_candidate_ref"] == context["parent_candidate_ref"] and
+                receipt["review_ref"] == context["parent_review_ref"] and receipt["review_project"] == plan["parent_project_dir"],
+                "receipt context mismatch", "conflict")
+        require(receipt["candidate_ref"] == to_data(ArtifactRef(request.source.project_id,
+                envelope["review_session"]["id"] + "/generated-proposal/" + root.name, "1", hash_bytes(candidate))),
+                "generated candidate identity mismatch", "conflict")
+        inspection, _ = _inspection(request, candidate, context)
+        require(strict_json(load(attempt / "inspection.json")) == {"generation_provenance":"not_verified", "inspection":inspection},
+                "checker diagnostic changed", "conflict")
+        stops = [] if inspection["status"] == "valid" else ["candidate_rejected"]
+        require(receipt["stop_reasons"] == stops and receipt["continue_allowed"] is (not stops), "receipt outcome mismatch", "conflict")
+        return {"plan":plan, "envelope":envelope, "request":request, "receipt":receipt,
+                "receipt_raw":receipt_raw, "response":response, "candidate":candidate}
+
+
 def _prepare_run(run_dir, request_paths, config, *, task_id, revision=None):
     """No network. The newly created run directory is this task's sole budget authority."""
     config.validate()
@@ -151,7 +285,7 @@ def _prepare_run(run_dir, request_paths, config, *, task_id, revision=None):
     contents = {}
     for index, path in enumerate(request_paths, 1):
         request = path if isinstance(path, ModelingRequest) else load_request(path)
-        prompt = revision["envelope"]["prompt"] if revision else language_prompt(request)
+        prompt = _revision_prompt(revision["envelope"], revision.get("feedback")) if revision else language_prompt(request)
         payload = encoded({"model": config.model, "input": prompt, "store": False, "stream": False,
                            "max_output_tokens": config.max_output_tokens,
                            "text": {"format": revision_response_format() if revision else {"type": "json_object"}}})
@@ -159,6 +293,8 @@ def _prepare_run(run_dir, request_paths, config, *, task_id, revision=None):
                  "prompt.txt": prompt.encode("utf-8"), "payload.json": payload}
         if revision:
             files["revision.json"] = encoded(revision["envelope"])
+            if revision.get("feedback"):
+                files["feedback.json"] = encoded(revision["feedback"])
             if any(len(raw) > 4 * 1024 * 1024 for raw in files.values()):
                 raise LanguageError("revision_input_size_limit")
         if any(redact(raw, config.key)[1] for raw in files.values()):
@@ -179,6 +315,8 @@ def _prepare_run(run_dir, request_paths, config, *, task_id, revision=None):
         plan["mode"] = "answer_revision/0.1"
         plan["parent_project_dir"] = revision["project_dir"]
         plan["parent_review_ref"] = revision["envelope"]["context"]["parent_review_ref"]
+        if revision.get("feedback"):
+            plan["feedback"] = "checker-feedback/0.1"
     plan_raw = encoded(plan)
     if redact(plan_raw, config.key)[1]:
         raise LanguageError("credential_in_plan")
@@ -227,7 +365,12 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
                 revision = verify_execution_revision(strict_json(load(folder / "revision.json", review_store.MAX_STORE_BYTES)))
                 if revision["review_session"] != to_data(parent_session) or digest(parent_session.request) != digest(request):
                     raise LanguageError("revision_parent_conflict")
-                prompt = revision["prompt"].encode("utf-8")
+                feedback = None
+                if plan.get("feedback"):
+                    feedback = strict_json(load(folder / "feedback.json"))
+                    require(feedback == _feedback(feedback["source_run"], feedback["source_plan_sha256"],
+                            feedback["source_receipt_sha256"], revision, str(parent)), "feedback observation changed", "conflict")
+                prompt = _revision_prompt(revision, feedback).encode("utf-8")
             else:
                 prompt = language_prompt(request).encode("utf-8")
             payload = load(folder / "payload.json")
@@ -366,39 +509,35 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
 
 
 def revision_proposal_from_run(run_dir, *, expected_plan_sha256, action_id, actor):
-    """Build an explicit registration DTO from one successful frozen receipt; no writes."""
-    root = safe_path(run_dir)
-    with locked(root):
-        plan_raw = load(root / "plan.json")
-        require(hash_bytes(plan_raw) == expected_plan_sha256, "wrong revision plan", "conflict")
-        plan = strict_json(plan_raw)
-        require(plan.get("mode") == "answer_revision/0.1" and plan["method_sha256"] == method_hashes(), "wrong revision method", "conflict")
-        item = plan["items"][0]
-        for name, h in item["files"].items():
-            require(Path(name).name == name and hash_bytes(load(root / "input-1" / name, review_store.MAX_STORE_BYTES)) == h,
-                    "revision input changed", "conflict")
-        envelope = verify_execution_revision(strict_json(load(root / "input-1/revision.json", review_store.MAX_STORE_BYTES)))
-        attempt = root / "attempts/001"
-        raw = load(attempt / "receipt.json")
-        require(hash_bytes(raw) == load(attempt / "receipt.sha256").decode("ascii"), "receipt changed", "conflict")
-        receipt = strict_json(raw)
-        require(receipt["plan_sha256"] == expected_plan_sha256 and receipt["slot"] == 1 and receipt["continue_allowed"],
-                "stopped or wrong revision receipt", "conflict")
-        for name, h in receipt["artifact_sha256"].items():
-            require(Path(name).name == name and hash_bytes(load(attempt / name)) == h, "revision output changed", "conflict")
-        candidate = load(attempt / "candidate.raw")
-        context = envelope["context"]
-        require(receipt["revision_ref"] == context["ref"] and receipt["parent_candidate_ref"] == context["parent_candidate_ref"]
-                and receipt["candidate"]["sha256"] == hash_bytes(candidate), "receipt context mismatch", "conflict")
-        response_ref = ArtifactRef(context["parent_request_ref"]["project_id"], "language-receipt/" + root.name, "1", hash_bytes(raw))
-        from modelspine_requirements.typed_revision import INSTRUCTIONS
-        require(hash_bytes(INSTRUCTIONS.encode("utf-8")) == context["method_instructions_sha256"],
-                "revision method instructions changed", "conflict")
-        return RevisionProposal("model-review-revision-proposal/0.1", action_id, response_ref.project_id,
-            decode(ArtifactRef, context["parent_request_ref"]), decode(ArtifactRef, context["parent_candidate_ref"]),
-            decode(ArtifactRef, context["parent_review_ref"]), actor,
-            tuple(decode(ArtifactRef, r) for r in envelope["action_refs"]), decode(ArtifactRef, context["ref"]),
-            response_ref, base64.b64encode(candidate).decode("ascii"), INSTRUCTIONS)
+    """Existing valid-only export. A proposal is never an adoption."""
+    result = _verified_revision_result(run_dir, expected_plan_sha256, None)
+    require(result["receipt"]["continue_allowed"], "stopped revision receipt", "conflict")
+    return _result_proposal(run_dir, result, action_id, actor)
+
+
+def review_proposal_from_run(run_dir, *, expected_plan_sha256, expected_receipt_sha256, action_id, actor):
+    """Current-method complete valid/rejected output for explicit unconfirmed review."""
+    require(type(expected_receipt_sha256) is str and len(expected_receipt_sha256) == 64,
+            "explicit review receipt hash required", "conflict")
+    result = _verified_revision_result(run_dir, expected_plan_sha256, expected_receipt_sha256)
+    return _result_proposal(run_dir, result, action_id, actor)
+
+
+def _result_proposal(run_dir, result, action_id, actor):
+    envelope = result["envelope"]
+    context = envelope["context"]
+    # Preserve the original expected head in the DTO. Registration checks current
+    # head (or the existing same-ID operation); export itself never changes state.
+    response_ref = ArtifactRef(context["parent_request_ref"]["project_id"], "language-receipt/" + Path(run_dir).name,
+                               "1", hash_bytes(result["receipt_raw"]))
+    from modelspine_requirements.typed_revision import INSTRUCTIONS
+    require(hash_bytes(INSTRUCTIONS.encode("utf-8")) == context["method_instructions_sha256"],
+            "revision method instructions changed", "conflict")
+    return RevisionProposal("model-review-revision-proposal/0.1", action_id, response_ref.project_id,
+        decode(ArtifactRef, context["parent_request_ref"]), decode(ArtifactRef, context["parent_candidate_ref"]),
+        decode(ArtifactRef, context["parent_review_ref"]), actor,
+        tuple(decode(ArtifactRef, r) for r in envelope["action_refs"]), decode(ArtifactRef, context["ref"]),
+        response_ref, base64.b64encode(result["candidate"]).decode("ascii"), INSTRUCTIONS)
 
 
 def main(argv=None):

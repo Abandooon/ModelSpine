@@ -26,6 +26,7 @@ function section(part, parent=document.getElementById("panels")) {
     }
   }
   details(s, "完整数据 / 原件详情", part.detail, part.open_detail);
+  for (const child of part.children || []) section(child, s);
   parent.append(s);
 }
 async function api(path, action) {

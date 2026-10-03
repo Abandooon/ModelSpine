@@ -6,13 +6,13 @@
 
 当前方法 `typed-domain-revision-proposal/0.2` 使用完整固定 strict JSON Schema，见[生成与投影合同](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)。所有字段 required、对象封闭，包含 residuals/Trace、证据 union 和递归表达式；仍须本地 strict 解析、类型/引用/来源检查，再交独立语义评价。第三方代理支持未验证；不支持/拒答/不完整即停止，没有 JSON mode 回退。此前三份真实修订均完整但严格拒绝，没有采纳后继，不能把 Schema 工程测试记作自动生成成功。
 
-生成 Schema 升为 `revision-output-schema/0.2` / `modelspine_revision_02`，按返回类别约束递归操作数组合。它保留嵌套 Bool equality、is_null(Object/Set/nullableGet)、Instant±Duration 和 Instant−Instant；Get 的实际类型及 Filter/时间异类参数顺序仍由本地检查负责。此 Schema 有意允许部分待检查组合，不等于完整类型证明或语义正确；不加新 AST 字段、不改执行器、不实现 checker 反馈循环。app/提示方法版本未改，新的 Schema 身份与完整源码 hash 区分运行。
+生成 Schema 升为 `revision-output-schema/0.2` / `modelspine_revision_02`，按返回类别约束递归操作数组合。它保留嵌套 Bool equality、is_null(Object/Set/nullableGet)、Instant±Duration 和 Instant−Instant；Get 的实际类型及 Filter/时间异类参数顺序仍由本地检查负责。此 Schema 有意允许部分待检查组合，不等于完整类型证明或语义正确；不加新 AST 字段、不改执行器、不实现 checker 反馈循环。该 Schema 分组交付未改 app/提示方法版本，新的 Schema 身份与完整源码 hash 区分运行。
 
 新版 envelope 增加 parent_projection：父候选原字节严格 UTF-8 文本、candidate_ref、raw_sha256、固定 exact_utf8 状态和版本。prompt 显示这份可读原文，省去 context 展示中的 base64；冻结 context/session 仍保留完整原件。非 UTF-8 明确 unsupported，留给 UI 审阅，不产生 replacement 提示。execution_context 不改，旧已登记/采纳历史仍按保存方法恢复；旧运行按原代码冻结。
 
 宿主先用 `model_review.record_clarification(project_dir, ExternalClarification)` 记录外加澄清，或用既有 submit_action 记录候选问题的 answer/decline。actor 是宿主归属，不是认证；不能把外加问题冒作某一旧 issue 的回答。完整 DTO 见合同和 `modelspine_protocols.review`。
 
-有界调用使用 `language_modeling.prepare_revision_run(run_dir, project_dir, config, expected_review_ref=..., action_refs=..., task_id=...)`；它冻结一个输入、完整原文/父候选/原话/当前方法/payload，不联网。方法 `typed-language-run/0.5` 重用同一 Responses transport、原预算 reservation/receipt/锁、无自动重试。执行持有父审阅锁，核对父 head、所有原件及完整方法，期间其他协作写者收到 busy。输出文件使用排他创建，4MiB 单个准备工件上限、2MiB 响应信封和 256KiB 候选上限不扩大。
+有界调用使用 `language_modeling.prepare_revision_run(run_dir, project_dir, config, expected_review_ref=..., action_refs=..., task_id=...)`；它冻结一个输入、完整原文/父候选/原话/当前方法/payload，不联网。当前方法 `typed-language-run/0.6` 重用同一 Responses transport、原预算 reservation/receipt/锁、无自动重试。执行持有父审阅锁，核对父 head、所有原件及完整方法，期间其他协作写者收到 busy。输出文件使用排他创建，4MiB 单个准备工件上限、2MiB 响应信封和 256KiB 候选上限不扩大。
 
 ```text
 python -B -I apps/language_modeling.py prepare-revision --run-dir ABS_NEW_RUN --project-dir ABS_PROJECT --bindings ABS_BINDINGS --task-id HOST_ALLOCATION_ID --env-file HOST_PRIVATE_CONFIG
@@ -27,6 +27,16 @@ bindings 恰有 expected_review_ref/action_refs。真实配置只由获授权宿
 `read_review` 投影版本为 model-review-local/0.3：actions 中 external clarification 保留整个 action、question_ref 和来源；proposals 含 revision_context；采纳后当前 view.revision_context 固定所用上下文，history 保留父视图与采纳动作。没有继承旧确认、旧实例或旧检查。以后仅修改当前提示不应影响既存项目恢复；旧动作中的方法原文及 hash 仍接受重放。
 
 有限执行定义、集合未知精度及仅资格查询范围见 [finite-domain/0.2](../packages/protocols/contracts/finite-domain-0.2.md)。LocalWeb/ApplicationSpec v0.1 明确不支持新版定义，不能将本次资格检查称作业务提交或自动应用交付。工程假传输/人工夹具不证明真实修订成功。
+
+## 显式检查反馈与结果审阅导出（0.6）
+
+当前装配为 `typed-language-run/0.6`。`prepare_feedback_run(new_run, project_dir, config, *, failed_run_dir, expected_failed_plan_sha256, expected_failed_receipt_sha256, expected_review_ref, action_refs, task_id)` 从完整失败运行准备一个新修订 slot，config.max_requests 必须为 1。它核对源运行的 plan/receipt/response/candidate/input/方法绑定，重新运行本地检查器并冻结 `feedback.json`。调用方不能提供诊断；执行前重新构造反馈，篡改即拒绝。只有可重现且诊断均为 invalid 的单一 candidate_rejected 失败可作为输入；非 UTF-8、不支持或绑定错误不能继续。反馈链最多三层，每层均是宿主显式准备和执行，无自动循环；宿主仍须管理跨目录的累计预算。
+
+反馈是工具检查观察，包含失败候选完整 UTF-8 原文及引用、当前诊断和可定位的表达式类型错误。它不是 SourceEvidence、ActionEvidence 或用户确认的要求。生成仍须整体重读原需求与用户逐字回答，返回完整候选。父候选是当前已保存但仍未确认的版本，用户采用补充要求不表示确认旧候选。失败输出不替换父候选，宿主不修输出。
+
+`review_proposal_from_run(run, *, expected_plan_sha256, expected_receipt_sha256, action_id, actor)` 只导出当前方法完整结果：严格合法，或唯一停止原因为 candidate_rejected。它重新验证原件与检查结论，返回既有 RevisionProposal，不登记、不采纳、不修改 receipt。非法提案可通过既有 submit_revision_proposal 登记待审，但 adopt_proposal 仍拒绝；HTTP/refusal/incomplete/credential_echo/完整性失败不能导出。`revision_proposal_from_run` 保持仅合法结果可导出。导出的 expected_review_ref 是原计划 head；登记时检查当前 head，允许既有同 ID 同内容幂等语义，不能以导出绕过旧页冲突。批次运行中不要登记推进父 head；宿主在批次结束后显式选择结果登记。
+
+历史 ReviewSession/context/DTO 未改。RevisionProposal.method_instructions 保存原 typed 修订方法文本；新增反馈装配完整方法由 plan 的源码闭包、prompt/payload/feedback 及 response_ref 指向的 receipt 固定，不塞入历史 context 或伪装来源。当前方法要求全部 18 源文件 hash 一致；唯一旧兼容输入为 0.5 的已审 app hash `493809940e3d7e72a1db672d36fce381ced3b4d576179041340d16db845a1ad7`，其余 16 方法文件必须与当前逐字节相同。此特例只允许作为反馈来源，不能按新方法执行旧 plan，也不能经新导出接口迁移旧结果。
 
 ## 保留的 revision-context/0.1 离线入口
 

@@ -570,5 +570,89 @@ class ExecutionUIHTTPTests(unittest.TestCase):
         self.assertEqual(self.view()["review_ref"],adopted["review_ref"])
 
 
+class ProposalPreviewTests(unittest.TestCase):
+    """Only the unadopted projection delta; fixtures are engineering-only."""
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "review"
+        self.root.mkdir()
+        self.request, self.raw = engineering_input()
+        create_review(self.root, self.request, self.raw, session_id="preview-engineering")
+        self.parent = read_review(self.root)
+
+    def propose(self, identity, raw):
+        from model_review import submit_action
+        from modelspine_protocols import decode
+        from modelspine_protocols.review import ReviewAction
+        payload = action(read_review(self.root), identity, kind="propose_edit", text="工程修改 " + ATTACK, proposal=raw)
+        submit_action(self.root, decode(ReviewAction, payload))
+        return read_review(self.root)
+
+    def parts(self, view):
+        from modelspine_interaction.review_ui import project_review
+        return [part for part in project_review(view) if part["key"] == "proposal_preview"]
+
+    def test_pending_own_model_checks_and_exact_comparison_without_head_change(self):
+        data = json.loads(self.raw)
+        data["definition"]["entities"][0]["name"] = "提案术语 " + ATTACK
+        data["definition"]["constraints"][0]["assertion"]["args"][0]["args"][1]["value"] = 9223372036854775807
+        view = self.propose("pending", dumps(data).encode())
+        self.assertEqual(view["candidate_ref"], self.parent["candidate_ref"])
+        self.assertEqual(view["terms"], self.parent["terms"])
+        before = (self.root / "model-review.json").read_bytes()
+        part = self.parts(view)[0]
+        children = {p["key"]:p for p in part["children"]}
+        self.assertIn("未采纳", part["title"])
+        self.assertIn("提案术语 " + ATTACK, children["terms"]["rows"][0][0])
+        self.assertIn("9223372036854775807", children["rules"]["rows"][0][-2])
+        self.assertIn(["术语 / 含字段", "$candidate", "内容变化"], children["proposal_comparison"]["rows"])
+        self.assertIn("实例检查：not_run", children["inspection"]["paragraphs"])
+        self.assertIn("意图忠实性：not_checked", children["inspection"]["paragraphs"])
+        self.assertTrue(children["residuals"]["rows"])
+        self.assertTrue(children["traces"]["rows"])
+        self.assertEqual(before, (self.root / "model-review.json").read_bytes())
+        self.assertEqual(self.parts(read_review(self.root)), [part])
+
+    def test_rejected_proposal_keeps_raw_diagnostics_and_never_borrows_current_model(self):
+        raw = ('{"definition":' + ATTACK).encode()
+        view = self.propose("rejected", raw)
+        children = {p["key"]:p for p in self.parts(view)[0]["children"]}
+        self.assertEqual(view["inspection"]["status"], "valid")
+        self.assertEqual(view["proposals"][0]["inspection"]["status"], "rejected")
+        self.assertNotIn("terms", children)
+        self.assertNotIn("rules", children)
+        self.assertNotIn("proposal_comparison", children)
+        self.assertEqual(children["proposal_text"]["detail"], raw.decode())
+        self.assertTrue(children["proposal_inspection"]["rows"])
+        view["proposals"][0]["inspection"]["diagnostics"] = []
+        self.assertIn("形式检查：rejected", self.parts(view)[0]["children"][1]["paragraphs"])
+
+    def test_parent_mismatch_is_not_compared_or_projected(self):
+        view = self.propose("pending", self.raw)
+        view["candidate_ref"] = {**view["candidate_ref"], "revision":"999"}
+        part = self.parts(view)[0]
+        self.assertTrue(any("不匹配" in text for text in part["paragraphs"]))
+        self.assertNotIn("terms", [p["key"] for p in part["children"]])
+        self.assertNotIn("proposal_comparison", [p["key"] for p in part["children"]])
+
+    def test_content_comparison_distinguishes_json_boolean_from_integer(self):
+        data = json.loads(self.raw)
+        def literal(value):
+            return {"op":"literal", "value":value, "symbol":None, "args":[]}
+        data["definition"]["constraints"][0]["assertion"] = {
+            "op":"eq", "value":None, "symbol":None, "args":[literal(True), literal(False)]}
+        self.root = Path(self.temp.name) / "type-comparison"
+        self.root.mkdir()
+        create_review(self.root, self.request, dumps(data).encode(), session_id="typed-preview-engineering")
+        data["definition"]["constraints"][0]["assertion"]["args"] = [literal(1), literal(0)]
+        view = self.propose("boolean-to-integer", dumps(data).encode())
+        self.assertEqual(view["inspection"]["status"], "valid")
+        self.assertEqual(view["proposals"][0]["inspection"]["status"], "valid")
+        children = {p["key"]:p for p in self.parts(view)[0]["children"]}
+        self.assertIn(["规则", "range", "内容变化"], children["proposal_comparison"]["rows"])
+        self.assertEqual(children["rules"]["rows"][0][-2], "(1 = 0)")
+
+
 if __name__ == "__main__":
     unittest.main()
