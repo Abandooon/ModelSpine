@@ -4,11 +4,13 @@
 
 0.1.2 修订提示消除 literal/instant/duration 与 value=null 的矛盾，限定对象数组项与精确 ArtifactRef 字段；不改变解析器或执行语义，也不保证模型输出合法。原文 v0.1 提示和检查继续保留；当前修订使用 `typed-domain-revision-proposal/0.2` 与 `finite-domain/0.2`，不拼接原 source、补 JSON 或推断固定业务字段。来源引用可绑定原文完整行或经过重放验证的问题/更正/回答段；方法指令原文随提案保存，后续提示变化不应破坏历史读取。保守 Filter 的未知结果不等于精确业务允许/拒绝，保留 required residual 和生命周期未决。新增接口的假传输回归不是新的真实实验结果；真实调用由授权宿主另行执行。
 
-协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定输出格式：原文入口为 `text.format={"type":"json_object"}`，修订入口为 `text.format={"type":"json_schema","name":"modelspine_revision_01","strict":true,"schema":完整固定schema}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
+协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定输出格式：原文入口为 `text.format={"type":"json_object"}`，修订入口为 `text.format={"type":"json_schema","name":"modelspine_revision_02","strict":true,"schema":完整固定schema}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
 
 0.3仅增加[Responses JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs)，完整保留0.2/SRC-01提示。官方合同约束可解析JSON，不保证typed schema，且仍须处理不完整等边界；该版本的原文入口继续使用已有typed检查，未增加Schema层；0.5 修订入口的新增格式见下段。供应商的一般兼容声明及官方模型能力不能证明当前代理实际执行该格式，尚须真实观察；即使返回合法JSON也不能证明内部约束实现或原文忠实。HTTP400不支持参数、refusal、不完整响应、completed但非法JSON或typed不合法均沿用停止与原件保留规则，不自动改参数再试。拒答content不被提取为候选，记录unsupported_output_shape；可提取但非法的候选仍供审阅。
 
 0.5 对回答修订加入[完整生成合同及父可读投影](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)：所有嵌套对象/union/表达式均有固定封闭 Schema，联网前重建并核对。Schema 不代替本地类型、引用和精确证据检查，更不证明语义忠实。依据宿主已核对的[官方 Structured Outputs 合同](https://developers.openai.com/api/docs/guides/structured-outputs)，格式支持递归与 required/nullable；官方模型能力不证明代理支持。无自动格式回退，400/拒答/incomplete/非法候选均停止并保存。父候选以严格 UTF-8、带原件 hash 的版本投影呈现，非 UTF-8 不准备模型请求；旧审阅历史结构不改。
+
+当前固定格式 `revision-output-schema/0.2` 按 Object/Set/Int/String/Bool/Instant/Duration 返回类别递归分组，规则根/逻辑限 Bool、count 限 Set，排除已知错误组合。is_null 仍接受全部类别；Get 类型/nullability、词法及引用继续本地校验。Filter 和时间异类参数的 items union 是扩大允许范围，不保证参数位置；详见[分组边界](../packages/requirements/contracts/execution-revision.md#02-返回类别分组及本地检查边界)。没有新 DTO/执行语义/提示业务答案或反馈循环；版本及 hash 进入新计划，旧失败不改写。
 
 ## 配置与准备
 
@@ -77,3 +79,8 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 ### 2026-10-04 完整形状方法的首次真实观察
 
 一次回答修订使用 fixed strict Schema 与精确父候选投影：HTTP200/completed，8022 输入、7380 输出 tokens，未截断。原始输出满足发送的形状约束，但因集合参与 Boolean 运算等静态类型错误被本地检查拒绝；未登记或采纳，父项目未变。此观察说明该请求获得响应，不证明代理强制实施 Schema，也不证明候选语义忠实。原件和失败由授权宿主保留，不能修补后冒称原始成功；后续方法与请求须另行固定。
+
+
+### 2026-10-04 返回类别分组的真实观察
+
+0.2 对相同原文、回答、父候选和提示执行一次请求，HTTP200/completed，8952输入、8651输出 tokens，未截断。新原件被本地检查拒绝：候选自身声明的 Instant 字段与普通字符串比较，报 comparison requires same scalar type。Get 的动态类型属于上述本地检查边界；不修候选、不登记或采纳。固定形状/类别约束不足以证明自动生成可靠性或语义忠实，后续须定义显式有界的检查反馈责任，不能以重复抽样代替验证。

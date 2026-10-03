@@ -6,6 +6,8 @@
 
 当前方法 `typed-domain-revision-proposal/0.2` 使用完整固定 strict JSON Schema，见[生成与投影合同](../packages/requirements/contracts/execution-revision.md#固定生成形状与可读父候选)。所有字段 required、对象封闭，包含 residuals/Trace、证据 union 和递归表达式；仍须本地 strict 解析、类型/引用/来源检查，再交独立语义评价。第三方代理支持未验证；不支持/拒答/不完整即停止，没有 JSON mode 回退。此前三份真实修订均完整但严格拒绝，没有采纳后继，不能把 Schema 工程测试记作自动生成成功。
 
+生成 Schema 升为 `revision-output-schema/0.2` / `modelspine_revision_02`，按返回类别约束递归操作数组合。它保留嵌套 Bool equality、is_null(Object/Set/nullableGet)、Instant±Duration 和 Instant−Instant；Get 的实际类型及 Filter/时间异类参数顺序仍由本地检查负责。此 Schema 有意允许部分待检查组合，不等于完整类型证明或语义正确；不加新 AST 字段、不改执行器、不实现 checker 反馈循环。app/提示方法版本未改，新的 Schema 身份与完整源码 hash 区分运行。
+
 新版 envelope 增加 parent_projection：父候选原字节严格 UTF-8 文本、candidate_ref、raw_sha256、固定 exact_utf8 状态和版本。prompt 显示这份可读原文，省去 context 展示中的 base64；冻结 context/session 仍保留完整原件。非 UTF-8 明确 unsupported，留给 UI 审阅，不产生 replacement 提示。execution_context 不改，旧已登记/采纳历史仍按保存方法恢复；旧运行按原代码冻结。
 
 宿主先用 `model_review.record_clarification(project_dir, ExternalClarification)` 记录外加澄清，或用既有 submit_action 记录候选问题的 answer/decline。actor 是宿主归属，不是认证；不能把外加问题冒作某一旧 issue 的回答。完整 DTO 见合同和 `modelspine_protocols.review`。

@@ -26,10 +26,21 @@ ReviewSession 的纯转换 `apply_action`、本地 `model_review.record_clarific
 
 ## 固定生成形状与可读父候选
 
-方法 `typed-domain-revision-proposal/0.2`、装配 `typed-language-run/0.5` 仅对回答修订请求使用 `revision_schema.response_format()`：Responses `text.format={type:"json_schema",name:"modelspine_revision_01",strict:true,schema:...}`。Schema 版本 `revision-output-schema/0.1`，固定而非通用 DTO 生成框架；所有对象 additionalProperties=false，所有字段 required，包括空 residuals/issues。Evidence 用 anyOf 区分 source/action；Expression 用递归 $ref 与判别分支覆盖全部算子，固定 args 数量、symbol 与三类叶节点 value；Constraint 区分 invariant/null operation 与 eligibility/string operation。原文 v0.1 路径继续 JSON mode，不自动作为修订失败的备用方式。
+方法 `typed-domain-revision-proposal/0.2`、装配 `typed-language-run/0.5` 仅对回答修订请求使用 `revision_schema.response_format()`：Responses `text.format={type:"json_schema",name:"modelspine_revision_02",strict:true,schema:...}`。Schema 版本 `revision-output-schema/0.2`，固定而非通用 DTO 生成框架；所有对象 additionalProperties=false，所有字段 required，包括空 residuals/issues。Evidence 用 anyOf 区分 source/action；Expression 用递归 $ref 与判别分支覆盖全部算子，固定 args 数量、symbol 与三类叶节点 value；Constraint 区分 invariant/null operation 与 eligibility/string operation。原文 v0.1 路径继续 JSON mode，不自动作为修订失败的备用方式。
 
 此 Schema 仅是服务端生成形状约束。非空/唯一 ID、signed64 与 Gregorian 时间范围、引用/词法作用域、操作数类型、资源上限、精确 source/action 引文、残余义务仍由本地严格检查负责。JSON Schema integer 可能接受数学整数 1.0，本地 DTO 仍拒绝 float；不放宽 parser。Schema 不能保证业务忠实或 B 评价通过。第三方代理是否支持并执行该格式尚未验证；HTTP 不支持、refusal、incomplete 或 schema/typed 不合法均保留失败并停止，无 text 回退、补 JSON、自动重试或降级。
 
 `parent_projection` 恰为 `{schema_version:"revision-parent-projection/0.1",candidate_ref,raw_sha256,text_status:"exact_utf8",text}`。从已重放父候选 base64 原字节严格解码；非 UTF-8 报 unsupported，原件仍供已有 UI 读取，不生成 replacement 文本。text 是准确原文 JSON 文本，不替父候选补字段、重新序列化或纠正；非法但 UTF-8 的原件也可被展示并保留其非法状态。父解释不是用户要求/来源证据。原 source 和用户原话不变，prompt 不要求模型解码 base64。
 
 execution_context body/ref 与 revision-context/0.2 不变，可读投影只在新 envelope/prompt。保存历史仍使用原 method_instructions 重建旧 context，registered/adopted 不随当前 schema 或 prompt 改变而损坏。旧 execution-revision-envelope/0.1 导出和运行仅由其冻结代码验证，不能按新版 prepare 执行；新导出使用新路径，原件不覆盖。verify_execution_revision 重算投影、prompt 和全部信封，不能仅相信其中自行声明的 hash。plan 同时冻结新 schema 模块源码与实际 payload；prepare 与联网前重建同一个 response_format，篡改或改回 json_object 被拒绝。
+
+
+### 0.2 返回类别分组及本地检查边界
+
+固定 ObjectExpr、SetExpr、IntExpr、StringExpr、BoolExpr、InstantExpr、DurationExpr 和 AnyExpr 递归分组；输出仍为原 `{op,args,symbol,value}`，没有新 AST 字段。Constraint 的 applies/assertion/unless 限 BoolExpr；and/or/implies/not 只消费 BoolExpr，count 消费 SetExpr，get/navigate 消费 ObjectExpr。比较分别采用同类别分支，Bool 的 eq 操作数为完整 BoolExpr（含嵌套比较/逻辑/is_null），不是仅 literal/Get。is_null 接受 AnyExpr，包括 Object、Set、nullable Get。
+
+Int 保留整数加减，Duration 保留秒数加减及 Instant−Instant，Instant 保留 Instant±Duration。Get 仅列于 Int/String/Bool/Instant，因为当前字段没有 Duration 类型；它的动态字段类型和 nullable 标志不在 Schema 中猜测。所有闭合字段、判别值、args 数量与叶节点值规则继续保留。
+
+Filter 的 args.items 使用 SetExpr|BoolExpr，Instant 算术使用 InstantExpr|DurationExpr。这是为保留合法异类参数而扩大允许范围：并不保证先后顺序或各出现一次，错误的 Filter(Bool,Set)、Instant 反向加法或两个 Instant 相加可能通过 Schema，仍由原检查器拒绝。不使用未经确认的 prefixItems，也不声称 Schema 已保证完整类型。wrong Get、nullable Boolean 用于逻辑、未绑定变量、关系端点、引文与词法作用域继续在本地检查。
+
+新分组可排除 and(Filter)、count(Boolean)、comparison(Object)、get(scalar)、navigate(scalar) 等确定错误，但不提供业务答案或语义忠实保障。原 0.1 完整真实响应是形状可接受但静态类型被拒的失败原件，不被改写为供应商格式失效或截断。0.2 是否由供应商执行及新真实输出结果须另行观察。app/提示版本、DTO、执行器及历史重放不变；Schema version/name、源码 hash 和新 plan 区分本次方法。没有 checker-feedback 或自动修复循环。

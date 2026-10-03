@@ -2,7 +2,7 @@
   "id": "requirements",
   "title": "需求澄清与模型细化",
   "status": "implemented-slice",
-  "version": "0.6.1-experimental",
+  "version": "0.6.2-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -70,7 +70,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Explicit finite interpretation/clarification with immutable answer history; strict raw-source and typed-domain-candidate inspection; source/request-bound finite review sessions, saved instance references, explicit proposal adoption and prior-version isolation. Offline revision-context/0.1 remains available. Execution-revision-envelope/0.1 and revision-context/0.2 separately preserve original source and verified question/action evidence; typed-domain-revision/0.1 inspection validates the new finite syntax and exact evidence. Saved revision proposals pin actual method instructions for stable replay. Bounded real language calls and local persistence are composed by apps; this package has no transport, persistence, automatic semantic acceptance or fidelity proof. Fixed revision-output-schema/0.1 constrains the complete revision generation shape; execution-revision-envelope/0.2 provides an exact UTF-8 parent projection while preserving historical context replay. Transport compatibility and candidate fidelity require actual validation.",
+  "implemented_scope": "Explicit finite interpretation/clarification with immutable answer history; strict raw-source and typed-domain-candidate inspection; source/request-bound finite review sessions, saved instance references, explicit proposal adoption and prior-version isolation. Offline revision-context/0.1 remains available. Execution-revision-envelope/0.1 and revision-context/0.2 separately preserve original source and verified question/action evidence; typed-domain-revision/0.1 inspection validates the new finite syntax and exact evidence. Saved revision proposals pin actual method instructions for stable replay. Bounded real language calls and local persistence are composed by apps; this package has no transport, persistence, automatic semantic acceptance or fidelity proof. Fixed revision-output-schema/0.2 constrains the complete revision generation shape and known expression return categories without replacing local type, scope or evidence checks; execution-revision-envelope/0.2 provides an exact UTF-8 parent projection while preserving historical context replay. Transport compatibility and candidate fidelity require actual validation.",
   "design_contract_entrypoint": "contracts/design.md",
   "design_contract_maturity": "draft",
   "additional_contract_entrypoints": [

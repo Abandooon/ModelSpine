@@ -168,16 +168,20 @@ class RevisionExecutionTests(unittest.TestCase):
         from modelspine_protocols import finite_execution as f
         from modelspine_protocols.domain_language import Bounds, BinaryRelation, Residual
         schema=app.revision_response_format()["schema"]; defs=schema["$defs"]
+        expression_branches=[branch for name,node in defs.items() if name.endswith("Expr")
+                             for branch in node.get("anyOf",[node]) if "properties" in branch]
         for name,cls in (("ArtifactRef",ArtifactRef),("SourceSpan",t.SourceSpan),("SourceEvidence",t.SourceEvidence),
                          ("ActionEvidence",t.ActionEvidence),("Trace",t.Trace),("Issue",t.Issue),
                          ("Field",f.Field),("EntityType",f.EntityType),("Cardinality",Bounds),
                          ("BinaryRelation",BinaryRelation),("Residual",Residual),("Constraint",f.Constraint),
-                         ("Expression",f.Expression),("DomainDefinition",f.DomainDefinition),(None,t.RevisionCandidate)):
+                         ("DomainDefinition",f.DomainDefinition),(None,t.RevisionCandidate)):
             node=schema if name is None else defs[name]
             for branch in node.get("anyOf",[node]):
                 self.assertEqual(set(branch["properties"]),{x.name for x in fields(cls)},name)
                 self.assertEqual(set(branch["required"]),set(branch["properties"]));self.assertIs(branch["additionalProperties"],False)
-        ops={op for b in defs["Expression"]["anyOf"] for op in b["properties"]["op"]["enum"]}
+        for branch in expression_branches:
+            self.assertEqual(set(branch["properties"]),{x.name for x in fields(f.Expression)})
+        ops={op for b in expression_branches for op in b["properties"]["op"]["enum"]}
         self.assertEqual(ops,set(get_args(get_type_hints(f.Expression)["op"])))
         for name,cls,key in (("Field",f.Field,"value_type"),("Issue",t.Issue,"kind"),
                              ("SourceEvidence",t.SourceEvidence,"kind"),("ActionEvidence",t.ActionEvidence,"kind"),
@@ -208,20 +212,91 @@ class RevisionExecutionTests(unittest.TestCase):
         for value in (None,"A question?"):self.assertTrue(schema_accepts(value,defs["Issue"]["properties"]["question"],defs))
         for value in (None,True,"7",7):
             e={"op":"duration","args":[],"symbol":None,"value":value}
-            self.assertEqual(schema_accepts(e,defs["Expression"],defs),type(value) is int)
-        for branch in defs["Expression"]["anyOf"]:
-            props=branch["properties"];op=props["op"]["enum"][0];n=props["args"]["minItems"]
-            leaf={"op":"literal","args":[],"symbol":None,"value":True}
-            e={"op":op,"args":[leaf]*n,"symbol":"v" if props["symbol"].get("type")=="string" else None,
-               "value":7 if op in ("literal","duration") else "2026-01-01T00:00:00Z" if op=="instant" else None}
-            self.assertTrue(schema_accepts(e,defs["Expression"],defs),op)
-            e["args"].append(leaf);self.assertFalse(schema_accepts(e,defs["Expression"],defs),op)
+            self.assertEqual(schema_accepts(e,defs["AnyExpr"],defs),type(value) is int)
         raw["traces"].append("explanation");self.assertFalse(schema_accepts(raw,schema,defs))
         data=json.loads(candidate(self.envelope));data["traces"][0]["evidence"][0]["span"]["start_line"]=1.0
         self.assertTrue(schema_accepts(data,schema,defs))
         with self.assertRaises(ContractError):inspect_revision_candidate(decode(review.ModelingRequest,self.envelope["review_session"]["request"]),wire.encoded(data),self.envelope["context"])
         # Fresh format values must not share mutable state across calls.
         schema["required"].clear();self.assertEqual(len(app.revision_response_format()["schema"]["required"]),7)
+
+    def test_grouped_schema_preserves_every_operator_and_legal_nested_categories(self):
+        from typing import get_args,get_type_hints
+        from modelspine_protocols import finite_execution as f
+        from test_finite_execution import ex
+        d,_=fixture();entity=replace(d.entities[0],fields=d.entities[0].fields+(
+            f.Field("n","Number","integer",True,False),f.Field("s","Text","string",True,False),
+            f.Field("b","Flag","boolean",True,False),f.Field("maybe","Optional flag","boolean",False,True),
+            f.Field("maybe_time","Optional time","instant",False,True)))
+        entities={entity.id:entity,d.entities[1].id:d.entities[1]};relations={r.id:r for r in d.relations}
+        root=ex("self");member=ex("var",symbol="entry");lit=lambda v:ex("literal",value=v)
+        get=lambda key:ex("get",root,symbol=key)
+        nav=ex("navigate",root,symbol="contains:out")
+        filtered=ex("filter",nav,ex("eq",ex("get",ex("var",symbol="member"),symbol="quality"),lit("eligible")),symbol="member")
+        instant=ex("instant",value="2026-01-01T00:00:00Z");duration=ex("duration",value=7)
+        count=ex("count",filtered);maybe=get("maybe")
+        typed=[(root,"object:bundle"),(member,"object:event"),(nav,"set:event"),(filtered,"set:event"),
+               (ex("navigate",member,symbol="contains:in"),"set:bundle"),(count,"integer"),
+               (lit(7),"integer"),(lit("text"),"string"),(lit(True),"boolean"),
+               (get("n"),"integer"),(get("s"),"string"),(get("b"),"boolean"),(maybe,"boolean"),
+               (instant,"instant"),(duration,"duration"),(get("deadline"),"instant"),(get("maybe_time"),"instant")]
+        for op in ("and","or","implies"):
+            typed.append((ex(op,ex("is_null",maybe),ex("le",count,get("n"))),"boolean"))
+        typed.append((ex("not",ex("eq",get("b"),lit(False))),"boolean"))
+        for operand in (root,nav,filtered,maybe,instant,duration,lit(7),lit("x")):
+            typed.append((ex("is_null",operand),"boolean"))
+        pairs=[(count,get("n")),(instant,get("deadline")),(duration,ex("sub",instant,get("deadline")))]
+        for op in ("eq","lt","le"):
+            typed.extend((ex(op,a,b),"boolean") for a,b in pairs)
+        typed.extend([(ex("eq",get("s"),lit("x")),"boolean"),(ex("eq",maybe,get("b")),"boolean"),
+                      (ex("eq",ex("and",lit(True),ex("is_null",nav)),ex("lt",count,lit(9))),"boolean")])
+        for op in ("add","sub"):
+            typed.extend([(ex(op,count,get("n")),"integer"),(ex(op,duration,ex("sub",instant,get("deadline"))),"duration"),
+                          (ex(op,get("maybe_time"),duration),"instant")])
+        typed.append((ex("sub",instant,get("deadline")),"duration"))
+        defs=app.revision_response_format()["schema"]["$defs"]
+        group={"integer":"IntExpr","string":"StringExpr","boolean":"BoolExpr","instant":"InstantExpr","duration":"DurationExpr"}
+        seen=set()
+        def visit(expr):
+            seen.add(expr.op)
+            for arg in expr.args:visit(arg)
+        for expr,kind in typed:
+            with self.subTest(op=expr.op,kind=kind):
+                actual=f.expression_type(expr,"bundle",entities,relations,{"entry":"object:event"})
+                self.assertEqual(actual[0],kind)
+                name="ObjectExpr" if kind.startswith("object:") else "SetExpr" if kind.startswith("set:") else group[kind]
+                self.assertTrue(schema_accepts(to_data(expr),defs[name],defs))
+                self.assertTrue(schema_accepts(to_data(expr),defs["AnyExpr"],defs))
+                extra=to_data(expr);extra["args"].append(to_data(lit(True)))
+                self.assertFalse(schema_accepts(extra,defs["AnyExpr"],defs))
+                visit(expr)
+        self.assertEqual(seen,set(get_args(get_type_hints(f.Expression)["op"])))
+        # No Get branch in Duration; finite Field has no Duration value_type.
+        self.assertFalse(schema_accepts(to_data(get("deadline")),defs["DurationExpr"],defs))
+
+    def test_grouped_schema_excludes_known_wrong_categories_but_keeps_local_type_boundary(self):
+        from modelspine_protocols import finite_execution as f
+        from test_finite_execution import ex
+        d,_=fixture();root=ex("self");yes=ex("literal",value=True)
+        nav=ex("navigate",root,symbol="contains:out");filtered=ex("filter",nav,yes,symbol="x")
+        instant=ex("instant",value="2026-01-01T00:00:00Z");duration=ex("duration",value=7)
+        defs=app.revision_response_format()["schema"]["$defs"]
+        rejected=[ex("and",filtered,yes),ex("count",yes),ex("eq",root,root),ex("le",root,instant),
+                  ex("get",yes,symbol="deadline"),ex("navigate",yes,symbol="contains:out"),ex("not",nav)]
+        for expr in rejected:
+            with self.subTest(expr=expr):self.assertFalse(schema_accepts(to_data(expr),defs["AnyExpr"],defs))
+        entity=replace(d.entities[0],fields=d.entities[0].fields+(f.Field("maybe","Maybe","boolean",False,True),))
+        entities={entity.id:entity,d.entities[1].id:d.entities[1]};relations={r.id:r for r in d.relations}
+        admitted=[ex("and",ex("get",root,symbol="deadline"),yes),
+                  ex("and",ex("get",root,symbol="maybe"),yes),
+                  ex("var",symbol="unbound"),ex("filter",yes,nav,symbol="x"),
+                  ex("filter",nav,nav,symbol="x"),ex("add",duration,instant),ex("add",instant,instant)]
+        for expr in admitted:
+            with self.subTest(expr=expr):
+                self.assertTrue(schema_accepts(to_data(expr),defs["AnyExpr"],defs))
+                with self.assertRaises(ContractError):f.expression_type(expr,"bundle",entities,relations)
+        # Constraint roots cannot be Object/Set even though AnyExpr includes them.
+        for expr in (root,nav):self.assertFalse(schema_accepts(to_data(expr),defs["BoolExpr"],defs))
 
     def test_readable_parent_projection_is_exact_and_recomputed(self):
         projection=self.envelope["parent_projection"]
