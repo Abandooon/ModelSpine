@@ -16,13 +16,19 @@ from modelspine_protocols import ArtifactRef, decode, dumps, require
 from modelspine_protocols.application import LocalWebSpec
 from modelspine_generation.local_web import plan
 from modelspine_implementation.local_web import materialize
+from modelspine_implementation.local_runtime import decode_local_definition
 
 
 def load_spec(project_dir):
     """Read A's store, replay the live review, and re-evaluate every readiness gate."""
+    current = model_review.read_review(project_dir)
+    if current["inspection"]["status"] == "valid":
+        decode_local_definition(current["inspection"]["checks"]["candidate"]["definition"])
     saved = application_spec.read_spec(project_dir)
     spec = decode(LocalWebSpec, saved["spec"])
     view = model_review.read_review(project_dir, expected_review_ref=spec.review_ref)
+    if view["inspection"]["status"] == "valid":
+        decode_local_definition(view["inspection"]["checks"]["candidate"]["definition"])
     result = plan(spec, decode(ArtifactRef, saved["spec_ref"]), view, checker=check_project)
     # Detect a spec-head change during the separate public reads.
     latest = application_spec.read_spec(project_dir)
@@ -39,7 +45,8 @@ def runtime_sources():
     protocols_version = json.loads((platform / "packages/protocols/module.json").read_text(encoding="utf-8"))["version"]
     mapping = {"domain_checks.py":("apps/domain_checks.py", CHECKER),
                "modelspine_protocols/__init__.py":("packages/protocols/src/modelspine_protocols/__init__.py", "protocols/" + protocols_version),
-               "modelspine_protocols/domain_language.py":("packages/protocols/src/modelspine_protocols/domain_language.py", "finite-domain/0.1")}
+               "modelspine_protocols/domain_language.py":("packages/protocols/src/modelspine_protocols/domain_language.py", "finite-domain/0.1"),
+               "modelspine_protocols/finite_execution.py":("packages/protocols/src/modelspine_protocols/finite_execution.py", "finite-domain/0.2")}
     result = {}
     for target, (source, capability) in mapping.items():
         raw = (platform / source).read_bytes()

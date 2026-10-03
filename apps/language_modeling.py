@@ -1,6 +1,7 @@
 """Prepare then explicitly execute a bounded raw-source/typed-candidate language run."""
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
+import base64
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -13,13 +14,18 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from domain_modeling import load_request
 from model_review import create_review, read_review
-from modelspine_protocols import ArtifactRef, ContractError, digest, dumps, to_data
+from modelspine_protocols import ArtifactRef, ContractError, decode, digest, dumps, to_data, require
+from modelspine_protocols.review import RevisionProposal
+import model_review as review_store
+from modelspine_requirements.domain_modeling import ModelingRequest
+from modelspine_requirements.revision_request import prepare_execution_revision, verify_execution_revision
+from modelspine_requirements.review import review_input, review_ref
 from modelspine_requirements.typed_domain import typed_modeling_prompt
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from language_response import (VERSION, LanguageError, encoded, extract_response, load_config,
                                post_response, redact, strict_json)
 
-METHOD = "typed-language-run/0.3"
+METHOD = "typed-language-run/0.4"
 PROMPT_VERSION = "typed-language-assembly/0.1"
 OUTPUT_INSTRUCTIONS = """Return one complete compact JSON object, without Markdown or commentary.
 Use short unique IDs and no indentation or repeated explanations. Retain every required
@@ -47,6 +53,9 @@ METHOD_PATHS = (
     "packages/requirements/src/modelspine_requirements/domain_modeling.py",
     "packages/requirements/src/modelspine_requirements/typed_domain.py",
     "packages/requirements/src/modelspine_requirements/review.py",
+    "packages/protocols/src/modelspine_protocols/finite_execution.py",
+    "packages/requirements/src/modelspine_requirements/typed_revision.py",
+    "packages/requirements/src/modelspine_requirements/revision_request.py",
 )
 
 
@@ -116,6 +125,20 @@ def locked(root):
 
 
 def prepare_run(run_dir, request_paths, config, *, task_id):
+    return _prepare_run(run_dir, request_paths, config, task_id=task_id)
+
+
+def prepare_revision_run(run_dir, project_dir, config, *, expected_review_ref, action_refs, task_id):
+    """Freeze one answer-bound revision; no parent mutation or network request."""
+    root = review_store._directory(project_dir)
+    with review_store._locked(root):
+        session = review_store._load(root)
+        envelope = prepare_execution_revision(session, expected_review_ref=expected_review_ref, action_refs=action_refs)
+        return _prepare_run(run_dir, (session.request,), config, task_id=task_id,
+                            revision={"project_dir": str(root), "envelope": envelope})
+
+
+def _prepare_run(run_dir, request_paths, config, *, task_id, revision=None):
     """No network. The newly created run directory is this task's sole budget authority."""
     config.validate()
     root = safe_path(run_dir)
@@ -125,12 +148,16 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
     items = []
     contents = {}
     for index, path in enumerate(request_paths, 1):
-        request = load_request(path)
-        prompt = language_prompt(request)
+        request = path if isinstance(path, ModelingRequest) else load_request(path)
+        prompt = revision["envelope"]["prompt"] if revision else language_prompt(request)
         payload = encoded({"model": config.model, "input": prompt, "store": False, "stream": False,
                            "max_output_tokens": config.max_output_tokens, "text": {"format": {"type": "json_object"}}})
         files = {"source.txt": request.text.encode("utf-8"), "request.json": dumps(request).encode("utf-8"),
                  "prompt.txt": prompt.encode("utf-8"), "payload.json": payload}
+        if revision:
+            files["revision.json"] = encoded(revision["envelope"])
+            if any(len(raw) > 4 * 1024 * 1024 for raw in files.values()):
+                raise LanguageError("revision_input_size_limit")
         if any(redact(raw, config.key)[1] for raw in files.values()):
             raise LanguageError("credential_in_input")
         prefix = f"input-{index}"
@@ -145,6 +172,10 @@ def prepare_run(run_dir, request_paths, config, *, task_id):
             "executable_slots": count, "reserved_revision_slots": max(0, config.max_requests - count),
             "automatic_retries": 0, "method_sha256": method_hashes(),
             "source_origin": "host_supplied_not_independently_verified"}
+    if revision:
+        plan["mode"] = "answer_revision/0.1"
+        plan["parent_project_dir"] = revision["project_dir"]
+        plan["parent_review_ref"] = revision["envelope"]["context"]["parent_review_ref"]
     plan_raw = encoded(plan)
     if redact(plan_raw, config.key)[1]:
         raise LanguageError("credential_in_plan")
@@ -164,13 +195,23 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
     """One explicit POST at most. Any unsuccessful predecessor stops the batch."""
     config.validate()
     root = safe_path(run_dir)
-    with locked(root):
+    with locked(root), ExitStack() as parent_locks:
         plan_raw = load(root / "plan.json")
         if hash_bytes(plan_raw) != expected_plan_sha256:
             raise LanguageError("plan_hash_conflict")
         plan = strict_json(plan_raw)
         if plan["config"] != config.public() or plan["method_sha256"] != method_hashes():
             raise LanguageError("configuration_or_method_conflict")
+        revision_mode = plan.get("mode") == "answer_revision/0.1"
+        parent_session = None
+        if revision_mode:
+            # Cooperative parent lock stays held through response persistence. No
+            # stale page can replace the parent while this bounded call is running.
+            parent = review_store._directory(plan["parent_project_dir"])
+            parent_locks.enter_context(review_store._locked(parent))
+            parent_session = review_store._load(parent)
+            if to_data(review_ref(parent_session)) != plan["parent_review_ref"]:
+                raise LanguageError("revision_parent_conflict")
         inputs = []
         # All frozen inputs are one plan: future and past slots are checked too.
         for input_slot, item in enumerate(plan["items"], 1):
@@ -179,7 +220,13 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
                 if Path(name).name != name or hash_bytes(load(folder / name)) != expected:
                     raise LanguageError("input_hash_conflict")
             request = load_request(folder / "request.json")
-            prompt = language_prompt(request).encode("utf-8")
+            if revision_mode:
+                revision = verify_execution_revision(strict_json(load(folder / "revision.json", review_store.MAX_STORE_BYTES)))
+                if revision["review_session"] != to_data(parent_session) or digest(parent_session.request) != digest(request):
+                    raise LanguageError("revision_parent_conflict")
+                prompt = revision["prompt"].encode("utf-8")
+            else:
+                prompt = language_prompt(request).encode("utf-8")
             payload = load(folder / "payload.json")
             expected_payload = encoded({"model": config.model, "input": prompt.decode("utf-8"), "store": False,
                                         "stream": False, "max_output_tokens": config.max_output_tokens,
@@ -208,6 +255,10 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
                         raise LanguageError("receipt_artifact_conflict")
                 if not receipt["continue_allowed"]:
                     raise LanguageError("previous_attempt_stopped")
+                if revision_mode:
+                    # One executable revision slot. Parent head was already checked;
+                    # its candidate intentionally remains the OLD candidate until adoption.
+                    continue
                 review = folder / "review-project"
                 if receipt["review_project"] != str(review):
                     raise LanguageError("review_binding_conflict")
@@ -271,19 +322,32 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
                 save(attempt / "candidate.raw", candidate)
                 receipt["candidate"] = {"path": "candidate.raw", "sha256": hash_bytes(candidate),
                                         "origin": "response.output.message.output_text_utf8"}
-                review = attempt / "review-project"
-                review.mkdir()
                 try:
-                    view = create_review(review, request, candidate, session_id=f"language-{slot}")
-                    reopened = read_review(review)
-                    if view != reopened or view["candidate_ref"]["content_hash"] != hash_bytes(candidate):
-                        raise LanguageError("review_identity_conflict")
-                    save(attempt / "inspection.json", encoded({"generation_provenance": "not_verified",
-                                                              "inspection": view["inspection"]}))
-                    receipt["review_project"] = str(review)
-                    receipt["candidate_ref"] = view["candidate_ref"]
-                    receipt["review_ref"] = view["review_ref"]
-                    if view["inspection"]["status"] != "valid":
+                    if revision_mode:
+                        # Pure inspection uses only the previously replayed context;
+                        # execution does not append a proposal or adopt it.
+                        from modelspine_requirements.review import _inspection
+                        inspection, _ = _inspection(request, candidate, revision["context"])
+                        receipt["review_project"] = str(parent)
+                        receipt["parent_candidate_ref"] = revision["context"]["parent_candidate_ref"]
+                        receipt["review_ref"] = revision["context"]["parent_review_ref"]
+                        receipt["revision_ref"] = revision["context"]["ref"]
+                        receipt["candidate_ref"] = to_data(ArtifactRef(request.source.project_id,
+                            parent_session.id + "/generated-proposal/" + root.name, "1", hash_bytes(candidate)))
+                        receipt["adoption"] = "not_requested"
+                    else:
+                        review = attempt / "review-project"
+                        review.mkdir()
+                        view = create_review(review, request, candidate, session_id=f"language-{slot}")
+                        reopened = read_review(review)
+                        if view != reopened or view["candidate_ref"]["content_hash"] != hash_bytes(candidate):
+                            raise LanguageError("review_identity_conflict")
+                        inspection = view["inspection"]
+                        receipt["review_project"] = str(review)
+                        receipt["candidate_ref"] = view["candidate_ref"]
+                        receipt["review_ref"] = view["review_ref"]
+                    save(attempt / "inspection.json", encoded({"generation_provenance": "not_verified", "inspection": inspection}))
+                    if inspection["status"] != "valid":
                         receipt["stop_reasons"].append("candidate_rejected")
                 except (ValueError, OSError, RecursionError):
                     receipt["stop_reasons"].append("review_creation_failed")
@@ -298,15 +362,55 @@ def execute_next(run_dir, config, *, expected_plan_sha256):
         return receipt
 
 
+def revision_proposal_from_run(run_dir, *, expected_plan_sha256, action_id, actor):
+    """Build an explicit registration DTO from one successful frozen receipt; no writes."""
+    root = safe_path(run_dir)
+    with locked(root):
+        plan_raw = load(root / "plan.json")
+        require(hash_bytes(plan_raw) == expected_plan_sha256, "wrong revision plan", "conflict")
+        plan = strict_json(plan_raw)
+        require(plan.get("mode") == "answer_revision/0.1" and plan["method_sha256"] == method_hashes(), "wrong revision method", "conflict")
+        item = plan["items"][0]
+        for name, h in item["files"].items():
+            require(Path(name).name == name and hash_bytes(load(root / "input-1" / name, review_store.MAX_STORE_BYTES)) == h,
+                    "revision input changed", "conflict")
+        envelope = verify_execution_revision(strict_json(load(root / "input-1/revision.json", review_store.MAX_STORE_BYTES)))
+        attempt = root / "attempts/001"
+        raw = load(attempt / "receipt.json")
+        require(hash_bytes(raw) == load(attempt / "receipt.sha256").decode("ascii"), "receipt changed", "conflict")
+        receipt = strict_json(raw)
+        require(receipt["plan_sha256"] == expected_plan_sha256 and receipt["slot"] == 1 and receipt["continue_allowed"],
+                "stopped or wrong revision receipt", "conflict")
+        for name, h in receipt["artifact_sha256"].items():
+            require(Path(name).name == name and hash_bytes(load(attempt / name)) == h, "revision output changed", "conflict")
+        candidate = load(attempt / "candidate.raw")
+        context = envelope["context"]
+        require(receipt["revision_ref"] == context["ref"] and receipt["parent_candidate_ref"] == context["parent_candidate_ref"]
+                and receipt["candidate"]["sha256"] == hash_bytes(candidate), "receipt context mismatch", "conflict")
+        response_ref = ArtifactRef(context["parent_request_ref"]["project_id"], "language-receipt/" + root.name, "1", hash_bytes(raw))
+        from modelspine_requirements.typed_revision import INSTRUCTIONS
+        require(hash_bytes(INSTRUCTIONS.encode("utf-8")) == context["method_instructions_sha256"],
+                "revision method instructions changed", "conflict")
+        return RevisionProposal("model-review-revision-proposal/0.1", action_id, response_ref.project_id,
+            decode(ArtifactRef, context["parent_request_ref"]), decode(ArtifactRef, context["parent_candidate_ref"]),
+            decode(ArtifactRef, context["parent_review_ref"]), actor,
+            tuple(decode(ArtifactRef, r) for r in envelope["action_refs"]), decode(ArtifactRef, context["ref"]),
+            response_ref, base64.b64encode(candidate).decode("ascii"), INSTRUCTIONS)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     prepare = sub.add_parser("prepare")
     prepare.add_argument("--request", action="append", required=True, type=Path)
     prepare.add_argument("--task-id", required=True)
+    revision_prepare = sub.add_parser("prepare-revision")
+    revision_prepare.add_argument("--project-dir", required=True, type=Path)
+    revision_prepare.add_argument("--bindings", required=True, type=Path)
+    revision_prepare.add_argument("--task-id", required=True)
     execute = sub.add_parser("execute-next")
     execute.add_argument("--expected-plan-sha256", required=True)
-    for command in (prepare, execute):
+    for command in (prepare, revision_prepare, execute):
         command.add_argument("--run-dir", type=Path, required=True)
         command.add_argument("--env-file", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -314,6 +418,12 @@ def main(argv=None):
         config = load_config(args.env_file)
         if args.command == "prepare":
             result = prepare_run(args.run_dir, args.request, config, task_id=args.task_id)
+        elif args.command == "prepare-revision":
+            bindings = strict_json(load(args.bindings))
+            require(set(bindings) == {"expected_review_ref", "action_refs"}, "invalid revision bindings")
+            result = prepare_revision_run(args.run_dir, args.project_dir, config, task_id=args.task_id,
+                expected_review_ref=decode(ArtifactRef, bindings["expected_review_ref"]),
+                action_refs=tuple(decode(ArtifactRef, r) for r in bindings["action_refs"]))
         else:
             receipt = execute_next(args.run_dir, config, expected_plan_sha256=args.expected_plan_sha256)
             result = {"status": "completed" if receipt["continue_allowed"] else "stopped",

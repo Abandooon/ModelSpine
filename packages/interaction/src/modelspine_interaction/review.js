@@ -44,13 +44,13 @@ function submitForm(title, build, consume, describe, operation) {
   f.dataset.operation = operation;
   const result = node("div"); result.className = "result"; result.setAttribute("role", "status");
   const fields = build(f);
-  const send = node("button", {"save-project":"保存实例", "check-project":"执行检查", "adopt-proposal":"采纳提案"}[operation] || "提交记录"); send.type = "submit";
+  const send = node("button", {"save-project":"保存实例", "check-project":"检查库存完整性", "check-eligibility":"仅检查资格", "clarification":"记录外加澄清", "revision-proposal":"登记修订产物", "adopt-proposal":"采纳提案"}[operation] || "提交记录"); send.type = "submit";
   const cancel = node("button", "取消草稿"); cancel.type = "button";
   cancel.onclick = () => { f.reset(); result.textContent = "已取消草稿；未提交。"; result.className = "result"; };
   f.append(send, cancel, result);
   f.onsubmit = async event => {
     event.preventDefault(); send.disabled = true; cancel.disabled = true;
-    result.className = "result"; result.textContent = operation==="check-project"?"正在检查，尚未收到结果…":"正在保存，尚未收到回执…";
+    result.className = "result"; result.textContent = operation.startsWith("check-")?"正在检查，尚未收到结果…":"正在保存，尚未收到回执…";
     try {
       const receipt = await consume(fields());
       result.className = "result success";
@@ -81,9 +81,10 @@ function actionForm(title, view, actor, build) {
   })), saved, "review-action");
 }
 function forms(view, actor, whole) {
+  const definition=view.inspection.status==="valid"?view.inspection.checks.candidate.definition:null;
   for (const q of view.questions) {
     actionForm(`问题 ${q.id} · ${q.text}`, view, actor, f => {
-      f.append(node("p", `状态：${q.status}；解决状态：${q.resolution}`));
+      f.append(node("p", `${q.kind==="external_clarification"?"外加澄清；更正："+(q.correction || "（空）"):"候选原问题或原件诊断"}；状态：${q.status}；解决状态：${q.resolution}`));
       const l = node("label", "动作"), select = node("select");
       for (const [value, label] of [["answer", "答复"], ["decline", "拒答"]]) {
         const option = node("option", label); option.value = value; select.append(option);
@@ -118,6 +119,30 @@ function forms(view, actor, whole) {
       return {kind:"propose_edit", text:t.value, proposal_base64:btoa(binary)};
     };
   });
+  submitForm("记录外加问题、更正与回答", f=>{
+    f.append(node("p",`这是新的外加澄清，绑定当前父候选与审阅。回答归属为 ${actor}（启动时标记，非认证）。原始来源不改写，解释不作为用户原话。`));
+    const fields={};
+    for(const [key,label] of [["question_text","外加问题原话"],["question_actor","问题提出者归属"],
+      ["correction_text","更正原话（无则留空）"],["correction_actor","更正归属（有更正时必填）"],
+      ["response_text","回答或拒答原话"],["interpretation_text","单独解释（可空，不是用户逐字原话）"],
+      ["interpretation_actor","解释者归属（有解释时必填）"]])fields[key]=input(f,label,2);
+    const label=node("label","回应类型"),kind=node("select");
+    for(const [value,text] of [["answer","回答"],["decline","拒答（原话可空）"]]){const o=node("option",text);o.value=value;kind.append(o);}
+    label.append(kind);f.append(label);
+    return ()=>Object.fromEntries([...Object.entries(fields).map(([key,t])=>[key,t.value]),["response_kind",kind.value]]);
+  },async fields=>recorded(await api("/api/clarification",{schema_version:"model-review-clarification/0.1",...binding(view,actor),...fields})),
+    saved,"clarification");
+  submitForm("登记已有回答修订产物",f=>{
+    f.append(node("p","这里只登记已经取得的完整产物，不调用语言服务。登记后当前候选仍不变，必须另行复核并明确采纳。生成来源标记 not_verified 不是模型调用认证。"));
+    const payload=input(f,"产物绑定 JSON：action_refs、revision_ref、response_ref、proposal_base64、method_instructions",10);
+    details(f,"填写约定","五个字段全部必需。action_refs 选取实际保存问答引用；revision_ref 取 A 已准备材料的 ref；response_ref 取产物来源引用；proposal_base64 是未修复、未重写原始响应字节的 base64；method_instructions 必须是生成该产物时冻结的方法原文，不能用当前提示补入旧历史。父候选、请求和审阅绑定使用本页所见版本，不从此输入替换。完整引用均含 project_id / artifact_id / revision / content_hash。没有产物时不填造候选。");
+    return ()=>{
+      const value=JSON.parse(payload.value),keys=["action_refs","revision_ref","response_ref","proposal_base64","method_instructions"];
+      if(!value || Array.isArray(value) || Object.keys(value).length!==keys.length || !keys.every(k=>Object.hasOwn(value,k)))throw new Error("绑定材料必须且仅含指定五个字段；不得补造历史方法。");
+      return value;
+    };
+  },async fields=>recorded(await api("/api/revision/proposal",{schema_version:"model-review-revision-proposal/0.1",...binding(view,actor),...fields})),
+    (result,receipt)=>{result.append(node("p","修订产物已登记；当前候选未变、尚未采纳。请在新窗口查看原件与诊断，再明确选择是否采纳。"));details(result,"登记回执",pretty(receipt));},"revision-proposal");
   if (view.definition_ref !== null) {
     submitForm("保存实例（不自动判为通过）", f => {
       const l=node("label", "实例用途"), purpose=node("select");
@@ -146,8 +171,8 @@ function forms(view, actor, whole) {
     document.getElementById("forms").append(node("p","候选原件未通过形式检查，无法保存可执行实例；仍可回答或提交修订提案。"));
   }
   for (const entry of view.projects) {
-    submitForm(`检查已保存实例 ${entry.project.id}`, f=>{
-      f.append(node("p",`用途 ${entry.purpose}；仅检查此实例与本页候选，结果不保存为可跨版本复用的报告。`));
+    submitForm(`检查库存完整性 · ${entry.project.id}`, f=>{
+      f.append(node("p",`用途 ${entry.purpose}；检查结构与库存不变量，不运行资格操作。结果不保存为跨版本报告，也不证明历史保留。`));
       details(f,"实例与检查绑定",pretty({project_ref:entry.ref,definition_ref:entry.definition_ref,
         candidate_ref:entry.candidate_ref,expected_review_ref:view.review_ref}));
       return ()=>({project_ref:entry.ref,expected_review_ref:view.review_ref});
@@ -157,6 +182,24 @@ function forms(view, actor, whole) {
       section(response.presentation,result);
       details(result,"完整检查结果及绑定（精确原值）",response.exact_details);
     },"check-project");
+    if(definition && definition.schema_version==="finite-domain/0.2") {
+      submitForm(`操作资格检查 · ${entry.project.id}`,f=>{
+        f.append(node("p","仅检查所选操作与目标的资格；不会提交、执行操作或改变实例，也不证明历史已保留。库存完整性请单独检查。"));
+        const choices=[];
+        for(const [key,label,values] of [["operation","操作标识",[...new Set(view.rules.filter(r=>r.scope==="eligibility").map(r=>r.operation))]],
+          ["target","目标对象",entry.project.objects.map(o=>o.id)]]){
+          const l=node("label",label),s=node("select");s.dataset.field=key;const empty=node("option","请明确选择");empty.value="";s.append(empty);
+          for(const value of values){const option=node("option",value);option.value=value;s.append(option);}l.append(s);f.append(l);choices.push([key,s]);
+        }
+        return ()=>{const values=Object.fromEntries(choices.map(([key,s])=>[key,s.value]));
+          if(!values.operation || !values.target)throw new Error("请明确选择操作与目标，尚未检查。");
+          return {project_ref:entry.ref,expected_review_ref:view.review_ref,...values};};
+      },query=>api("/api/project/eligibility",query),(result,response)=>{
+        if(response.check.status!=="checked" || response.check.scope!=="eligibility" || response.check.action_execution!=="not_run")throw new Error("unexpected_receipt: 资格检查回执不完整");
+        result.append(node("p",`操作 ${response.check.operation} · 目标 ${response.check.target} · 仅资格检查；操作执行 not_run，未提交。`));
+        section(response.presentation,result);details(result,"资格/实例/候选/审阅绑定及完整结果",response.exact_details);
+      },"check-eligibility");
+    }
   }
   for (const proposal of view.proposals) {
     if (proposal.inspection.status!=="valid") {
@@ -168,6 +211,8 @@ function forms(view, actor, whole) {
       details(f,"即将采纳的完整原件",proposal.text);
       details(f,"采纳前候选与提案来源",pretty({candidate_ref:view.candidate_ref,proposal_ref:proposal.ref,
         based_on_review_ref:proposal.based_on_review_ref,provenance:proposal.provenance}));
+      if(proposal.revision_context)details(f,"生成时冻结的方法身份",pretty({version:proposal.revision_context.method_instructions_version,
+        sha256:proposal.revision_context.method_instructions_sha256,revision_ref:proposal.revision_context.ref}));
       const reason=input(f,"采纳理由（必填）");
       const label=node("label"), consent=node("input");consent.type="checkbox";
       label.append(consent,document.createTextNode("我已复核完整提案，明确建立后继候选"));f.append(label);
@@ -185,6 +230,8 @@ function revisionExport(view) {
   const panel=node("section");panel.id="revision-export";panel.append(node("h2","导出回答修订材料"),
     node("p","选择已保存的答复或拒答。下载包含原文、候选原件、问题、回答和完整审阅绑定；尚未调用语言服务，不会产生新候选。历史回答保留原候选来源。"));
   const choices=[];
+  if([...view.history.map(h=>h.view),view].some(v=>v.actions.some(a=>a.action.schema_version==="model-review-clarification/0.1")))
+    panel.append(node("p","此处现有下载只包含普通答复/拒答。外加澄清的执行修订材料由 A 的独立入口准备，本页未接该下载接口；它们仍完整保存在审阅与历史中。"));
   for(const snapshot of [...view.history.map(h=>h.view),view]) for(const entry of snapshot.actions) {
     if(!["answer","decline"].includes(entry.action.kind))continue;
     const label=node("label"),box=node("input");box.type="checkbox";
@@ -230,6 +277,10 @@ function applicationAssessment(parent, assessment) {
 }
 async function applicationEditor(view, template) {
   const panel=node("section");panel.id="application-spec";
+  if(template===null) {
+    panel.append(node("h2","当前候选不支持应用配置"),node("p","应用配置入口仅支持旧版有限定义。当前新版本或非法候选不能填旧版表单、准备、确认或保存应用配置；原件仍可审阅。资格检查不能替代应用许可。"));
+    document.getElementById("offline-tools").append(panel);return;
+  }
   panel.append(node("h2","准备应用配置"),node("p","先编辑并保存草稿，再准备未用过的下一版本。阅读准备后的完整配置，主动确认后再次保存，并在新窗口重新读取就绪结果。此处不生成或运行应用。"),
     node("p","配置必须明确初始数据、可编辑内容、四种任务、视图、保存位置、访问方式和公开验收样例，并逐项提供真实来源。未知或负向检查不会变成通过。"));
   const guide=`所有顶层字段均保留。id 为同一应用的稳定标识，version 每次更改保存须使用新值；五个来源/审阅引用必须与当前记录一致，不能任意填 hash。
@@ -246,7 +297,7 @@ JSON 内的 Int64 数值按原文处理；不要用浏览器 Number 重建配置
   details(panel,"字段结构与填写方法",guide);
   details(panel,"可引用的原文及实际用户记录",pretty({source_ref:view.source_ref,source_text:view.source_text,
     saved_projects:view.projects.map(p=>({ref:p.ref,purpose:p.purpose,id:p.project.id})),
-    actions:[...view.history.map(h=>h.view),view].flatMap(v=>v.actions.map(a=>({ref:a.provenance.action_ref,text:a.action.text})))}));
+    actions:[...view.history.map(h=>h.view),view].flatMap(v=>v.actions.filter(a=>a.action.schema_version==="model-review/0.1").map(a=>({ref:a.provenance.action_ref,text:a.action.text})))}));
   const editor=input(panel,"完整应用配置 JSON（保留精确数值）",22);editor.id="spec-json";
   const next=input(panel,"准备时使用的版本号（留空保留当前；改动后保存须用未使用过的版本）",1);next.id="spec-version";
   const templateButton=node("button","填入未配置结构模板"),save=node("button","保存当前草稿"),prepare=node("button","准备确切配置"),confirm=node("button","明确确认这份配置");

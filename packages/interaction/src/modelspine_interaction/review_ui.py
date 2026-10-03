@@ -34,18 +34,43 @@ def project_report(report: dict) -> dict:
             "detail":json.dumps(report, ensure_ascii=False, indent=2)}
 
 
-def format_expression(expr: dict) -> str:
-    """Format validated finite syntax, without evaluation or simplification."""
+def format_expression(expr: dict, schema_version: str = "finite-domain/0.1") -> str:
+    """Versioned syntax only; no evaluation, unit conversion or simplification."""
+    if schema_version not in ("finite-domain/0.1", "finite-domain/0.2"):
+        raise ValueError("unsupported expression version: " + str(schema_version))
+    v2 = schema_version == "finite-domain/0.2"
     op = expr["op"]
     if op == "literal":
         return json.dumps(expr["value"], ensure_ascii=False)
-    if op in ("field", "count"):
+    if not v2 and op in ("field", "count"):
         return op + "(" + json.dumps(expr["symbol"], ensure_ascii=False) + ")"
-    args = [format_expression(arg) for arg in expr["args"]]
+    common = {"not", "is_null", "eq", "lt", "le", "and", "or", "implies"}
+    if op not in common | ({"self", "var", "get", "navigate", "filter", "count", "instant", "duration", "add", "sub"} if v2 else set()):
+        raise ValueError("unsupported expression operator for " + schema_version + ": " + op)
+    if op == "self":
+        return "self"
+    if op == "var":
+        return "var(" + json.dumps(expr["symbol"], ensure_ascii=False) + ")"
+    if op in ("instant", "duration"):
+        return op + "(" + json.dumps(expr["value"], ensure_ascii=False) + (" seconds" if op == "duration" else "") + ")"
+    args = [format_expression(arg, schema_version) for arg in expr["args"]]
+    if v2 and op in ("get", "navigate"):
+        return op + "(" + args[0] + ", " + json.dumps(expr["symbol"], ensure_ascii=False) + ")"
+    if v2 and op == "filter":
+        return "filter(" + args[0] + ", " + json.dumps(expr["symbol"], ensure_ascii=False) + " => " + args[1] + ")"
+    if v2 and op == "count":
+        return "count(" + args[0] + ")"
     if op in ("not", "is_null"):
         return op.upper() + "(" + args[0] + ")"
-    symbols = {"eq":"=", "lt":"<", "le":"<=", "and":"AND", "or":"OR", "implies":"IMPLIES"}
+    symbols = {"eq":"=", "lt":"<", "le":"<=", "and":"AND", "or":"OR", "implies":"IMPLIES", "add":"+", "sub":"-"}
     return "(" + args[0] + " " + symbols[op] + " " + args[1] + ")"
+
+
+def definition_version(view: dict) -> str | None:
+    """Read A's verified definition identity; never infer a version from operators."""
+    if view["inspection"]["status"] != "valid":
+        return None
+    return view["inspection"]["checks"]["candidate"]["definition"]["schema_version"]
 
 
 def project_review(view: dict) -> list[dict]:
@@ -71,12 +96,26 @@ def project_review(view: dict) -> list[dict]:
     add("关系与双向基数", "relations", columns=["关系 / ID", "源 → 目标", "每个源对应目标数", "每个目标对应源数"],
         rows=[[r["name"] + " [" + r["id"] + "]", names[r["source"]] + " → " + names[r["target"]],
                bounds(r["targets_per_source"]), bounds(r["sources_per_target"])] for r in view["relations"]])
-    add("规则", "rules", paragraphs=["仅格式化 finite 表达式，不求值或自动解释。字段与计数保留稳定 ID；括号保留 AND/OR 组合。"],
-        columns=["规则 ID", "上下文", "适用 applies", "断言 assertion", "例外 unless"],
-        rows=[[r["id"], names[r["context"]], format_expression(r["applies"]), format_expression(r["assertion"]),
-               format_expression(r["unless"])] for r in view["rules"]])
-    add("问题与回答状态", "questions", columns=["问题 ID", "问题", "回答状态", "解决状态"],
-        rows=[[q["id"], q["text"], {"open":"未回答", "answer_recorded":"答复已记录", "declined":"已拒答"}[q["status"]],
+    version = definition_version(view)
+    v2 = version == "finite-domain/0.2"
+    rule_rows = []
+    for rule in view["rules"]:
+        scope = ([{"invariant":"库存完整性 invariant", "eligibility":"操作资格 eligibility"}.get(rule["scope"], "未支持作用域"),
+                  rule["operation"] or "无操作"] if v2 else [])
+        try:
+            expressions = [format_expression(rule[key], version) for key in ("applies", "assertion", "unless")]
+        except ValueError as exc:
+            expressions = [str(exc), "未解释；请查看完整原件", "未解释"]
+        rule_rows.append([rule["id"], names[rule["context"]], *scope, *expressions])
+    add("规则", "rules", paragraphs=["仅格式化表达式，不求值或自动解释；括号保留 AND/OR 组合。定义版本：" + str(version),
+        "库存关系基数与过滤后的资格计数独立。资格检查不是执行提交，也不能证明已保留历史。UTC 时间保留原始整秒，不转本地时区。" ] if v2 else
+        ["仅格式化 finite 表达式，不求值或自动解释。字段与计数保留稳定 ID；括号保留 AND/OR 组合。" +
+         (" 未支持定义版本：" + str(version) if version not in (None, "finite-domain/0.1") else "")],
+        columns=["规则 ID", "上下文", *(["作用域", "操作标识"] if v2 else []), "适用 applies", "断言 assertion", "例外 unless"], rows=rule_rows)
+    kinds={"candidate_issue":"候选中的原问题", "inspection_diagnostic":"原件诊断问题", "external_clarification":"外加澄清（独立记录）"}
+    add("问题与回答状态", "questions", columns=["问题 ID", "来源类别", "问题", "回答状态", "解决状态"],
+        rows=[[q["id"], kinds.get(q.get("kind", "candidate_issue"), "未支持问题类别"), q["text"],
+               {"open":"未回答", "answer_recorded":"答复已记录", "declined":"已拒答"}[q["status"]],
                q["resolution"] + "（仍未决）"] for q in view["questions"]])
     add("候选未决项", "issues", columns=["ID", "类别", "说明", "相关元素", "问题"],
         rows=[[i["id"], i["kind"], i["text"], ", ".join(i["related_ids"]), i["question"] or "无提问"] for i in view["issues"]])
@@ -86,14 +125,66 @@ def project_review(view: dict) -> list[dict]:
     add("形式检查与诊断", "inspection", paragraphs=["候选形式检查：" + inspection["status"],
         "意图忠实性：" + view["requirement_fidelity"], "实例检查：" + view["instance_conformance"]],
         columns=["诊断代码", "消息"], rows=[[d["code"], d["message"]] for d in inspection["diagnostics"]])
-    add("来源追踪", "traces", columns=["元素 ID", "原文依据"],
-        rows=[[t["element"], "\n".join(str(e["start_line"]) + "–" + str(e["end_line"]) + " 行：" + e["quote"] for e in t["evidence"])] for t in view["traces"]])
+    revision = view["inspection"].get("checks", {}).get("candidate", {}).get("schema_version") == "typed-domain-revision/0.1"
+    trace_rows = []
+    for trace in view["traces"]:
+        for evidence in trace["evidence"]:
+            if not revision:
+                trace_rows.append([trace["element"], "原始来源 source", str(evidence["start_line"]) + "–" + str(evidence["end_line"]) + " 行", evidence["quote"]])
+            elif evidence["kind"] == "source":
+                span = evidence["span"]
+                trace_rows.append([trace["element"], "原始来源 source", evidence["source_ref"]["artifact_id"] + " · " + str(span["start_line"]) + "–" + str(span["end_line"]) + " 行", span["quote"]])
+            elif evidence["kind"] == "action":
+                trace_rows.append([trace["element"], "用户动作 action · " + evidence["part"],
+                                   evidence["action_ref"]["artifact_id"] + " / 问题 " + evidence["question_ref"]["artifact_id"], evidence["quote"]])
+            else:
+                trace_rows.append([trace["element"], "未支持来源类型", "未解释", "见完整详情"])
+    add("来源追踪", "traces", paragraphs=["原始来源与后续动作分开；总领解释不是用户逐字原话。完整引用及原件在详情中。"],
+        columns=["元素 ID", "来源类别", "引用 / 位置", "原话"], rows=trace_rows)
     add("用户确认", "confirmations", paragraphs=["仅登记用户看过的目标；不改变形式检查或接受候选。"],
         columns=["目标", "归属", "说明"], rows=[[", ".join(c["targets"]), c["provenance"]["actor"], c["provenance"]["text"]] for c in view["confirmations"]])
-    add("修订提案", "proposals", paragraphs=["保存提案不改变候选；只有明确采纳合法提案才建立后继候选。"], columns=["提案 ID", "采纳状态", "检查", "修改理由"],
-        rows=[[p["ref"]["artifact_id"], p["adoption"], p["inspection"]["status"], p["provenance"]["text"]] for p in view["proposals"]])
+    add("修订提案", "proposals", paragraphs=["登记只推进审阅记录，当前候选未变；只有明确采纳合法提案才建立后继候选。语言生成来源未因登记而被认证。"], columns=["提案 ID", "采纳状态", "检查", "说明"],
+        rows=[[p["ref"]["artifact_id"], p["adoption"], p["inspection"]["status"],
+               p["provenance"]["text"] if p["provenance"]["kind"] == "user_action" else "外部修订产物；生成来源 not_verified"] for p in view["proposals"]])
+    action_rows, clarification_rows = [], []
+    for record in view["actions"]:
+        action = record["action"]
+        schema = action["schema_version"]
+        if schema == "model-review/0.1":
+            action_rows.append([action["id"], action["kind"], action["actor"], action["text"]])
+        elif schema == "model-review-clarification/0.1":
+            action_rows.append([action["id"], "外加澄清 · " + action["response_kind"], action["actor"], action["response_text"]])
+            for label, owner, text in (("外加问题",action["question_actor"],action["question_text"]),
+                    ("更正",action["correction_actor"],action["correction_text"]),
+                    ("答复" if action["response_kind"] == "answer" else "拒答",action["actor"],action["response_text"]),
+                    ("解释（非用户原话）",action["interpretation_actor"],action["interpretation_text"])):
+                clarification_rows.append([action["id"],label,owner or "未提供",text or "（空）"])
+        elif schema == "model-review-revision-proposal/0.1":
+            action_rows.append([action["id"],"修订产物登记",action["actor"],"待明确采纳；生成来源 not_verified"])
+        else:
+            action_rows.append([action["id"],"未支持动作版本：" + schema,action["actor"],"见完整原件"])
     add("已保存动作", "actions", columns=["动作 ID", "类型", "归属", "用户原话"],
-        rows=[[a["action"]["id"], a["action"]["kind"], a["action"]["actor"], a["action"]["text"]] for a in view["actions"]])
+        rows=action_rows)
+    if clarification_rows:
+        sections.append({"key":"external_clarifications", "title":"外加澄清与分别归属", "columns":["动作 ID", "部分", "归属标记", "原文内容"],
+                         "rows":clarification_rows, "paragraphs":["以下是独立外加记录，不改写原始来源；解释不当作用户原话或候选通过。归属标记不是身份认证。"],
+                         "open_detail":False, "detail":json.dumps([a for a in view["actions"] if a["action"]["schema_version"] == "model-review-clarification/0.1"], ensure_ascii=False, indent=2)})
+    if view.get("revision_context") is not None:
+        context_rows = []
+        for response in view["revision_context"]["responses"]:
+            action = response["action"]
+            if action["schema_version"] == "model-review-clarification/0.1":
+                parts = [("外加问题", action["question_actor"], action["question_text"]),
+                         ("更正", action["correction_actor"], action["correction_text"]),
+                         (action["response_kind"], action["actor"], action["response_text"]),
+                         ("解释（非用户原话）", action["interpretation_actor"], action["interpretation_text"])]
+            else:
+                parts = [("原问题", "候选问题", response["verbatim"]["question"]),
+                         (action["kind"], action["actor"], action["text"])]
+            context_rows.extend([[response["action_ref"]["artifact_id"], label, owner or "未提供", text or "（空）"]
+                                for label, owner, text in parts])
+        add("当前候选的回答修订来源", "revision_context", paragraphs=["以下是父版本的问答来源；原始请求与来源仍独立保留。解释不是用户原话；引用这些材料不等于用户确认候选或业务执行成功。"],
+            columns=["父版本动作", "部分", "归属标记", "内容"], rows=context_rows)
     add("原响应文本", "candidate_text", paragraphs=["UTF-8 替换仅供显示；精确字节见下方 base64。"], open_detail=inspection["status"] == "rejected")
     add("原响应精确字节（base64）", "candidate_base64")
     for index, entry in enumerate(view["projects"]):
@@ -112,7 +203,7 @@ def project_review(view: dict) -> list[dict]:
 
 def spec_template(view: dict) -> str | None:
     """Unconfigured structural draft; no invented permission or initial-data decision."""
-    if view["definition_ref"] is None:
+    if definition_version(view) != "finite-domain/0.1":
         return None
     return json.dumps({"schema_version":"local-project-web/0.1", "id":"", "version":"",
         **{key:view[key] for key in ("project_id", "request_ref", "source_ref", "definition_ref", "candidate_ref", "review_ref")},

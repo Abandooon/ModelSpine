@@ -1,6 +1,6 @@
 # 原文领域建模入口
 
-当前完成原文输入与候选合同消费者：可准备请求、导出语言模型提示、核对外部候选；新增有限类型化定义及实例规则检查。[有界真实语言入口](real-language.md)装配现有typed提示、单一Responses调用和本地审阅保存；2026-10-03用户明确恢复真实调用，补齐根字段提示后的run-07已取得S01/S02两份原样typed-valid候选。两份仍含必需残余，独立语义验收及回答驱动自动修订尚未完成。2026-09-30旧三次尝试的网络失败、输出上限截断及completed响应中的JSON语法错误均冻结保留，后两次候选检查rejected，同一失败原件可由UI读取。2026-10-02新批首调HTTP403 insufficient_balance及随后暂停调用的历史也保留，不改写为成功。既有有限澄清与图构造入口保留各自范围，不作为本入口的前置条件。
+当前完成原文输入与候选合同消费者：可准备请求、导出语言模型提示、核对外部候选；新增有限类型化定义及实例规则检查。[有界真实语言入口](real-language.md)装配现有typed提示、单一Responses调用和本地审阅保存；2026-10-03用户明确恢复真实调用，补齐根字段提示后的run-07已取得S01/S02两份原样typed-valid候选。两份仍含必需残余。现有[回答修订入口](revision-request.md)已接入有限 finite-domain/0.2 检查及显式登记/采纳，但真实修订候选尚未通过严格检查，独立语义验收未完成；0.1 原文命令不因此升级为 v2 资格查询。2026-09-30旧三次尝试的网络失败、输出上限截断及completed响应中的JSON语法错误均冻结保留，后两次候选检查rejected，同一失败原件可由UI读取。2026-10-02新批首调HTTP403 insufficient_balance及随后暂停调用的历史也保留，不改写为成功。既有有限澄清与图构造入口保留各自范围，不作为本入口的前置条件。
 
 2026-09-28新增[finite-domain/0.1合同](../packages/protocols/contracts/finite-domain-0.1.md)、[完整语言设计](../packages/protocols/contracts/language-0.2.md)及[消费者设计](../packages/protocols/contracts/consumers-0.2.md)。公开[工程正/反/未知/残余样例](../packages/protocols/contracts/finite-domain-examples.json)可供一次来源投影试验；样例为人工构造，不是自然语言或独立语义验收。
 
@@ -10,7 +10,7 @@ python -B -I apps/domain_modeling.py typed-inspect --request request.json --resp
 python -B -I apps/domain_modeling.py check-project --request request.json --response typed-response.json --project-model project.json
 ```
 
-新增命令保持来源/请求绑定和不覆盖输出。check-project在三标量/二元关系/有限表达式配置内真正执行检查，报告逐项satisfied/violated/unknown/error/not_applicable；退出0仅表示报告已完成，不代表所有义务通过。原R1 prompt/inspect仍只执行原合同。typed-response必须提供全部元素引文，不能直接把独立样例或参考答案当作模型输出。宿主已提供真实API配置并指定gpt-6-luna；2026-09-30旧批共3次POST尝试：首次用量未知，第二次因4096输出上限截断、报告5072 tokens；第三次原模型/上限不变，输入1455+输出3488=4943 tokens，response completed且输出未到上限，但候选JSON语法错误仍被拒绝。旧批已知合计10015 tokens加首次未知，费用未测，旧预算3/3耗尽、余0保持冻结。2026-10-02用户另授权20次、单次输出上限40960 tokens，首调HTTP403 insufficient_balance无候选、用量未知，随后按用户要求暂停。2026-10-03明确恢复后，run-06候选因缺根schema_version被拒绝；提示窄修后的run-07 S01/S02均HTTP200/completed，原始输出未经修补通过typed检查，用量分别1477输入+3909输出=5386、1481输入+4757输出=6238 tokens。新增20次现累计用4、余16，旧3次另列，费用未测。两候选分别有7/8个必需残余且均无constraint，requirement_fidelity=not_checked、instance_conformance=not_run；独立语义验收仍待完成，结构合法不代表业务可执行或F1完成。不自动重试、修补原JSON或以手工合法候选替代。
+新增命令保持来源/请求绑定和不覆盖输出。check-project在三标量/二元关系/有限表达式配置内真正执行检查，报告逐项satisfied/violated/unknown/error/not_applicable；退出0仅表示报告已完成，不代表所有义务通过。原R1 prompt/inspect仍只执行原合同。typed-response必须提供全部元素引文，不能直接把独立样例或参考答案当作模型输出。宿主已提供真实API配置并指定gpt-6-luna；2026-09-30旧批共3次POST尝试：首次用量未知，第二次因4096输出上限截断、报告5072 tokens；第三次原模型/上限不变，输入1455+输出3488=4943 tokens，response completed且输出未到上限，但候选JSON语法错误仍被拒绝。旧批已知合计10015 tokens加首次未知，费用未测，旧预算3/3耗尽、余0保持冻结。2026-10-02用户另授权20次、单次输出上限40960 tokens，首调HTTP403 insufficient_balance无候选、用量未知，随后按用户要求暂停。2026-10-03明确恢复后，run-06候选因缺根schema_version被拒绝；提示窄修后的run-07 S01/S02均HTTP200/completed，原始输出未经修补通过typed检查，用量分别1477输入+3909输出=5386、1481输入+4757输出=6238 tokens。截至 run-07，新增20次累计用4、余16（后续修订消耗另按真实收据登记），旧3次另列，费用未测。两候选分别有7/8个必需残余且均无constraint，requirement_fidelity=not_checked、instance_conformance=not_run；独立语义验收仍待完成，结构合法不代表业务可执行或F1完成。不自动重试、修补原JSON或以手工合法候选替代。
 
 从仓库根运行，source.txt 是你提供的 UTF-8 需求原文：
 
@@ -34,3 +34,6 @@ python -B -I apps/domain_modeling.py inspect --request request.json --response c
 [五段独立开发原文](../tests/fixtures/domain-modeling/README.md)及其语义期待用于后续人工/独立评价。可以显式选择 sources 中某段原文作为输入；expectations.json 只能在评价侧读取，不能放入生成提示或作为方法的答案目录。手工候选的合同测试不构成自然语言抽取的成绩。
 
 真实调用走独立[language_modeling入口](real-language.md)：先固定请求、提示和有界计划，再显式执行单次请求并保留响应、失败与审阅项目。模型/端点/预算均显式，错误不换模型或自动修复；原有prepare/prompt/typed-inspect命令仍不联网。
+
+
+2026-10-03回答修订批次已使用独立保存的真实用户补充需求。三笔均HTTP200/completed且非截断，原始候选分别因规则context使用显示名、Trace数组含字符串、DomainDefinition缺residuals而严格拒绝；没有登记或采纳后继。原文、父候选、回答和失败均保留。新增20次累计已用7、剩13，单次输出40960，旧3次单列；本批停止继续调用。有限时间/过滤/计数、只读资格及修订接口的工程验收不能替代合法真实修订、B行为执行或F1完成。

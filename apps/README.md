@@ -2,6 +2,8 @@
 
 [language_modeling.py](language_modeling.py) 提供prepare/execute-next：固定一或两份独立原文请求、含精确行表的typed提示与方法身份，再显式单次调用语言适配器，记录预算/失败/用量并复用model_review保存同一候选。没有自动重试、JSON修复或采纳；配置、停止与恢复边界见[真实语言说明](../docs/real-language.md)。凭据及运行目录由宿主显式传入，不依赖研究目录或本机固定路径。
 
+回答修订使用同一language_modeling入口的 `prepare_revision_run` / `revision_proposal_from_run`：绑定原文、父候选、真实回答和方法，实际调用仍每次显式执行；成功提案另行登记、另行明确采纳，失败原件保留。`model_review.record_clarification` 分别保存原问题、更正及回答来源，`check_saved_eligibility` 只检查指定操作/对象的资格，不执行该操作。
+
 [model_review.py](model_review.py) 提供create_review/read_review/submit_action、save_project/check_saved_project/adopt_proposal：从原文请求和typed候选原字节建立本地审阅并核验版本链。实例保存和实际有限检查分别执行；已保存的合法完整提案经明确采纳建立后继候选，旧来源、回答、确认和实例留在历史中，不能串用为新候选证据。非法候选仍保留原件和诊断，不改变下文clarification的进程内范围。接口没有认证服务或真实模型调用，见[说明](../docs/model-review.md)。
 
 [model_review_ui.py](model_review_ui.py) 提供有限前置审阅页面：`python -B -I apps/model_review_ui.py --project-dir "E:/absolute/existing-review-project"`，只服务一个显式目录和本机地址。interaction负责呈现，保存和采纳经model_review.py处理；实例检查显示逐项状态，旧页面冲突保留草稿，历史只读。启动、首次创建和恢复边界见[说明](../docs/model-review-ui.md)。真实语言传输由独立language_modeling入口负责，完整Studio尚未实现。

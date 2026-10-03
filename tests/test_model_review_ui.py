@@ -384,5 +384,191 @@ class PhaseTwoHTTPTests(unittest.TestCase):
             finally:self.server.project_dir=original
 
 
+def execution_ui_fixture(root):
+    """Hand-authored engineering work-order example, not S01/S02 or B expectations."""
+    source="工程工单连接采样事件，保留数值；时间与资格由后续回答完善。"+ATTACK
+    request=prepare_request(source.encode(),ArtifactRef("ui-execution","source","1",sha256(source.encode()).hexdigest()),
+                            request_id="execution-ui",scope=PROVENANCE)
+    definition={"schema_version":"finite-domain/0.1","id":"work-order","version":"1",
+        "entities":[{"id":"job","name":"工程工单","fields":[]},{"id":"event","name":"采样事件","fields":[
+            {"id":"reading","name":"读数","value_type":"integer","required":True,"nullable":False}]}],
+        "relations":[{"id":"samples","name":"采样","source":"job","target":"event","targets_per_source":{"minimum":0,"maximum":"unbounded"},"sources_per_target":{"minimum":0,"maximum":1}}],
+        "constraints":[],"residuals":[{"id":"history","family":"lifecycle","text":"纯检查未执行操作，也不证明历史保留","required":True}]}
+    span={"start_line":1,"end_line":1,"quote":source}
+    candidate={"schema_version":"typed-domain-candidate/0.1","request_hash":digest(request),"status":"unconfirmed","definition":definition,
+        "traces":[{"element":x,"evidence":[span]} for x in ("job","event","reading","samples","history")],
+        "issues":[{"id":"original-time","kind":"missing_information","text":"时间待明确","related_ids":["job"],"question":"原问题：如何约束采样时间？","evidence":[span]}]}
+    return request,create_review(root,request,dumps(candidate).encode(),session_id="execution-ui")
+
+
+def external_clarification(view, identity="supplement"):
+    return {"schema_version":"model-review-clarification/0.1","id":identity,"project_id":view["project_id"],
+        "request_ref":view["request_ref"],"candidate_ref":view["candidate_ref"],"expected_review_ref":view["review_ref"],
+        "question_text":"工程补充：工单提交时刻，事件采集时刻和质量；发布资格仅计90秒内合格的1到3个事件。"+ATTACK,
+        "question_actor":"engineering-questioner","correction_text":"更正：数量限制仅资格，不限制库存关系数量。",
+        "correction_actor":"engineering-corrector","response_kind":"answer","response_text":"采用工程补充，未知仍待处理。",
+        "actor":"local-reviewer","interpretation_text":"工程解释：将整秒时间与导航过滤计数用于资格检查；非用户逐字原话。",
+        "interpretation_actor":"engineering-interpreter"}
+
+
+def execution_revision(request, view, action_ref, identity="register", defect=None):
+    from modelspine_protocols import decode
+    from modelspine_requirements.revision_request import execution_context
+    from modelspine_requirements.typed_revision import INSTRUCTIONS
+    frozen_method=INSTRUCTIONS
+    context=execution_context(request,view,(decode(ArtifactRef,action_ref),),method_instructions=frozen_method)
+    response=context["responses"][0]
+    def e(op,*args,symbol=None,value=None):return {"op":op,"args":list(args),"symbol":symbol,"value":value}
+    lit=lambda x:e("literal",value=x)
+    root=e("self");member=e("var",symbol="sample")
+    timestamp=e("get",member,symbol="taken");submitted=e("get",root,symbol="submitted")
+    predicate=e("and",e("get",member,symbol="quality"),e("and",e("le",e("sub",submitted,e("duration",value=90)),timestamp),e("le",timestamp,submitted)))
+    count=e("count",e("filter",e("navigate",root,symbol="samples:out"),predicate,symbol="sample"))
+    definition={"schema_version":"finite-domain/0.2","id":"work-order","version":"2",
+        "entities":[{"id":"job","name":"工程工单","fields":[{"id":"submitted","name":"提交时刻","value_type":"instant","required":True,"nullable":False}]},
+                    {"id":"event","name":"采样事件","fields":[{"id":"reading","name":"读数","value_type":"integer","required":True,"nullable":False},
+                        {"id":"taken","name":"采集时刻","value_type":"instant","required":True,"nullable":False},
+                        {"id":"quality","name":"质量","value_type":"boolean","required":True,"nullable":False}]}],
+        "relations":[{"id":"samples","name":"采样","source":"job","target":"event","targets_per_source":{"minimum":0,"maximum":"unbounded"},"sources_per_target":{"minimum":0,"maximum":1}}],
+        "constraints":[{"id":"reading-bound","context":"event","scope":"invariant","operation":None,"applies":lit(True),
+            "assertion":e("le",e("get",root,symbol="reading"),lit(9223372036854775807)),"unless":lit(False)},
+            {"id":"publish-window","context":"job","scope":"eligibility","operation":"publish","applies":e("le",e("instant",value="2026-10-03T00:00:01Z"),submitted),
+             "assertion":e("and",e("le",lit(1),count),e("le",count,lit(3))),"unless":e("or",lit(False),lit(False))}],
+        "residuals":[{"id":"history","family":"lifecycle","text":"纯检查未执行操作，也不证明历史保留","required":True}]}
+    source={"kind":"source","source_ref":view["source_ref"],"span":{"start_line":1,"end_line":1,"quote":request.text}}
+    action_evidence={"kind":"action","question_ref":response["question_ref"],"action_ref":action_ref,"part":"correction","quote":response["verbatim"]["correction"]}
+    ids=["job","submitted","event","reading","taken","quality","samples","reading-bound","publish-window","history"]
+    candidate={"schema_version":"typed-domain-revision/0.1","request_hash":digest(request),"revision_ref":context["ref"],"status":"unconfirmed",
+        "definition":definition,"traces":[{"element":x,"evidence":[source,action_evidence]} for x in ids],"issues":[]}
+    candidate=json.loads(json.dumps(candidate))
+    if defect=="source":candidate["traces"][0]["evidence"][0]["source_ref"]["content_hash"]="0"*64
+    if defect=="action":candidate["traces"][0]["evidence"][1]["action_ref"]["content_hash"]="0"*64
+    if defect=="interpretation":candidate["traces"][0]["evidence"][1]["quote"]=external_clarification(view)["interpretation_text"]
+    if defect=="version":candidate["definition"]["schema_version"]="finite-domain/9"
+    raw=dumps(candidate).encode()
+    return {"schema_version":"model-review-revision-proposal/0.1","id":identity,"project_id":view["project_id"],
+        "request_ref":view["request_ref"],"candidate_ref":view["candidate_ref"],"expected_review_ref":view["review_ref"],"actor":"local-reviewer",
+        "action_refs":[action_ref],"revision_ref":context["ref"],"response_ref":{"project_id":view["project_id"],"artifact_id":"engineering-response/"+identity,"revision":"1","content_hash":sha256(raw).hexdigest()},
+        "proposal_base64":base64.b64encode(raw).decode(),"method_instructions":frozen_method}
+
+
+def execution_project(definition_ref, state="known", count=2):
+    objects=[{"id":"job-1","entity":"job","slots":[{"field":"submitted","state":"known","value":"2026-10-03T00:01:31Z"}]}]
+    for i in range(count):
+        objects.append({"id":"event-"+str(i),"entity":"event","slots":[{"field":"reading","state":"known","value":9223372036854775807},
+            {"field":"taken","state":"known","value":"2026-10-03T00:00:01Z"},
+            {"field":"quality","state":state,"value":True if state=="known" else None}]})
+    return {"schema_version":"finite-project/0.1","id":"engineering-"+state+str(count),"version":"1","definition":definition_ref,
+        "objects":objects,"links":[{"relation":"samples","source":"job-1","target":"event-"+str(i)} for i in range(count)],"population_complete":True}
+
+
+class ExecutionUIHTTPTests(unittest.TestCase):
+    request=ReviewHTTPTests.request
+    post=ReviewHTTPTests.post
+    view=ReviewHTTPTests.view
+    tearDown=ReviewHTTPTests.tearDown
+
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name).resolve()
+        self.modeling_request,self.initial=execution_ui_fixture(self.root)
+        self.server=ReviewServer(self.root);self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start()
+
+    def supplement(self):
+        code,result=self.post(external_clarification(self.view()),"/api/clarification")
+        self.assertEqual(code,200,result)
+        return result["action_ref"]
+
+    def successor(self):
+        ref=self.supplement()
+        query=execution_revision(self.modeling_request,self.view(),ref)
+        code,result=self.post(query,"/api/revision/proposal");self.assertEqual(code,200,result)
+        code,result=self.post(adoption(self.view()),"/api/adopt");self.assertEqual(code,200,result)
+        return self.view()
+
+    def test_clarification_attribution_reopen_original_question_and_stale(self):
+        before=self.view();self.supplement();after=self.view()
+        self.assertEqual(after["source_text"],before["source_text"])
+        self.assertEqual(after["candidate_ref"],before["candidate_ref"])
+        self.assertEqual([q["kind"] for q in after["questions"]],["candidate_issue","external_clarification"])
+        code,raw=self.request();projection=json.loads(raw)["presentation"]
+        rows=next(p for p in projection if p["key"]=="external_clarifications")["rows"]
+        self.assertEqual([r[2] for r in rows],["engineering-questioner","engineering-corrector","local-reviewer","engineering-interpreter"])
+        self.assertIn("非用户原话",rows[-1][1])
+        self.assertEqual(self.post(external_clarification(before,"stale"),"/api/clarification")[0],409)
+        foreign=external_clarification(after,"foreign");foreign["request_ref"]={**after["request_ref"],"content_hash":"0"*64}
+        self.assertEqual(self.post(foreign,"/api/clarification")[0],409)
+
+    def test_revision_bad_sources_not_adopted_valid_pending_then_history(self):
+        ref=self.supplement();original=self.view()["candidate_ref"]
+        for defect in ("source","action","interpretation","version"):
+            query=execution_revision(self.modeling_request,self.view(),ref,identity=defect,defect=defect)
+            self.assertEqual(self.post(query,"/api/revision/proposal")[0],200)
+            view=self.view();self.assertEqual(view["proposals"][-1]["inspection"]["status"],"rejected")
+            self.assertEqual(self.post(adoption(view,"reject-"+defect,len(view["proposals"])-1),"/api/adopt")[0],400)
+            self.assertEqual(self.view()["candidate_ref"],original)
+        old=self.view();query=execution_revision(self.modeling_request,old,ref)
+        self.assertEqual(self.post(query,"/api/revision/proposal")[0],200)
+        self.assertEqual(self.view()["candidate_ref"],original)
+        self.assertEqual(self.post({**query,"id":"stale-proposal"},"/api/revision/proposal")[0],409)
+        current=self.view();self.assertEqual(current["proposals"][-1]["inspection"]["status"],"valid")
+        self.assertEqual(self.post(adoption(current,"adopt-good",len(current["proposals"])-1),"/api/adopt")[0],200)
+        after=self.view();self.assertNotEqual(after["candidate_ref"],original)
+        self.assertEqual(after["history"][0]["view"]["candidate_ref"],original)
+        self.assertEqual(after["source_ref"],self.initial["source_ref"])
+        data=json.loads(self.request()[1]);self.assertIsNone(data["spec_template"])
+        text=json.dumps(data["presentation"],ensure_ascii=False)
+        for expected in ("操作资格 eligibility","库存完整性 invariant","9223372036854775807","duration(90 seconds)","2026-10-03T00:00:01Z","用户动作 action","解释（非用户原话）"):
+            self.assertIn(expected,text)
+
+    def test_saved_eligibility_is_scoped_readonly_and_failures_not_pass(self):
+        self.successor()
+        for i,(state,count,expected) in enumerate((("known",2,"satisfied"),("known",0,"violated"),("unknown",1,"unknown"),("null",1,"error"))):
+            view=self.view();payload={"schema_version":"model-review-project/0.1","id":"project-"+str(i),"project_id":view["project_id"],
+                "request_ref":view["request_ref"],"candidate_ref":view["candidate_ref"],"expected_review_ref":view["review_ref"],"actor":"local-reviewer","purpose":"example",
+                "project":execution_project(view["definition_ref"],state,count)}
+            code,result=self.post(payload,"/api/project");self.assertEqual(code,200,result)
+            query={"project_ref":result["project_ref"],"expected_review_ref":self.view()["review_ref"]}
+            before=(self.root/"model-review.json").read_bytes()
+            code,report=self.post(query,"/api/project/check");self.assertEqual(code,200,report)
+            self.assertNotIn("publish-window",[o["obligation"] for o in report["check"]["report"]["outcomes"]])
+            code,report=self.post({**query,"operation":"publish","target":"job-1"},"/api/project/eligibility");self.assertEqual(code,200,report)
+            outcome=next(o for o in report["check"]["report"]["outcomes"] if o["obligation"]=="publish-window")
+            self.assertEqual(outcome["status"],expected)
+            self.assertEqual(report["check"]["action_execution"],"not_run")
+            self.assertEqual((self.root/"model-review.json").read_bytes(),before)
+            self.assertEqual(self.post({**query,"operation":"missing","target":"job-1"},"/api/project/eligibility")[0],400)
+            self.assertEqual(self.post({**query,"operation":"publish","target":"missing"},"/api/project/eligibility")[0],400)
+        old=query;self.post(action(self.view(),"advance",kind="confirm",targets=["review:candidate"]))
+        self.assertEqual(self.post({**old,"operation":"publish","target":"job-1"},"/api/project/eligibility")[0],409)
+
+    def test_v2_application_and_cross_origin_clarification_are_rejected(self):
+        self.successor();before=(self.root/"model-review.json").read_bytes()
+        for route in ("/api/spec/save","/api/spec/prepare","/api/spec/confirm"):
+            code,result=self.post({},route);self.assertEqual((code,result["code"]),(400,"unsupported"))
+        code,raw=self.request(path="/api/spec");self.assertEqual(code,400);self.assertEqual(json.loads(raw)["code"],"unsupported")
+        raw=json.dumps(external_clarification(self.view(),"foreign"))
+        self.assertEqual(self.request("POST","/api/clarification",raw,{"Origin":"https://evil.invalid"})[0],403)
+        self.assertEqual((self.root/"model-review.json").read_bytes(),before)
+        self.assertFalse((self.root/"application-spec.json").exists())
+
+    def test_frozen_method_is_required_and_replay_survives_prompt_change(self):
+        ref=self.supplement();query=execution_revision(self.modeling_request,self.view(),ref)
+        before=(self.root/"model-review.json").read_bytes()
+        missing=dict(query);del missing["method_instructions"]
+        self.assertEqual(self.post(missing,"/api/revision/proposal")[0],400)
+        changed={**query,"method_instructions":query["method_instructions"]+"\nchanged-at-registration"}
+        self.assertEqual(self.post(changed,"/api/revision/proposal")[0],409)
+        self.assertEqual((self.root/"model-review.json").read_bytes(),before)
+        self.assertEqual(self.post(query,"/api/revision/proposal")[0],200)
+        pending=self.view()
+        with patch("modelspine_requirements.typed_revision.INSTRUCTIONS",query["method_instructions"]+"\nordinary-prompt-update"):
+            self.assertEqual(self.view()["review_ref"],pending["review_ref"])
+            self.assertEqual(self.post(adoption(pending,"adopt-frozen"),"/api/adopt")[0],200)
+            adopted=self.view()
+            self.assertEqual(adopted["history"][0]["view"]["actions"][-1]["action"]["method_instructions"],query["method_instructions"])
+            self.assertEqual(adopted["revision_context"]["method_instructions_sha256"],sha256(query["method_instructions"].encode()).hexdigest())
+        self.assertEqual(self.view()["review_ref"],adopted["review_ref"])
+
+
 if __name__ == "__main__":
     unittest.main()

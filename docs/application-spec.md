@@ -2,6 +2,8 @@
 
 目标是用户明确选择的Python标准库本机服务和静态页面：编辑ProjectModel、服务端check_project、显式保存、读取。它不是BESSER自动降级，也不是完整ApplicationSpec实现。总体合同仍由[consumers-0.2](../packages/protocols/contracts/consumers-0.2.md)统筹；本profile不制造finite语言没有的Operation/Policy，不覆盖域权限、远程集成或后台业务。生成器由独立消费者实现，本入口不生成应用。
 
+当前目标只接受 `finite-domain/0.1`。可审阅、可检查的 `finite-domain/0.2` 仍返回 `unsupported_definition_profile`，规格保持 draft；携带新版检查器依赖不启用新版应用生成。
+
 共享API在[protocols/application.py](../packages/protocols/src/modelspine_protocols/application.py)。实现包可以直接导入LocalWebSpec、各嵌套DTO、validate_spec、spec_content_hash、acceptance_digest、assess_application；该模块不导入apps，也不执行I/O。`assess_application(spec, verified_review_view, checker=...)`要求宿主提供已重放核验的审阅视图及现有checker（签名为definition、ProjectModel、project_id关键字，返回DomainReport）。缺checker会阻止验收就绪，不能只相信预存报告。输出为status（draft/generation_ready）、generation_ready、blockers及spec_content_hash。
 
 所有DTO均为封闭dataclass JSON，未知/缺失键、类型或枚举错误拒绝。LocalWebSpec字段为schema_version、id、version、project_id、request_ref、source_ref、definition_ref、candidate_ref、review_ref、initial_project_ref、no_initial_data_reason、edit_scope、tasks、views、storage、access、evidence、acceptance_cases、confirmation_refs、required_unresolved、unsupported_requirements。schema_version固定local-project-web/0.1；edit_scope/storage/access允许null以保存草案，集合允许空但不会默认补配置。

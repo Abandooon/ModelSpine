@@ -5,11 +5,11 @@ import subprocess
 import sys
 
 from modelspine_protocols import decode, dumps, require
-from modelspine_protocols.domain_language import DomainDefinition, ProjectModel
+from modelspine_protocols.domain_language import ProjectModel
 from modelspine_generation.local_web import TEMPLATE, render
 from .local_runtime import (
     LOCK, MANIFEST, MAX_STORE, directory, entry, exclusive, hash_bytes, no_redirect,
-    read_bytes, read_store, safe_path, verify_files, check_target_paths,
+    read_bytes, read_store, safe_path, verify_files, check_target_paths, decode_local_definition,
 )
 
 DELIVERY = "local-web-delivery/0.1"
@@ -28,8 +28,12 @@ if __name__ == "__main__":
 
 
 def candidate_files(plan, runtime_sources):
-    require(set(runtime_sources) == {"domain_checks.py", "modelspine_protocols/__init__.py", "modelspine_protocols/domain_language.py"},
+    decode_local_definition(plan.definition)
+    require(set(runtime_sources) == {"domain_checks.py", "modelspine_protocols/__init__.py", "modelspine_protocols/domain_language.py",
+                                    "modelspine_protocols/finite_execution.py"},
             "runtime source set must be explicit and minimal")
+    for source in runtime_sources.values():
+        require(hash_bytes(source["bytes"]) == source["sha256"], "runtime source bytes/hash mismatch", "conflict")
     files = render(plan)
     files.update({name: source["bytes"] for name, source in runtime_sources.items()})
     files["local_runtime.py"] = Path(__file__).with_name("local_runtime.py").read_bytes()
@@ -96,7 +100,7 @@ def _write_new(output_root, name, plan, runtime_sources, checker, *, old=None, e
     data_name = plan.spec["storage"]["relative_path"]
     require(not data_name.casefold().startswith(("modelspine_protocols/",)), "storage overlaps runtime namespace", "conflict")
     data = {"schema_version":"local-project-data/0.1", "project_id":plan.spec["project_id"], "entries":[]}
-    definition = decode(DomainDefinition, plan.definition)
+    definition = decode_local_definition(plan.definition)
     old_manifest, human, actual = None, {}, {}
     if old is not None:
         require(not target.resolve().is_relative_to(old.resolve()) and not old.resolve().is_relative_to(target.resolve()),

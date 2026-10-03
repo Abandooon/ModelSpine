@@ -160,7 +160,11 @@ def assess_application(spec, verified_review_view, *, checker=None):
         need(initial_entry is not None, "initial_project_binding")
     definition = None
     if view["inspection"]["status"] == "valid":
-        definition = decode(DomainDefinition, view["inspection"]["checks"]["candidate"]["definition"])
+        candidate_definition = view["inspection"]["checks"]["candidate"]["definition"]
+        need(candidate_definition["schema_version"] == "finite-domain/0.1", "unsupported_definition_profile")
+        if candidate_definition["schema_version"] == "finite-domain/0.1":
+            definition = decode(DomainDefinition, candidate_definition)
+    if definition is not None:
         entities = {e.id for e in definition.entities}
         fields = {f.id for e in definition.entities for f in e.fields}
         relations = {r.id for r in definition.relations}
@@ -210,7 +214,10 @@ def assess_application(spec, verified_review_view, *, checker=None):
         need(set(spec.access.allowed_actions) == ACTIONS and len(spec.access.allowed_actions) == 4, "access_actions")
     sources = [(view["source_ref"], view["source_text"])]
     for snapshot in (view, *(h["view"] for h in view["history"])):
-        sources.extend((x["provenance"]["action_ref"], x["action"]["text"]) for x in snapshot["actions"])
+        # This v0.1 spec evidence format has one text field. New clarification
+        # bundles are deliberately not flattened into an attributed user string.
+        sources.extend((x["provenance"]["action_ref"], x["action"]["text"]) for x in snapshot["actions"]
+                       if x["action"].get("schema_version") == "model-review/0.1")
     need({e.area for e in spec.evidence} == AREAS, "missing_config_evidence")
     for evidence in spec.evidence:
         need(bool(evidence.reason.strip()) and bool(evidence.quote.strip())

@@ -30,6 +30,7 @@ from modelspine_protocols.domain_language import ProjectModel
 from modelspine_protocols.review import ReviewAction, ProposalAdoption, WHOLE_CANDIDATE
 from modelspine_requirements.domain_modeling import prepare_request
 from modelspine_implementation.local_runtime import Engine, LOCK, exclusive, safe_path
+from modelspine_implementation.local_web import materialize
 
 
 def engineering(root, *, limit=100, version="1", definition_version="1", old_spec_ref=None):
@@ -273,6 +274,50 @@ class LocalWebTests(unittest.TestCase):
         self.assertEqual(error.exception.code,"unsupported")
         self.assertIn("one complete",str(error.exception))
         self.assertFalse((self.root / "split").exists())
+
+    def test_exact_runtime_closure_missing_extra_and_tampered_hash_refuse_before_write(self):
+        plan=app.load_spec(self.review)
+        sources=app.runtime_sources()
+        required={"domain_checks.py", "modelspine_protocols/__init__.py", "modelspine_protocols/domain_language.py",
+                  "modelspine_protocols/finite_execution.py"}
+        self.assertEqual(set(sources),required)
+        variants=[]
+        for missing in required:
+            variant=dict(sources);del variant[missing];variants.append(variant)
+        variants.append({**sources,"extra.py":sources["domain_checks.py"]})
+        changed=deepcopy(sources);changed["modelspine_protocols/finite_execution.py"]["sha256"]="0"*64
+        variants.append(changed)
+        for index,variant in enumerate(variants):
+            with self.subTest(index=index),self.assertRaises(ContractError):
+                materialize(self.root,"bad-source-"+str(index),plan,variant,checker=check_project)
+            self.assertFalse((self.root / ("bad-source-"+str(index))).exists())
+        for name,source in sources.items():
+            self.assertEqual((self.release / name).read_bytes(),source["bytes"])
+            self.assertEqual(sha256(source["bytes"]).hexdigest(),source["sha256"])
+
+    def test_v2_refused_before_spec_read_and_before_materialization(self):
+        plan=app.load_spec(self.review)
+        view=model_review.read_review(self.review)
+        definition=deepcopy(plan.definition);definition["schema_version"]="finite-domain/0.2"
+        definition["constraints"]=definition["constraints"][:1]
+        definition["constraints"][0].update(scope="invariant",operation=None,
+            assertion={"op":"get","args":[{"op":"self","args":[],"symbol":None,"value":None}],"symbol":"ready","value":None})
+        from modelspine_protocols.finite_execution import decode_definition, validate_definition
+        validate_definition(decode_definition(definition))  # Valid v2, not a malformed v1.
+        view["inspection"]["checks"]["candidate"]["definition"]=definition
+        from modelspine_protocols.application import assess_application
+        assessment=assess_application(decode(LocalWebSpec,plan.spec),view,checker=check_project)
+        self.assertFalse(assessment["generation_ready"])
+        self.assertIn("unsupported_definition_profile",assessment["blockers"])
+        with patch.object(model_review,"read_review",return_value=view),patch.object(application_spec,"read_spec") as read_spec:
+            with self.assertRaises(ContractError) as error: app.generate(self.review,self.root,"v2")
+            self.assertEqual(error.exception.code,"unsupported")
+            read_spec.assert_not_called()
+        with self.assertRaises(ContractError) as error:
+            materialize(self.root,"v2-direct",replace(plan,definition=definition),app.runtime_sources(),checker=check_project)
+        self.assertEqual(error.exception.code,"unsupported")
+        self.assertFalse((self.root / "v2").exists())
+        self.assertFalse((self.root / "v2-direct").exists())
 
 
 if __name__ == "__main__":

@@ -8,11 +8,11 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 当前优先推进自然语言驱动的领域建模：版本化原文 → 概念、关系与约束候选 → 来源、未决项与澄清 → 领域元模型候选及可支持部分的校核。已提供[原文输入与领域候选合同消费者](domain-modeling.md)，包括请求、固定提示、外部候选结构/引用检查，以及来源绑定的 typed 候选检查和有限 check-project；另有[有限前置候选审阅 UI](model-review-ui.md)。新增[有界真实语言传输](real-language.md)和原文候选装配；实际生成/失败与工程验收分别记录，自动语义忠实性验证及完整Studio尚未实现。
 
-既有 requirements 有限解释切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考；新增 typed 候选另用领域定义合同承载。protocols 的旧 `Metamodel`/`KindSpec`/`FieldSpec` 定义有限标量结构；新增 `domain_language` 的 finite-domain/0.1 支持实体、三标量、二元关系、双向基数和有限纯表达式，由 apps/domain_checks.py 执行实例检查。详细语言及消费者合同仍为 draft，复杂执行器未实现；旧图配置与自动机行为仍由各自适配器解释。
+既有 requirements 有限解释切片预先接收解释及其模型操作，所有候选使用同一个既定元模型，再以固定布尔探针区分。它可以提供来源绑定、回答留痕和未决停止的实现参考；新增 typed 候选另用领域定义合同承载。protocols 的旧 `Metamodel`/`KindSpec`/`FieldSpec` 定义有限标量结构；`domain_language` 的 finite-domain/0.1 支持实体、三标量、二元关系、双向基数和有限纯表达式。新增 [finite-domain/0.2](../packages/protocols/contracts/finite-domain-0.2.md) 提供整秒时间、词法过滤/计数和导航，由 apps/domain_checks.py 分别执行存储不变量与指定目标的只读资格检查。过滤遇到可能影响成员集合的未知值返回保守 unknown，完整精度及生命周期义务保留残余；资格满足不执行业务操作。详细全语言及消费者合同仍为 draft，旧图配置与自动机行为仍由各自适配器解释。
 
 自然语言建模的候选与解释仍归 requirements，来源完整性与已支持部分的检查可消费 protocols 和 assurance；apps 装配可审查流程。新的候选产物先按实际消费者设计，不强塞入现有同元模型 `ChangeProposal`，也不提前实现通用元模型迁移。模型提交继续由 kernel 负责，候选草案、人工确认、形式检查和已接受模型分别记录。
 
-[有限审阅接口](model-review.md)已提供独立候选/审阅身份及四种追加动作：protocols.review定义封闭动作，requirements.review负责纯审阅转换与重放，apps/model_review.py在显式本地目录互斥保存、恢复并拒绝旧版本/损坏。原件检查拒绝仍可审阅，propose_edit保存待采纳完整候选；实例另行保存及执行检查，显式adopt_proposal建立后继候选并保留旧版本，不自动继承确认或旧实例。回答可导出离线修订信封，尚无自动模型修订。apps/model_review_ui.py通过本机HTTP装配该保存入口，interaction只提供纯文本/表格投影和页面资源，不拥有审阅状态。该本地保存不改变旧clarification会话只在进程内的边界，也不构成已接受模型提交。
+[有限审阅接口](model-review.md)已提供独立候选/审阅身份及追加动作：protocols.review定义封闭动作，requirements.review负责纯审阅转换与重放，apps/model_review.py在显式本地目录互斥保存、恢复并拒绝旧版本/损坏。原件检查拒绝仍可审阅，propose_edit保存待采纳完整候选；实例另行保存及执行检查，显式adopt_proposal建立后继候选并保留旧版本，不自动继承确认或旧实例。新增外加澄清分别保存问题、更正、回答与解释归属；[回答修订入口](revision-request.md)固定原文、父候选、回答和方法，执行单次真实调用并严格检查，登记及采纳仍是分开的显式操作。入口实现不证明真实输出有效或语义忠实。apps/model_review_ui.py通过本机HTTP装配该保存入口，interaction只提供投影和页面资源，不拥有审阅状态或发起模型调用。该本地保存不改变旧clarification会话只在进程内的边界，也不构成已接受模型提交。当前本机Web规格/生成仍只接受v0.1，v0.2明确阻塞为unsupported_definition_profile。
 
 有界 DAG 构造、三条件记录和候选批次重放保留为保障机制与比较方法的工程支撑。[候选后端合同](candidate-backend-contract.md)是这条支线的接入设计，当前主线不要求先完成其外部 API。具体支线按任务启动，目录或可运行入口的存在不决定下一优先级。
 
@@ -20,9 +20,9 @@ ModelSpine 是元模型中心的软件开发框架，ModelSpine Studio 是目标
 
 | 模块 | 拥有的状态或产物 | 公开边界及当前范围 |
 |---|---|---|
-| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验、finite-domain/0.1值对象及静态检查；新增审阅/实例/采纳信封及local-project-web/0.1规格和就绪检查，不持有项目状态 |
+| [protocols](../packages/protocols/contracts/design.md) | 共享身份、版本、交换值对象、错误 | 已实现严格 v0.1 JSON、有限标量元模型、任务信封与公共报告校验、finite-domain/0.1与0.2值对象及静态检查；新增审阅/实例/澄清/修订提案/采纳信封及local-project-web/0.1规格和就绪检查，不持有项目状态 |
 | [model-kernel](../packages/model-kernel/contracts/design.md) | 已接受快照、决定、提交、证据适用性 | 已实现单实例内存事务、六种操作和依赖影响；新增必填且不可空的纯标量定义只读无损投影，拒绝关系/规则/残余及可选/可空字段；无持久化或跨进程事务 |
-| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清、原文/typed候选提示与检查；新增有限审阅会话及用户动作，文件保存归apps；无自动抽取、自动修订或直接模型写权，通用诊断仍为设计 |
+| [requirements](../packages/requirements/contracts/design.md) | 需求证据、问题、答复、诊断、候选 | 已实现显式有限解释澄清、原文/typed候选提示与检查；新增有限审阅会话及用户动作，文件保存归apps；真实生成/回答修订由apps装配；本包不联网、不直接写已接受模型，通用诊断仍为设计 |
 | [assurance](../packages/assurance/contracts/design.md) | 义务、形式化、检查计划、逐项报告 | 已实现设计字段 integer_range/equals；已实现固定任务准备与评估，一般形式化和外部求解器仍属设计 |
 | [generation](../packages/generation/contracts/design.md) | 生成计划、候选、修复建议、运行轨迹 | 已实现单字段控制、有界选项构造/终验记录、纯报告比较及有限本机Web计划/模板；DAG语义留在适配器，无LLM或完整修复循环 |
 | [implementation](../packages/implementation/contracts/design.md) | CommandBinding、文件计划、构建、迁移计划 | 已实现单一本机Web制品物化、构建、完整实例检查/保存及新目录更新；通用CommandBinding、迁移和自动回滚仍为设计 |

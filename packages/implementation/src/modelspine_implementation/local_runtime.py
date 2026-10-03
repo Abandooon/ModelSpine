@@ -24,6 +24,14 @@ def hash_bytes(raw):
     return sha256(raw).hexdigest()
 
 
+def decode_local_definition(data):
+    """The packaged checker import closure does not enlarge this target's profile."""
+    require(type(data) is dict, "definition must be an object")
+    require(data.get("schema_version") == "finite-domain/0.1",
+            "local-project-web/0.1 supports only finite-domain/0.1; unsupported definition profile", "unsupported")
+    return decode(DomainDefinition, data)
+
+
 def no_redirect(path):
     info = path.lstat()
     require(not stat.S_ISLNK(info.st_mode) and not (getattr(info, "st_file_attributes", 0) & 0x400),
@@ -167,7 +175,7 @@ def read_store(root, relative_path, checker, project_id):
     for item in data["entries"]:
         require(type(item) is dict and set(item) == {"definition", "project", "report", "parent", "hash"},
                 "invalid history entry", "corrupt")
-        definition = decode(DomainDefinition, item["definition"])
+        definition = decode_local_definition(item["definition"])
         project = decode(ProjectModel, item["project"])
         require(item == entry(definition, project, checker, project_id, previous), "data chain/report mismatch", "corrupt")
         previous = item["hash"]
@@ -194,7 +202,7 @@ class Engine:
         self.manifest = verify_files(self.root)
         self.settings = strict_json(read_bytes(safe_path(self.root, "settings.json"), MAX_STORE).decode("utf-8"))
         self.spec = self.settings["spec"]
-        self.definition = decode(DomainDefinition, self.settings["definition"])
+        self.definition = decode_local_definition(self.settings["definition"])
         self.project_id = self.spec["project_id"]
         require(digest(self.settings["spec"]) == self.manifest["spec_ref"]["content_hash"], "spec hash mismatch", "corrupt")
         self.storage = self.spec["storage"]["relative_path"]

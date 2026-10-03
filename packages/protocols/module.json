@@ -2,7 +2,7 @@
   "id": "protocols",
   "title": "共享协议与稳定引用",
   "status": "implemented-slice",
-  "version": "0.4.0-experimental",
+  "version": "0.6.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [],
   "runtime_dependencies": [],
@@ -33,14 +33,20 @@
     "review.ProposalAdoption",
     "application.LocalWebSpec",
     "application.assess_application",
-    "application.spec_content_hash"
+    "application.spec_content_hash",
+    "finite_execution.DomainDefinition",
+    "finite_execution.decode_definition",
+    "finite_execution.validate_definition",
+    "review.ExternalClarification",
+    "review.RevisionProposal"
   ],
   "scope": "定义交换格式和版本策略；不承担所有领域语义。",
   "implementation_entrypoints": [
     "src/modelspine_protocols/__init__.py",
     "src/modelspine_protocols/domain_language.py",
     "src/modelspine_protocols/review.py",
-    "src/modelspine_protocols/application.py"
+    "src/modelspine_protocols/application.py",
+    "src/modelspine_protocols/finite_execution.py"
   ],
   "validation_evidence": [
     "../../docs/validation.md",
@@ -54,7 +60,7 @@
   "contract_entrypoint": "contracts/v0.1/README.md",
   "contract_examples": "contracts/v0.1/examples.json",
   "contract_maturity": "exercised-subset",
-  "implemented_scope": "Strict immutable v0.1 JSON and task-contract/task-assessment 0.1 envelopes; scalar-field metamodel; identity/version/hash binding; synchronous Checker and shared caller-selected report validation Finite-domain/0.1 source-independent domain values, static expression typing and bounded definition validation; full language/0.2 remains a reviewed design draft, not a general executor. Adds finite model-review/0.1 action envelopes with explicit request/candidate/review/question binding; no persistence or authentication. Adds explicit project/adoption envelopes and source-bound local-project-web/0.1 configuration/readiness. Positive public checker evidence and valid complete initial data are mandatory; target-specific build/runtime execution is the implementation consumer responsibility.",
+  "implemented_scope": "Strict immutable artifact/task/report references and finite v0.1 exchange; typed finite-domain/0.1 and /0.2 definitions with bounded reference/type validation. The v0.2 subset adds explicit object navigation, lexical filtering, counting, whole-UTC-second types and invariant/eligibility scope; execution belongs to the app checker, and language/0.2 outside this slice remains design. Review DTOs cover source-bound actions, instances, explicit adoption, externally attributed questions/corrections/answers and method-pinned revision proposals. LocalWebSpec/readiness remains finite-domain/0.1 only and explicitly blocks v0.2; no operation, lifecycle, authentication or persistence implementation in this package.",
   "reference_sources": [
     {
       "asset_id": "prime-code-audit-2026-09-21",
@@ -71,6 +77,7 @@
   "additional_contract_entrypoints": [
     "contracts/finite-domain-0.1.md",
     "contracts/language-0.2.md",
-    "contracts/consumers-0.2.md"
+    "contracts/consumers-0.2.md",
+    "contracts/finite-domain-0.2.md"
   ]
 }

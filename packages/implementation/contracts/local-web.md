@@ -1,6 +1,8 @@
 # 有限本机应用物化与维护合同
 
-`modelspine_implementation.local_web` 消费 generation 的已核验计划与 apps 明确装配的三个运行源码文件，输出新目录。生成包含标准库服务、静态页面、完整 spec/definition、源事实与文件 owner/hash manifest；不导入平台 apps/research，不需原工作区路径或安装第三方依赖。checks 始终使用原有限 checker。目录创建前检查路径、命名冲突、初始数据以及公开成功例的实际 task/view/scope/version 路径；unsupported、冲突和 draft 不创建交付目录。
+2026-10-03兼容边界：固定运行闭包为 domain_checks.py、protocols/__init__.py、domain_language.py、finite_execution.py 四文件。finite_execution 是当前 checker 顶层导入所必需；不开放v2应用生成。缺/多文件或bytes/hash不符在写目录前拒绝。定义仍仅支持finite-domain/0.1；物化及运行时读取其他profile均明确unsupported。
+
+`modelspine_implementation.local_web` 消费 generation 的已核验计划与 apps 明确装配的四个运行源码文件，输出新目录。生成包含标准库服务、静态页面、完整 spec/definition、源事实与文件 owner/hash manifest；不导入平台 apps/research，不需原工作区路径或安装第三方依赖。checks 始终使用原有限 checker。目录创建前检查路径、命名冲突、初始数据以及公开成功例的实际 task/view/scope/version 路径；unsupported、冲突和 draft 不创建交付目录。
 
 所有 task/view 及范围来自规格；支持至少一个覆盖全 edit_scope 的四动作视图，不合成多视图事务。范围检查与真实 save 共用同一函数。目标预检检查至少一条正例能在交付时基线数据及已用版本上保存；基线作为生成设置保存，后续正常保存不使 build/restart 的验收基准漂移。build 编译生成的 Python 并重跑公开检查和路径预检；实际 HTTP 行为另行验收。
 

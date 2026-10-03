@@ -1,5 +1,7 @@
 # 有限本机 Web 模板合同
 
+定义支持仍为 finite-domain/0.1。apps 在读取规格前核验当前审阅定义profile，implementation在物化及运行读取时再次守住目标边界；finite-domain/0.2明确unsupported，不以eligibility结果推导业务操作支持。为使v1制品独立导入当前checker而打包finite_execution源码，只是精确运行依赖闭包，不是模板能力升级。
+
 `modelspine_generation.local_web` 拥有 local-project-web-template/0.1 的确定性计划和静态页面渲染。消费 A 的 `LocalWebSpec`、保存的 spec_ref、宿主重放核验的当前 review 以及显式 checker；调用 `assess_application`，draft 一律拒绝。plan 绑定全部规格、定义、初始实例、审阅摘要及来源引用；它不写文件，也不生成领域 Operation/Policy。
 
 render 只把显式 views 的标题/ID输出为转义文本；浏览器完整 ProjectModel 始终是字符串。按钮来自显式 tasks；服务端重新核对 task、view、编辑范围、数据版本和全部有限义务。模板不生成规则求值器，不在 JS 中重建 Int64。静态页面只是候选文件，尚非通过交付验收。

@@ -1,6 +1,6 @@
 # 本机 ProjectModel 应用生成与更新
 
-该有限目标交付独立的 Python 标准库服务与静态应用页，实际编辑、服务端检查、显式保存和读取 ProjectModel。它是明确选择的确定性模板；没有模型调用、第三方运行依赖、域 Operation/Policy、远程集成或后台业务。手写工程输入只证明工程路径，不能证明 F1/F2/F3/F4 真实主链完成。
+该有限目标交付独立的 Python 标准库服务与静态应用页，实际编辑、服务端检查、显式保存和读取 ProjectModel。它是明确选择的确定性模板；没有模型调用、第三方运行依赖、域 Operation/Policy、远程集成或后台业务。定义支持仍限定为 finite-domain/0.1；finite-domain/0.2 在 load-spec、物化或运行时读取定义时明确 unsupported，不生成半成品、不把 eligibility 当业务操作。手写工程输入只证明工程路径，不能证明 F1/F2/F3/F4 真实主链完成。
 
 先按 [application-spec](application-spec.md) 在一个当前审阅工程中保存/明确确认规格；`generation_ready` 是必要条件。本目标还要求至少一个完整范围视图绑定四动作，且至少一条公开成功例可以按相同范围和版本规则保存。分散视图不能完成该路径时明确 unsupported，不自动合成事务。若有初始数据，公开成功例须使用尚未保存的 ProjectModel.version。规格的正例 checker结果及目标路径预检均不替代真实 HTTP 业务验收。
 
@@ -34,6 +34,6 @@ python -B -I apps/local_web.py update --project-dir ABS_REVIEW --output-root ABS
 
 更新失败不会改写旧数据或代码。新目录 build 失败保留 `.incomplete-delivery`、stdout/stderr；该目录不能 serve。正常已保存数据可重启读取，但遗留锁/pending不自动清除，不提供自动回滚、崩溃恢复或数据迁移。文件原子保存范围与所有权细节见 [implementation 合同](../packages/implementation/contracts/local-web.md)。
 
-apps 显式装配三个固定来源：原 `apps/domain_checks.py`、`protocols/__init__.py` 和 `protocols/domain_language.py`，保持源码原字节；runtime manifest记录源相对路径、实际 module/capability版本、当前 Git HEAD 和逐文件 SHA-256。HEAD不是未提交字节的证明。其他 runtime/template文件由本目标生成并记录 hash。制品附原来源声明，平台整体仍未声明许可证，不把旧来源许可扩大到所有新代码；不复制平台、BESSER或研究材料。
+apps 显式装配四个固定来源：原 `apps/domain_checks.py`、`protocols/__init__.py`、`protocols/domain_language.py` 和 `protocols/finite_execution.py`，保持源码原字节。checker 顶层导入 finite_execution，后者依赖 domain_language；因此 v1 制品也需要这个精确导入闭包，携带 v2 模块不表示本应用支持 v2。缺少或多出源码一律拒绝，物化前核对每份 bytes/hash；不动态遍历整包、不忽略 ImportError。runtime manifest记录源相对路径、实际 module/capability版本、当前 Git HEAD 和逐文件 SHA-256。HEAD不是未提交字节的证明。其他 runtime/template文件由本目标生成并记录 hash。制品附原来源声明，平台整体仍未声明许可证，不把旧来源许可扩大到所有新代码；不复制平台、BESSER或研究材料。旧制品不原地覆写；更新仍走旧manifest、实际文件和数据兼容检查后的新目录发布。
 
 包职责见 [generation 合同](../packages/generation/contracts/local-web.md)；生产包只导入 protocols/generation标准接口，apps 拥有固定检查器装配。无依赖探测器、安装器、其他后端或失败后的自动降级。

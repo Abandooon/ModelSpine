@@ -6,9 +6,11 @@ from typing import Literal
 
 from modelspine_protocols import ArtifactRef, ContractError, checked, decode, digest, dumps, require, to_data
 from modelspine_protocols.domain_language import DomainDefinition, definition_ids
+from modelspine_protocols.finite_execution import decode_definition
 from modelspine_protocols.review import (
     MAX_PROPOSAL_BYTES, REVIEW_VERSION, WHOLE_CANDIDATE, ReviewAction, proposal_bytes, validate_action,
     ProjectSubmission, ProposalAdoption, validate_operation,
+    ExternalClarification, RevisionProposal,
 )
 from modelspine_requirements.domain_modeling import ModelingRequest, validate_request
 from modelspine_requirements.typed_domain import inspect_typed_candidate
@@ -23,7 +25,7 @@ class ReviewSession:
     id: str
     request: ModelingRequest
     candidate_base64: str
-    actions: tuple[ReviewAction | ProjectSubmission | ProposalAdoption, ...]
+    actions: tuple[ReviewAction | ProjectSubmission | ProposalAdoption | ExternalClarification | RevisionProposal, ...]
 
 
 def _ref(session, name, revision, content_hash):
@@ -50,9 +52,13 @@ def create_session(request: ModelingRequest, raw: bytes, *, session_id: str) -> 
     return session
 
 
-def _inspection(request, raw):
+def _inspection(request, raw, context=None):
     try:
-        result = inspect_typed_candidate(request, raw)
+        if context is None:
+            result = inspect_typed_candidate(request, raw)
+        else:
+            from modelspine_requirements.typed_revision import inspect_revision_candidate
+            result = inspect_revision_candidate(request, raw, context)
     except ValueError as exc:
         # ContractError is a ValueError; JSON's integer digit limit also raises
         # ValueError before the typed decoder. Both are rejected input, not unknown.
@@ -63,9 +69,9 @@ def _inspection(request, raw):
             "requirement_fidelity": "not_checked", "instance_conformance": "not_run"}, result.candidate
 
 
-def _initial_view(session, candidate_revision=1):
+def _initial_view(session, candidate_revision=1, context=None):
     raw = proposal_bytes(session.candidate_base64)
-    inspection, candidate = _inspection(session.request, raw)
+    inspection, candidate = _inspection(session.request, raw, context)
     request_ref = _ref(session, "request", 1, digest(session.request))
     candidate_ref = _ref(session, "candidate", candidate_revision, sha256(raw).hexdigest())
     questions = []
@@ -101,7 +107,8 @@ def _initial_view(session, candidate_revision=1):
             "questions": questions, "actions": [], "proposals": [], "confirmations": [],
             "revision_status": "not_run", "next_candidate_ref": None,
             "requirement_fidelity": "not_checked", "instance_conformance": "not_run",
-            "capability_version": "model-review-local/0.2", "projects": [], "history": [],
+            "capability_version": "model-review-local/0.3", "projects": [], "history": [],
+            "revision_context": context,
             "parent_candidate_ref": None}
 
 
@@ -118,7 +125,7 @@ def _check_binding(view, action, expected):
         ids = {WHOLE_CANDIDATE}
         checks = view["inspection"].get("checks")
         if checks:
-            ids.update(definition_ids(decode(DomainDefinition, checks["candidate"]["definition"])))
+            ids.update(definition_ids(decode_definition(checks["candidate"]["definition"])))
         require(set(action.targets) <= ids, "unknown confirmation target")
 
 
@@ -150,6 +157,41 @@ def _record(view, session, action):
 def _transition(view, session, operation):
     if isinstance(operation, ReviewAction):
         _record(view, session, operation)
+    elif isinstance(operation, ExternalClarification):
+        body = {"candidate_ref": view["candidate_ref"], "source_ref": view["source_ref"],
+                "question_text": operation.question_text, "correction_text": operation.correction_text,
+                "operation_id": operation.id}
+        question_ref = to_data(_ref(session, "external-question/" + digest(body), 1, digest(body)))
+        action_ref = to_data(_ref(session, "action/" + operation.id, 1, digest(operation)))
+        provenance = {"kind": "external_clarification", "actor": operation.actor, "action_ref": action_ref,
+                      "source_ref": view["source_ref"], "based_on_candidate_ref": view["candidate_ref"],
+                      "asserts_original_source": False, "authentication": "host_attributed_not_authenticated"}
+        view["actions"].append({"action": to_data(operation), "question_ref": question_ref, "provenance": provenance})
+        view["questions"].append({"id": operation.id, "text": operation.question_text, "correction": operation.correction_text,
+                                  "kind": "external_clarification", "ref": question_ref,
+                                  "status": "answer_recorded" if operation.response_kind == "answer" else "declined",
+                                  "resolution": "unresolved", "last_action_ref": action_ref})
+        view["revision_status"] = "pending"
+    elif isinstance(operation, RevisionProposal):
+        from modelspine_requirements.revision_request import execution_context
+        # Persistent history binds the actual proposal-time method bytes, not
+        # whichever prompt happens to be installed when the project is reopened.
+        context = execution_context(session.request, view, operation.action_refs,
+                                    method_instructions=operation.method_instructions)
+        require(to_data(operation.revision_ref) == context["ref"], "wrong revision context binding", "conflict")
+        raw = proposal_bytes(operation.proposal_base64)
+        inspection, _ = _inspection(session.request, raw, context)
+        provenance = {"kind": "generated_revision_proposal", "actor": operation.actor,
+                      "action_ref": to_data(_ref(session, "action/" + operation.id, 1, digest(operation))),
+                      "response_ref": to_data(operation.response_ref), "generation_provenance": "not_verified",
+                      "based_on_candidate_ref": view["candidate_ref"], "asserts_original_source": False}
+        view["actions"].append({"action": to_data(operation), "provenance": provenance})
+        view["proposals"].append({"ref": to_data(_ref(session, "proposal/" + operation.id, 1, sha256(raw).hexdigest())),
+                                  "raw_base64": operation.proposal_base64, "inspection": inspection,
+                                  "text": raw.decode("utf-8", errors="replace"), "provenance": provenance,
+                                  "adoption": "pending", "revision_context": context,
+                                  "based_on_review_ref": to_data(operation.expected_review_ref)})
+        view["revision_status"] = "pending"
     elif isinstance(operation, ProjectSubmission):
         require(view["inspection"]["status"] == "valid", "invalid candidate cannot accept executable instances")
         require(to_data(operation.project.definition) == view["definition_ref"], "wrong project definition", "conflict")
@@ -164,11 +206,12 @@ def _transition(view, session, operation):
         proposal = next((p for p in view["proposals"] if p["ref"] == to_data(operation.proposal_ref)), None)
         require(proposal is not None, "proposal is not saved under current candidate", "conflict")
         raw = proposal_bytes(proposal["raw_base64"])
-        inspection, _ = _inspection(session.request, raw)
+        context = proposal.get("revision_context")
+        inspection, _ = _inspection(session.request, raw, context)
         require(inspection["status"] == "valid", "cannot adopt rejected proposal")
         parent = {k: v for k, v in view.items() if k != "history"}
         successor = _initial_view(create_session(session.request, raw, session_id=session.id),
-                                  int(view["candidate_ref"]["revision"]) + 1)
+                                  int(view["candidate_ref"]["revision"]) + 1, context=context)
         successor["parent_candidate_ref"] = view["candidate_ref"]
         successor["history"] = view["history"] + [{"view": parent, "adoption": to_data(operation)}]
         view = successor

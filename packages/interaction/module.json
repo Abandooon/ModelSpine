@@ -2,7 +2,7 @@
   "id": "interaction",
   "title": "任务界面与用户审查",
   "status": "implemented-slice",
-  "version": "0.3.0-experimental",
+  "version": "0.4.0-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -17,9 +17,10 @@
     "review_ui.review_asset",
     "review_ui.project_instance",
     "review_ui.project_report",
-    "review_ui.spec_template"
+    "review_ui.spec_template",
+    "review_ui.definition_version"
   ],
-  "scope": "有限候选、实例、规则检查及历史的审阅呈现；本机app装配显式采纳、离线回答下载与应用配置准备/确认/保存。无自动候选生成、业务CommandBinding或完整Studio。",
+  "scope": "有限候选/实例/规则及历史审阅，按v1/v2显示作用域与来源；本机app接外加澄清、修订产物登记、显式采纳和独立资格检查。无自动模型调用或完整Studio。",
   "implementation_entrypoints": [
     "src/modelspine_interaction/review_ui.py"
   ],
@@ -45,5 +46,5 @@
     "InteractionPlan",
     "VisualAssetRef"
   ],
-  "implemented_scope": "Standard-library-only finite review presentation/static resources and unconfigured application-spec structure. Exact integer/rule/project/spec text remains server-produced; explicit instance checks, proposal adoption and history are composed by the app through A public interfaces. Offline revision download and configuration preview/confirmation/save remain distinct from generation, runtime acceptance and semantic fidelity. No model state ownership, automatic model calls or authentication service."
+  "implemented_scope": "Standard-library exact finite-domain/0.1 and /0.2 presentation: expressions, invariant versus eligibility scope, original-source/action evidence, external question/correction/answer and separately attributed interpretation. The app consumes shared clarification, method-pinned revision registration, deliberate adoption/history and saved-instance eligibility APIs. Unknown/error remain visible, qualification never implies action execution, and v0.2 application configuration is explicitly unsupported. Legacy offline ordinary-answer export and v0.1 specification preview/confirmation/save remain. No state ownership, evaluator duplication, model transport or authentication service."
 }

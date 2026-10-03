@@ -14,9 +14,10 @@ import bootstrap
 bootstrap.activate(("requirements",))
 
 from modelspine_protocols import ArtifactRef, ContractError, checked, decode, dumps, loads, require, to_data
-from modelspine_protocols.review import ReviewAction, ProjectSubmission, ProposalAdoption
+from modelspine_protocols.review import ReviewAction, ProjectSubmission, ProposalAdoption, ExternalClarification, RevisionProposal
 from modelspine_protocols.domain_language import DomainDefinition, ProjectModel
-from domain_checks import check_project
+from modelspine_protocols.finite_execution import decode_definition
+from domain_checks import check_project, check_eligibility
 from modelspine_requirements.domain_modeling import ModelingRequest
 from modelspine_requirements.review import (
     ReviewSession, apply_action, create_session, review_input, review_ref,
@@ -126,7 +127,7 @@ def read_review(project_dir, *, expected_review_ref: ArtifactRef | None = None) 
 
 def _definition(view):
     require(view["inspection"]["status"] == "valid", "invalid candidate cannot execute")
-    return decode(DomainDefinition, view["inspection"]["checks"]["candidate"]["definition"])
+    return decode_definition(view["inspection"]["checks"]["candidate"]["definition"])
 
 
 def _submit(project_dir, action) -> dict:
@@ -154,6 +155,14 @@ def save_project(project_dir, submission: ProjectSubmission) -> dict:
 
 def adopt_proposal(project_dir, adoption: ProposalAdoption) -> dict:
     return _submit(project_dir, checked(adoption, ProposalAdoption))
+
+
+def record_clarification(project_dir, operation: ExternalClarification) -> dict:
+    return _submit(project_dir, checked(operation, ExternalClarification))
+
+
+def submit_revision_proposal(project_dir, operation: RevisionProposal) -> dict:
+    return _submit(project_dir, checked(operation, RevisionProposal))
 
 
 def _project_entry(view, project_ref, expected_review_ref):
@@ -186,6 +195,25 @@ def check_saved_project(project_dir, project_ref: ArtifactRef, *, expected_revie
                 "definition_ref": view["definition_ref"], "review_ref": view["review_ref"],
                 "population_complete": project.population_complete,
                 "required_residuals": [r.id for r in definition.residuals if r.required], "report": to_data(report)}
+
+
+def check_saved_eligibility(project_dir, project_ref, *, expected_review_ref, operation, target):
+    """Read-only scoped check bound to an existing current-candidate project record."""
+    root = _directory(project_dir)
+    with _locked(root):
+        view = review_input(_load(root))
+        entry = _project_entry(view, project_ref, expected_review_ref)
+        require(entry["candidate_ref"] == view["candidate_ref"] and entry["request_ref"] == view["request_ref"]
+                and entry["definition_ref"] == view["definition_ref"], "instance belongs to archived candidate", "conflict")
+        definition = _definition(view)
+        project = decode(ProjectModel, entry["project"])
+        result = check_eligibility(definition, project, project_id=view["project_id"], operation=operation, target=target)
+        return {"status": "checked", "scope": "eligibility", "operation": operation, "target": target,
+                "project_ref": entry["ref"], "purpose": entry["purpose"], "request_ref": view["request_ref"],
+                "candidate_ref": view["candidate_ref"], "definition_ref": view["definition_ref"],
+                "review_ref": view["review_ref"], "population_complete": project.population_complete,
+                "required_residuals": [r.id for r in definition.residuals if r.required], "report": to_data(result.report),
+                "action_execution": "not_run"}
 
 
 def engineering_demo(project_dir) -> dict:
@@ -227,7 +255,8 @@ def engineering_demo(project_dir) -> dict:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("create", "show", "act", "demo", "save-project", "read-project", "check-project", "adopt"):
+    for name in ("create", "show", "act", "demo", "save-project", "read-project", "check-project", "adopt",
+                 "clarify", "revision-proposal", "check-eligibility"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--project-dir", required=True, type=Path)
         if name == "create":
@@ -236,13 +265,18 @@ def main(argv=None):
             cmd.add_argument("--session-id", required=True)
         if name == "act":
             cmd.add_argument("--action", type=Path, required=True)
+        if name in ("clarify", "revision-proposal"):
+            cmd.add_argument("--operation", type=Path, required=True)
         if name == "save-project":
             cmd.add_argument("--submission", type=Path, required=True)
         if name == "adopt":
             cmd.add_argument("--adoption", type=Path, required=True)
-        if name in ("read-project", "check-project"):
+        if name in ("read-project", "check-project", "check-eligibility"):
             cmd.add_argument("--project-ref", type=Path, required=True)
             cmd.add_argument("--expected-review-ref", type=Path, required=True)
+        if name == "check-eligibility":
+            cmd.add_argument("--operation", required=True)
+            cmd.add_argument("--target", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "create":
@@ -258,6 +292,15 @@ def main(argv=None):
             output = save_project(args.project_dir, loads(ProjectSubmission, _read_bytes(args.submission, 512 * 1024).decode("utf-8")))
         elif args.command == "adopt":
             output = adopt_proposal(args.project_dir, loads(ProposalAdoption, _read_bytes(args.adoption, 512 * 1024).decode("utf-8")))
+        elif args.command in ("clarify", "revision-proposal"):
+            cls, call = ((ExternalClarification, record_clarification) if args.command == "clarify"
+                         else (RevisionProposal, submit_revision_proposal))
+            output = call(args.project_dir, loads(cls, _read_bytes(args.operation, 512 * 1024).decode("utf-8")))
+        elif args.command == "check-eligibility":
+            output = check_saved_eligibility(args.project_dir,
+                loads(ArtifactRef, _read_bytes(args.project_ref, 65536).decode("utf-8")),
+                expected_review_ref=loads(ArtifactRef, _read_bytes(args.expected_review_ref, 65536).decode("utf-8")),
+                operation=args.operation, target=args.target)
         elif args.command in ("read-project", "check-project"):
             project_ref = loads(ArtifactRef, _read_bytes(args.project_ref, 64 * 1024).decode("utf-8"))
             expected = loads(ArtifactRef, _read_bytes(args.expected_review_ref, 64 * 1024).decode("utf-8"))

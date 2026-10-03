@@ -2,7 +2,7 @@
   "id": "implementation",
   "title": "业务实现与应用交付",
   "status": "implemented-slice",
-  "version": "0.1.0-experimental",
+  "version": "0.1.1-experimental",
   "entrypoint": "README.md",
   "depends_on": [
     "protocols",
@@ -42,5 +42,5 @@
   "additional_contract_entrypoints": [
     "contracts/local-web.md"
   ],
-  "implemented_scope": "Python standard-library loopback server and independent generated artifacts; whole ProjectModel edit/check/save/load with actual finite checker, exact integers, version CAS, atomic single-file history retention and source/ownership manifests. Explicit new-directory updates preserve old releases and human files; incompatible data/rules or file hashes reject. No general CommandBinding, migration, automatic rollback/crash recovery, remote integration or background business."
+  "implemented_scope": "Python standard-library loopback server and standalone finite-domain/0.1 artifacts with ProjectModel edit/check/save/load, exact integers, version CAS, atomic single-file history and source/ownership manifests. Explicit four-file checker/protocol dependency closure is hash-checked before materialization; bundled v0.2 type support does not enable v0.2 target generation. New-directory updates preserve old releases and human files; incompatible data/rules, hashes or unsupported definition profiles reject. No general business command, migration, automatic rollback/crash recovery, remote integration or background business."
 }

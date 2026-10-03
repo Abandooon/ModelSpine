@@ -55,14 +55,65 @@ class ProposalAdoption:
     text: str
 
 
+@dataclass(frozen=True)
+class ExternalClarification:
+    """Host-attributed question/correction/response, not a candidate issue answer."""
+    schema_version: Literal["model-review-clarification/0.1"]
+    id: str
+    project_id: str
+    request_ref: ArtifactRef
+    candidate_ref: ArtifactRef
+    expected_review_ref: ArtifactRef
+    question_text: str
+    question_actor: str
+    correction_text: str
+    correction_actor: str
+    response_kind: Literal["answer", "decline"]
+    response_text: str
+    actor: str
+    interpretation_text: str
+    interpretation_actor: str
+
+
+@dataclass(frozen=True)
+class RevisionProposal:
+    schema_version: Literal["model-review-revision-proposal/0.1"]
+    id: str
+    project_id: str
+    request_ref: ArtifactRef
+    candidate_ref: ArtifactRef
+    expected_review_ref: ArtifactRef
+    actor: str
+    action_refs: tuple[ArtifactRef, ...]
+    revision_ref: ArtifactRef
+    response_ref: ArtifactRef
+    proposal_base64: str
+    method_instructions: str
+
+
 def validate_operation(value):
     if isinstance(value, ReviewAction):
         return validate_action(value)
-    require(type(value) in (ProjectSubmission, ProposalAdoption), "unknown review operation")
+    require(type(value) in (ProjectSubmission, ProposalAdoption, ExternalClarification, RevisionProposal), "unknown review operation")
     value = checked(value, type(value))
     require(all(s.strip() for s in (value.id, value.project_id, value.actor)), "empty operation identity/actor")
-    refs = (value.request_ref, value.candidate_ref, value.expected_review_ref,
-            value.project.definition if isinstance(value, ProjectSubmission) else value.proposal_ref)
+    refs = (value.request_ref, value.candidate_ref, value.expected_review_ref)
+    if isinstance(value, ProjectSubmission): refs += (value.project.definition,)
+    if isinstance(value, ProposalAdoption): refs += (value.proposal_ref,)
+    if isinstance(value, RevisionProposal):
+        refs += (value.revision_ref, value.response_ref, *value.action_refs)
+        require(0 < len(value.action_refs) <= 64, "revision action count")
+        proposal_bytes(value.proposal_base64)
+        require(value.method_instructions.startswith("typed-domain-revision-proposal/")
+                and len(value.method_instructions.encode("utf-8")) <= 64 * 1024,
+                "missing/oversized frozen revision method")
+    if isinstance(value, ExternalClarification):
+        require(bool(value.question_text.strip()) and bool(value.question_actor.strip()), "external question required")
+        require(value.response_kind == "decline" or bool(value.response_text.strip()), "empty external answer")
+        require(not value.correction_text or bool(value.correction_actor.strip()), "correction owner required")
+        require(not value.interpretation_text or bool(value.interpretation_actor.strip()), "interpretation owner required")
+        require(all(len(s) <= 64 * 1024 for s in (value.question_text, value.correction_text, value.response_text,
+                                                value.interpretation_text)), "clarification text limit", "unsupported")
     for ref in refs:
         validate_artifact_ref(ref)
         require(ref.project_id == value.project_id, "cross-project operation reference", "conflict")

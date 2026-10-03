@@ -1,6 +1,8 @@
-# 有界真实语言入口（typed-language-run/0.3）
+# 有界真实语言入口（typed-language-run/0.4）
 
-`apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。这是P1-R2有限入口，不包含自动修复、回答驱动修订、实例生成/检查、提案采纳或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
+`apps/language_modeling.py`将一个原文ModelingRequest经现有typed提示、单一Responses适配器、已有typed检查、A审阅保存交给[本地审阅UI](model-review-ui.md)。0.4 新增[回答修订入口](revision-request.md)，冻结同项目父审阅与单独归属的用户原话，严格检查原样后继提案，明确登记/采纳才推进审阅/候选。无自动修复、实例生成或应用生成；结构合法不等于原文忠实。生产代码不读取研究样本或独立答案。
+
+0.1.2 修订提示消除 literal/instant/duration 与 value=null 的矛盾，限定对象数组项与精确 ArtifactRef 字段；不改变解析器或执行语义，也不保证模型输出合法。原文 v0.1 提示和检查继续保留；修订使用 `typed-domain-revision-proposal/0.1.2` 与 `finite-domain/0.2`，不拼接原 source、补 JSON 或推断固定业务字段。来源引用可绑定原文完整行或经过重放验证的问题/更正/回答段；方法指令原文随提案保存，后续提示变化不应破坏历史读取。保守 Filter 的未知结果不等于精确业务允许/拒绝，保留 required residual 和生命周期未决。新增接口的假传输回归不是新的真实实验结果；真实调用由授权宿主另行执行。
 
 协议固定为`POST https://api.openai-proxy.org/v1/responses`、`gpt-6-luna`。供应商[兼容说明](https://doc.closeai-asia.com/tutorial/api/openai.html)声明支持无状态Responses；[官方参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)定义input、store、stream、max_output_tokens及响应状态/usage。请求带model、装配后的typed提示input、store=false、stream=false、max_output_tokens，以及固定`text.format={"type":"json_object"}`；不传previous_response_id、工具、温度或额外推理设置。prepare和执行重建均固定同一格式，不提供text回退开关。
 
@@ -42,7 +44,7 @@ python -B -I apps/language_modeling.py execute-next --env-file "E:/private/.env"
 
 response.body为HTTP响应体，与候选分开。提取只接受Responses object、一个assistant message的一个output_text（可伴随reasoning项），不拼接多个答案/工具结果、不替换拒答为空候选。content.text按UTF-8编码保存为candidate.raw；它是JSON字符串解码后的精确文本字节，不冒称其与HTTP信封字节相同。不可提取时只有信封和失败收据，不伪造审阅候选。
 
-能提取的非法/错绑定/截断JSON仍保存，并经既有create_review创建review-project；其检查调用inspect_typed_candidate，拒绝原件也可显示。inspection.json沿用generation_provenance=not_verified、requirement_fidelity=not_checked、instance_conformance=not_run。receipt另外说明真实transport观察、请求/返回模型、HTTP及Responses完成状态、实际usage、时间、字节身份；不把传输收据改写成语义认证。缺usage记录unknown/null，计价未核定则cost=null/not_measured，不填0。
+原文 v0.1 模式中，能提取的非法/错绑定/截断JSON仍保存，并经既有create_review创建review-project；其检查调用inspect_typed_candidate，拒绝原件也可显示。回答修订模式则保存原样 attempt 工件并调用 inspect_revision_candidate；失败不注册提案、不修改父审阅，不能将它当作已进入 UI 的后继候选。inspection.json沿用generation_provenance=not_verified、requirement_fidelity=not_checked、instance_conformance=not_run。receipt另外说明真实transport观察、请求/返回模型、HTTP及Responses完成状态、实际usage、时间、字节身份；不把传输收据改写成语义认证。缺usage记录unknown/null，计价未核定则cost=null/not_measured，不填0。
 
 服务若回显凭据，识别到的原文/JSON转义/嵌套JSON回显会在落盘前脱敏；ASCII凭据的原文字符、JSON短转义与Unicode转义混合匹配不依赖外层JSON完整，缺末括号或字符串被截断也可识别已完整出现的凭据。JSON字符串及其已收到的完整字符前缀最多解码4层用于识别，覆盖截断外信封中output_text等嵌套JSON字符串的混合转义回显，包括外层字符串尚未结束的情况。命中后保留实际结束符或未完成转义尾部，不补齐保存的字符串或外信封。这不是任意编码或无限嵌套识别器。receipt区分received_sha256与stored_sha256及response_bytes=redacted，并停止，不把脱敏工件称原始响应或送入候选链。异常日志只给本地固定错误码，不回显远端异常内容。不得将凭据主动发入输入；准备/执行都有检查。
 
@@ -58,7 +60,7 @@ python -B -I apps/model_review_ui.py --project-dir "<receipt中的review_project
 
 2026-10-03，公共提示 `typed-domain-proposal/0.1.1` 补全既有 `typed-domain-candidate/0.1` 的六个必需且封闭的根字段，明确 `schema_version="typed-domain-candidate/0.1"` 与 `status="unconfirmed"`。这只修正提示枚举遗漏；候选格式、严格检查器、完整原文及有限语言说明不变。缺失/错误判别值或额外根字段仍拒绝，不补默认值或修复历史候选。提示及方法源码字节已变化，须固定新计划；旧计划和固定旧源码哈希的独立评价基线应拒绝当前字节，历史计划/基线不回写。该修正不保证模型遵从格式或领域语义正确。
 
-同日用户明确恢复真实调用。run-06缺根schema_version的拒绝原件保留；窄修后的run-07 S01/S02均返回HTTP200/completed，原始输出未经修补通过typed检查并按原件身份重开审阅。用量分别1477输入+3909输出=5386、1481输入+4757输出=6238 tokens；新增20次累计用4、余16，单次上限40960，旧3次另列，费用未测。S01有3实体、1关系、0约束和7个必需残余；S02有3实体、2关系、0约束和8个必需残余。两份均为unconfirmed，requirement_fidelity=not_checked、instance_conformance=not_run；独立语义验收及回答驱动自动修订尚未完成，不能据此宣布业务可执行或F1/F2完成。
+同日用户明确恢复真实调用。run-06缺根schema_version的拒绝原件保留；窄修后的run-07 S01/S02均返回HTTP200/completed，原始输出未经修补通过typed检查并按原件身份重开审阅。用量分别1477输入+3909输出=5386、1481输入+4757输出=6238 tokens；截至 run-07 新增20次累计用4、余16（后续修订消耗按各运行收据另记），单次上限40960，旧3次另列，费用未测。S01有3实体、1关系、0约束和7个必需残余；S02有3实体、2关系、0约束和8个必需残余。两份均为unconfirmed，requirement_fidelity=not_checked、instance_conformance=not_run；独立语义验收及回答驱动自动修订尚未完成，不能据此宣布业务可执行或F1/F2完成。
 
 2026-10-02首次0.3离线交付：prepare与execute固定JSON mode，既有提示、typed检查、adapter及审阅接口不变。针对性工程验证核对实际adapter构造的HTTP请求参数、双slot成功后拒第三次、格式删除/改写即使重算hash仍拒绝，以及HTTP400/refusal/incomplete/非法JSON/typed错误原件保留并阻止下一slot。合成响应不计真实语义成功。当时拟S01/S02各一次、每次4096，未释放；该旧准备计划零attempt冻结弃用，不修改原件或执行旧计划。
 

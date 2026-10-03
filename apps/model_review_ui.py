@@ -10,16 +10,17 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_review import adopt_proposal, check_saved_project, create_review, read_review, save_project, submit_action
+from model_review import check_saved_eligibility, record_clarification, submit_revision_proposal
 from application_spec import read_spec, save_spec
 from revision_request import export_revision_request
 from domain_checks import check_project
 
 import bootstrap
 bootstrap.activate(("interaction",))
-from modelspine_interaction.review_ui import project_report, project_review, review_asset, review_page, spec_template
+from modelspine_interaction.review_ui import definition_version, project_report, project_review, review_asset, review_page, spec_template
 from modelspine_protocols import ArtifactRef, ContractError, decode, loads, require, to_data
 from modelspine_protocols.application import LocalWebSpec, acceptance_digest, assess_application, spec_content_hash, validate_spec
-from modelspine_protocols.review import ProjectSubmission, ProposalAdoption, ReviewAction, WHOLE_CANDIDATE
+from modelspine_protocols.review import ExternalClarification, RevisionProposal, ProjectSubmission, ProposalAdoption, ReviewAction, WHOLE_CANDIDATE
 from modelspine_requirements.domain_modeling import ModelingRequest
 
 MAX_ACTION_BYTES = 512 * 1024
@@ -30,6 +31,12 @@ class _ProjectCheck:
     """HTTP arguments for A's readonly function, not a new shared action."""
     project_ref: ArtifactRef
     expected_review_ref: ArtifactRef
+
+
+@dataclass(frozen=True)
+class _EligibilityCheck(_ProjectCheck):
+    operation: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -67,6 +74,11 @@ def optional_spec(root):
 
 def exact_spec(result):
     return {**result, "spec_text":json.dumps(result["spec"], ensure_ascii=False, indent=2)}
+
+
+def require_local_web(view):
+    require(definition_version(view) == "finite-domain/0.1",
+            "application configuration supports finite-domain/0.1 only; this candidate is unsupported", "unsupported")
 
 
 class ReviewServer(ThreadingHTTPServer):
@@ -153,8 +165,10 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self.reply(200, {"view": view, "presentation":project_review(view), "actor":self.server.actor,
                                  "history_presentation":[project_review(h["view"]) for h in view["history"]],
                                  "spec_template":spec_template(view),
+                                 "definition_version":definition_version(view),
                                  "whole_candidate":WHOLE_CANDIDATE})
             elif self.path == "/api/spec":
+                require_local_web(read_review(self.server.project_dir))
                 result = optional_spec(self.server.project_dir)
                 self.reply(200, exact_spec(result) if result is not None else {"status":"not_saved"})
             else:
@@ -167,8 +181,10 @@ class ReviewHandler(BaseHTTPRequestHandler):
             return
         routes = {"/api/action":(ReviewAction, submit_action),
                   "/api/project":(ProjectSubmission, save_project),
+                  "/api/clarification":(ExternalClarification, record_clarification),
+                  "/api/revision/proposal":(RevisionProposal, submit_revision_proposal),
                   "/api/adopt":(ProposalAdoption, adopt_proposal)}
-        if self.path not in (*routes, "/api/project/check", "/api/revision/export", "/api/spec/save", "/api/spec/prepare", "/api/spec/confirm"):
+        if self.path not in (*routes, "/api/project/check", "/api/project/eligibility", "/api/revision/export", "/api/spec/save", "/api/spec/prepare", "/api/spec/confirm"):
             self.fail(404, "not_found", "unknown action route")
             return
         if self.headers.get("Content-Type") != "application/json":
@@ -194,6 +210,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
                         expected_review_ref=query.expected_review_ref, action_refs=query.action_refs)
                 self.reply(200, {"envelope_text":json.dumps(envelope, ensure_ascii=False, indent=2)})
             elif self.path.startswith("/api/spec/"):
+                require_local_web(read_review(self.server.project_dir))
                 dto = {"/api/spec/save":_SpecEdit, "/api/spec/prepare":_SpecPrepare, "/api/spec/confirm":_SpecConfirm}[self.path]
                 query = loads(dto, raw.decode("utf-8"))
                 spec = validate_spec(query.spec)
@@ -221,10 +238,12 @@ class ReviewHandler(BaseHTTPRequestHandler):
                     bound = replace(spec, review_ref=decode(ArtifactRef, receipt["review_ref"]),
                                     confirmation_refs=(decode(ArtifactRef, receipt["action_ref"]),))
                     self.reply(200, exact_spec({"spec":to_data(bound), "receipt":receipt}))
-            elif self.path == "/api/project/check":
-                query = loads(_ProjectCheck, raw.decode("utf-8"))
-                checked = check_saved_project(self.server.project_dir, query.project_ref,
-                                             expected_review_ref=query.expected_review_ref)
+            elif self.path in ("/api/project/check", "/api/project/eligibility"):
+                eligibility = self.path == "/api/project/eligibility"
+                query = loads(_EligibilityCheck if eligibility else _ProjectCheck, raw.decode("utf-8"))
+                consumer = check_saved_eligibility if eligibility else check_saved_project
+                checked = consumer(self.server.project_dir, query.project_ref, expected_review_ref=query.expected_review_ref,
+                                   **({"operation":query.operation,"target":query.target} if eligibility else {}))
                 self.reply(200, {"check":checked, "presentation":project_report(checked["report"]),
                                  "exact_details":json.dumps(checked, ensure_ascii=False, indent=2)})
             else:

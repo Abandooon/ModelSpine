@@ -68,14 +68,26 @@ def main(argv=None):
     typed_inspect = commands.add_parser("typed-inspect", help="check finite language candidate and source binding")
     typed_inspect.add_argument("--request", type=Path, required=True)
     typed_inspect.add_argument("--response", type=Path, required=True)
+    revision_inspect = commands.add_parser("revision-inspect", help="strict answer-bound finite/0.2 candidate inspection")
+    revision_inspect.add_argument("--envelope", type=Path, required=True)
+    revision_inspect.add_argument("--response", type=Path, required=True)
     instance = commands.add_parser("check-project", help="execute finite instance checks; no model writes")
     instance.add_argument("--request", type=Path, required=True)
     instance.add_argument("--response", type=Path, required=True)
     instance.add_argument("--project-model", type=Path, required=True)
-    for command in (prepare, prompt, inspect, typed_prompt, typed_inspect, instance):
+    for command in (prepare, prompt, inspect, typed_prompt, typed_inspect, instance, revision_inspect):
         command.add_argument("--output", type=Path, help="new UTF-8 file; omitted means stdout")
     args = parser.parse_args(argv)
     try:
+        if args.command == "revision-inspect":
+            from modelspine_requirements.revision_request import verify_execution_revision
+            from modelspine_requirements.typed_revision import inspect_revision_candidate
+            from modelspine_protocols import decode
+            envelope = verify_execution_revision(loads(dict, _read(args.envelope, 4 * 1024 * 1024).decode("utf-8")))
+            request = decode(ModelingRequest, envelope["review_session"]["request"])
+            result = inspect_revision_candidate(request, _read(args.response, MAX_RESPONSE_BYTES), envelope["context"])
+            _write(args.output, dumps(result) + "\n")
+            return 0
         if args.command == "prepare":
             raw = _read(args.source, MAX_SOURCE_BYTES)
             reference = ArtifactRef(args.project, args.source_id, args.source_version, sha256(raw).hexdigest())
